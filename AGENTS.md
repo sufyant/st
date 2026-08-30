@@ -15,6 +15,7 @@ Monorepo for a multi-tenant product: API, web, marketing site, and mobile app.
 apps/
   api          .NET Web API          deploys to Azure Container Apps
   web          Next.js               deploys to Azure Container Apps
+  admin        Next.js               platform back-office, separate host
   marketing    Next.js               deploys to Vercel
   mobile       Expo                  ships via EAS Build / EAS Update
 packages/
@@ -31,6 +32,7 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 |---|---|
 | `apps/api/*` | `apps/api/AGENTS.md` |
 | `apps/web/*` | `apps/web/AGENTS.md` |
+| `apps/admin/*` | `apps/admin/AGENTS.md` |
 | `apps/marketing/*` | `apps/marketing/AGENTS.md` |
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
@@ -53,6 +55,13 @@ subtree belong in that subtree's `AGENTS.md`, not here.
 - **Tenancy is resolved at the edge, once.** The tenant comes from the request
   token; no client sends a tenant identifier, and no application code threads one
   through. How this is enforced is `apps/api`'s business.
+- **`apps/admin` is a separate identity domain.** Platform admins authenticate
+  against their own directory, never the customer one — a customer credential
+  must not be able to reach admin surface at all, not merely fail a check. Admin
+  routes do not go through tenant resolution; the target tenant is an explicit
+  parameter on the request. Never add an "if admin, skip tenancy" branch to the
+  normal request path. There is no admin user table — identity lives in the
+  provider; only admin *actions* are persisted, as an audit trail.
 - **Scope discipline.** No Kubernetes, Elasticsearch, Redis, or event sourcing
   until a concrete problem demands one. v1 has no teams, billing, or onboarding.
   These are deliberate constraints. If a task seems to require breaking one, say
