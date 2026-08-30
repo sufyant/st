@@ -85,8 +85,8 @@ subtree belong in that subtree's `AGENTS.md`, not here.
 
 - **UI lives in three layers.** Design tokens in `packages/tokens`; primitives
   with no domain knowledge (the shadcn output — Button, Input, Dialog) in
-  `packages/ui`; product components that understand the domain (TenantSwitcher,
-  PropertyCard) inside the app that shows them. A product component moves into
+  `packages/ui`; product components that understand the domain (a tenant
+  switcher, an invite form) inside the app that shows them. A product component moves into
   `packages/ui` only when a *second* app actually needs it — never in
   anticipation. This is what keeps "each app deploys independently" honest:
   primitives change rarely, and the components that change daily never leave
@@ -133,14 +133,14 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   from the same catalog. An English sentence in an API response is a bug.
 - **A locale is always a full tag, never a bare language.** `en-IE`, not `en`.
   The region is what `Intl` needs: `en` alone silently formats dates and numbers
-  the American way, and `03/09` read as the wrong month is an operational error
-  in a lease, not a cosmetic one.
+  the American way, and `03/09` read as the wrong month is an operational error,
+  not a cosmetic one.
 - **Message catalogs are keyed by language, formatting by the full tag.** One
   `en` catalog serves `en-IE` and `en-GB`; maintaining two that differ in a
   handful of words is a cost with no return. Resolve a catalog by falling back to
   the language subtag, and hand `Intl` the whole tag.
-- **Currency comes from the data; the format comes from the viewer.** A property
-  in Ireland is priced in euro no matter who opens the page, so every money value
+- **Currency comes from the data; the format comes from the viewer.** An amount
+  recorded in euro stays euro no matter who opens the page, so every money value
   is stored with its currency beside it. The viewer's locale decides only how it
   is written. Money is minor units in the database — formatting needs both facts
   and may guess neither.
