@@ -1,5 +1,12 @@
 import { Button } from "@st/ui/components/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserMenu,
+} from "@/lib/auth/components";
+import { getSession } from "@/lib/auth/server";
 
 // Temporary scaffolding: proves the token pipeline and both themes render.
 // Delete once the first real screen lands.
@@ -15,7 +22,9 @@ const semantic = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  const session = await getSession();
+
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-10 p-10">
       <header className="flex items-center justify-between">
@@ -25,8 +34,24 @@ export default function Page() {
             Brand is indigo; success, warning and destructive stay distinct.
           </p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <SignedOut>
+            <SignInButton>
+              <Button>Sign in</Button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserMenu />
+          </SignedIn>
+          <ThemeToggle />
+        </div>
       </header>
+
+      <section className="text-muted-foreground rounded-lg border p-4 text-sm">
+        {session
+          ? `Signed in as ${session.email ?? session.externalAuthId}.`
+          : "Not signed in. Access is by invitation; tenant and role come from our API, never from the provider."}
+      </section>
 
       <section className="flex flex-wrap gap-2">
         <Button>Primary</Button>

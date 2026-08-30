@@ -44,7 +44,10 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 | `apps/marketing/*` | `apps/marketing/AGENTS.md` |
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
-Only `apps/web` is scaffolded. The rest land with their app.
+Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`. Everything else
+in the layout above is a planned location, not an existing one — do not import
+from a package that has not been built yet, and do not invent a local substitute
+for it either. Say so instead.
 
 ## Cross-Cutting Rules
 
@@ -128,12 +131,23 @@ subtree belong in that subtree's `AGENTS.md`, not here.
 - **The API returns error codes, never user-facing prose.** `Entity.ErrorName`
   maps onto the `errors.*` namespace, so `web` and `admin` translate the same code
   from the same catalog. An English sentence in an API response is a bug.
-- **English is the only locale today, and nothing may assume it is the only one.**
-  Adding a locale must be a config and translation change, never a refactor. So:
-  no literal user-facing strings in components, and no date, number, or currency
-  formatting outside the `Intl` helpers in `packages/shared`. Money is minor units
-  in the database; formatting it is a presentation concern that needs both a
-  locale and a currency.
+- **A locale is always a full tag, never a bare language.** `en-IE`, not `en`.
+  The region is what `Intl` needs: `en` alone silently formats dates and numbers
+  the American way, and `03/09` read as the wrong month is an operational error
+  in a lease, not a cosmetic one.
+- **Message catalogs are keyed by language, formatting by the full tag.** One
+  `en` catalog serves `en-IE` and `en-GB`; maintaining two that differ in a
+  handful of words is a cost with no return. Resolve a catalog by falling back to
+  the language subtag, and hand `Intl` the whole tag.
+- **Currency comes from the data; the format comes from the viewer.** A property
+  in Ireland is priced in euro no matter who opens the page, so every money value
+  is stored with its currency beside it. The viewer's locale decides only how it
+  is written. Money is minor units in the database — formatting needs both facts
+  and may guess neither.
+- **English is the only language today, and nothing may assume it is the only
+  one.** Adding one must be a config and translation change, never a refactor: no
+  literal user-facing strings in components, and no date, number, or currency
+  formatting outside the `Intl` helpers in `packages/shared`.
 - **`apps/admin` is not localized.** Its users are our own staff. English only, no
   locale routing, no catalogs.
 - **`apps/web` carries no locale in the URL.** It sits behind auth and is not
@@ -167,11 +181,19 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   is a row in our own catalog, keyed by the provider's user id. Two consequences,
   both deliberate:
   - **Do not enable Clerk Organizations.** Not `clerk enable orgs`, not
-    `<OrganizationSwitcher />`, not org claims in the JWT. Tooling will keep
-    offering it — Clerk's own setup skill ends by suggesting it. Decline. Using
-    it would move tenant membership into the provider, which is the one thing
-    that makes the provider expensive to leave, and starts a per-organization
-    meter we have no reason to pay.
+    `<OrganizationSwitcher />`, not `useOrganization`, not org claims in the JWT.
+    Using it would move tenant membership into the provider, which is the one
+    thing that makes the provider expensive to leave, and starts a
+    per-organization meter we have no reason to pay.
+
+    Tooling pushes hard the other way and will keep doing so: Clerk's setup skill
+    ends by offering Organizations, and an installed `clerk-orgs` skill advertises
+    itself for "multi-tenant, org switching, RBAC" — the exact words that describe
+    this product. It will look like the right tool. Decline it, and say that you
+    declined rather than quietly routing around this rule.
+
+    Verified off on the customer instance: `organization_settings.enabled` is
+    `false`. Re-check with `clerk config pull` from `apps/web` and read that key.
   - Invite and membership screens are ours to build. That cost is accepted.
 - **The provider's id lives in exactly one column.** `users.external_auth_id`,
   next to `users.auth_provider`. No `clerk_*` column exists anywhere else, and a

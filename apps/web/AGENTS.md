@@ -34,6 +34,11 @@ from the root. There is one `biome.json`, at the root, and no package defines it
 own — a second config is how two packages quietly stop agreeing on what formatted
 code looks like.
 
+Both commands are scoped to `apps` and `packages`. Skill packages under
+`.claude/skills` ship other frameworks' example code, which fails our rules and
+even trips our own `@clerk` import restriction. It is not our source and is not
+linted.
+
 Biome replaces both ESLint and Prettier. Do not add either.
 
 ## Where code goes
@@ -58,13 +63,54 @@ shared abstraction that every app must then be redeployed for.
 
 ## Auth
 
-`@clerk/nextjs` may be imported **only** from `src/lib/auth/**`. The rest of the
-app imports from `@/lib/auth`, which exports our own session shape — not Clerk's
-types. A lint rule enforces this; if it fires, the fix is to widen the wrapper,
-never to add an exception.
+`@clerk/*` may be imported **only** from `src/lib/auth/**`. This is enforced by
+`noRestrictedImports` in the root `biome.json`, not by convention — an import
+elsewhere fails `pnpm lint`. If it fires, widen the wrapper; never add an
+exception.
+
+There is no barrel export, deliberately: a single `@/lib/auth` would let server
+code follow a client import into the browser bundle. Import the specific module.
+
+| Need | Import from |
+|---|---|
+| Session in a Server Component | `@/lib/auth/server` |
+| Session in a client component | `@/lib/auth/client` |
+| Sign-in UI, user menu, provider | `@/lib/auth/components` |
+| The `Session` type | `@/lib/auth/types` |
+
+The wrapper renames what it re-exports — `AuthProvider`, `SignInForm`,
+`UserMenu`. That is not decoration: Clerk Core 3 removed `<SignedIn>` and
+`<SignedOut>` in a way that still typechecks and throws at runtime, and the
+change stopped inside this folder.
 
 This app authenticates against the **customer** Clerk instance. `apps/admin` uses
 a different one. Never share an instance, a key, or a session between them.
+
+Clerk's components wear our theme: `AuthProvider` passes `@clerk/ui`'s `shadcn`
+theme, which reads the same CSS variables `@st/tokens` generates. The sign-in
+form follows our palette and our light/dark switch without a second palette to
+keep in sync. `@clerk/ui/themes/shadcn.css` is imported from this app's
+`globals.css`, not from `@st/ui` — the design system must not know about an auth
+vendor, and `apps/marketing` consumes `@st/ui` while never touching Clerk.
+
+## Access is by invitation
+
+There is no sign-up route and no sign-up component. The app cannot create an
+account at all.
+
+Invitations are ours to build, which the root AGENTS.md already accepts as the
+price of keeping membership out of the provider. Our flow creates the identity
+through Clerk's Backend API; the invited person then signs in. Nothing about that
+needs a public form, so none exists — this is a closed door, not a hidden one.
+
+**Our code being closed does not close the provider.** Public sign-up must also
+be switched off on the Clerk instance, or its own hosted pages remain reachable.
+The instance setting is the enforcement; everything in this repo is presentation.
+
+Configuring it needs a linked application. `clerk doctor` reports the account is
+already authenticated but this directory is "not linked — using the keyless
+application", which covers fewer settings; `clerk config` therefore cannot reach
+the sign-up restrictions. The unblocking step is `clerk link`, not another login.
 
 Clerk supplies the user's identity and nothing else. Tenant membership, roles,
 and permissions come from our API. Do not read tenant or role information out of
@@ -100,9 +146,14 @@ Never send a tenant identifier with a request. The tenant comes from the token.
 `NEXT_PUBLIC_` means "ship this to every browser that loads the app." Nothing
 tenant-related and no secret carries that prefix.
 
-Environment variables are parsed through a zod schema at startup, so a missing or
-malformed value fails the build. The alternative is finding out from a production
-error at an inconvenient hour.
+Environment variables are parsed through a zod schema in `src/lib/env.ts` at
+startup, so a malformed value fails the build rather than a request at an
+inconvenient hour.
+
+Deployment checks key off `APP_ENV` (`local` | `staging` | `production`), never
+`NODE_ENV`. `next build` sets `NODE_ENV=production` on a developer's laptop too,
+so a rule written against it fires during ordinary local builds and teaches
+everyone to ignore it. `APP_ENV` is set by the deployment and nowhere else.
 
 ## Metadata
 
@@ -114,8 +165,8 @@ Nothing else — no description, OG image, or canonical tag. See Indexing.
 
 ## Language
 
-English only today, but nothing may assume it. No user-facing literal belongs in
-a component — all strings come from a catalog. Dates, numbers, and currency go
+The locale is `en-IE`, not `en`. No user-facing literal belongs in a component —
+all strings come from a catalog. Dates, numbers, and currency go
 through the `Intl` helpers in `@st/shared`; a raw `toLocaleString()` or a
 hand-built date format is a bug.
 

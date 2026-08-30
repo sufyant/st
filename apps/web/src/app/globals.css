@@ -1,1 +1,8 @@
 @import "@st/ui/globals.css";
+
+/* Maps our CSS variables onto Clerk's components, so its forms follow the same
+   palette and the same light/dark switch as everything else.
+   It lives here rather than in @st/ui because the design system must not know
+   about an auth vendor — apps/marketing consumes @st/ui and never touches
+   Clerk at all. */
+@import "@clerk/ui/themes/shadcn.css";

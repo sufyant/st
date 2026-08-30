@@ -7,7 +7,13 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/node_modules", "!**/.next", "!**/dist", "!**/build"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/dist",
+      "!**/build"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -22,7 +28,22 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": [
+                  "@clerk/**"
+                ],
+                "message": "The identity provider SDK may only be imported from lib/auth. Import from @/lib/auth instead; if something is missing, widen that wrapper rather than adding an exception here."
+              }
+            ]
+          }
+        }
+      }
     },
     "domains": {
       "next": "recommended",
@@ -35,5 +56,19 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/src/lib/auth/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ]
 }
