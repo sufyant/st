@@ -1,0 +1,18 @@
+# Depoda her şey LF ile saklanır
+* text=auto eol=lf
+
+# Windows'a özel dosyalar CRLF kalır
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# İkili dosyalar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
