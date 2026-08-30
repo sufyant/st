@@ -26,9 +26,13 @@ Run from the repo root so pnpm resolves the workspace:
 ```
 pnpm --filter @st/web dev
 pnpm --filter @st/web build
-pnpm --filter @st/web lint      # biome check
-pnpm --filter @st/web format    # biome format --write
+pnpm --filter @st/web typecheck
 ```
+
+Linting and formatting are repo-wide, not per app: `pnpm lint` and `pnpm format`
+from the root. There is one `biome.json`, at the root, and no package defines its
+own — a second config is how two packages quietly stop agreeing on what formatted
+code looks like.
 
 Biome replaces both ESLint and Prettier. Do not add either.
 
@@ -43,6 +47,12 @@ Biome replaces both ESLint and Prettier. Do not add either.
 | Shared strings | `@st/i18n` |
 | Strings only this app shows | `messages/**` |
 | Auth | `src/lib/auth/**` — see below |
+
+Of those packages only `@st/ui` exists today. `@st/tokens`, `@st/i18n`,
+`@st/shared` and `@st/api-client` are where that code will live — do not invent a
+local substitute for one, and do not import it before it is built. Colors
+currently live in `@st/ui`'s stylesheet and move to `@st/tokens` when mobile
+starts.
 
 A component in `src/components` that turns out to be generic does not move to
 `@st/ui` until a second app needs it. Duplication is cheaper than a premature
