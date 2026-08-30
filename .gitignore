@@ -38,3 +38,10 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# Agent skills live in .claude/skills as real directories, installed with
+# `skills add <pkg> --copy -a claude-code`. Without --copy the tool instead
+# creates a store in .agents/ plus symlinks, and a second malformed copy in
+# agent/ for agents we do not use. Neither belongs in the repo if it reappears.
+.agents/
+agent/

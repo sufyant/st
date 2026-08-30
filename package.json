@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "lint": "biome check",
-    "format": "biome check --write",
+    "lint": "biome check apps packages",
+    "format": "biome check --write apps packages",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },
