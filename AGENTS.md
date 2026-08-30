@@ -21,7 +21,12 @@ apps/
 packages/
   shared       types, zod schemas
   api-client   generated from the API's OpenAPI schema
+docs/          cross-cutting notes and decisions
+scripts/       repo-wide tooling
 ```
+
+`docs/` and `scripts/` hold what spans subtrees. Anything one app owns belongs
+under that app, not here.
 
 ## Subtree Guidance
 
