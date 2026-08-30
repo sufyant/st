@@ -62,6 +62,17 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   parameter on the request. Never add an "if admin, skip tenancy" branch to the
   normal request path. There is no admin user table — identity lives in the
   provider; only admin *actions* are persisted, as an audit trail.
+- **The identity provider supplies identity only — membership is ours.** Clerk
+  answers "who is this person" and nothing else. Which tenants a person may enter
+  is a row in our own catalog, keyed by the provider's user id. Two consequences,
+  both deliberate:
+  - **Do not enable Clerk Organizations.** Not `clerk enable orgs`, not
+    `<OrganizationSwitcher />`, not org claims in the JWT. Tooling will keep
+    offering it — Clerk's own setup skill ends by suggesting it. Decline. Using
+    it would move tenant membership into the provider, which is the one thing
+    that makes the provider expensive to leave, and starts a per-organization
+    meter we have no reason to pay.
+  - Invite and membership screens are ours to build. That cost is accepted.
 - **Scope discipline.** No Kubernetes, Elasticsearch, Redis, or event sourcing
   until a concrete problem demands one. v1 has no teams, billing, or onboarding.
   These are deliberate constraints. If a task seems to require breaking one, say
