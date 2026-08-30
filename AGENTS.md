@@ -94,10 +94,17 @@ subtree belong in that subtree's `AGENTS.md`, not here.
 - **shadcn is not a dependency.** The CLI copies source files that we then own.
   Components are added into `packages/ui`, not into an app, and are edited freely
   afterward.
-- **Tokens are platform-neutral data.** Define them once as plain values, then
-  generate the web CSS variables and the mobile JS object from that single
-  source. No token is written twice, and no styling library — on either platform
-  — is a prerequisite for defining one.
+- **Tokens are platform-neutral data.** A color exists in exactly one file,
+  `packages/tokens/src/theme.ts`, authored as hex. The web's CSS variables are
+  generated from it and committed; native reads the same values as TypeScript.
+  Never write a color into a component, a stylesheet, or the generated
+  `tokens.css` — the last of those is silently discarded on the next
+  regeneration, taking native out of step with web.
+- **Contrast is measured, not judged.** `pnpm --filter @st/tokens check`
+  regenerates the CSS to prove it is current, then fails if any surface and its
+  paired foreground drops below WCAG AA in either theme. Run it after touching a
+  color. Every accessible-looking palette that shipped inaccessible was approved
+  by someone confident it looked fine.
 - **Locale is a property of the person; theme is a property of the device.** A
   user's language lives in our database, because email rendered by the API must
   match what the app shows them. Theme preference lives in the browser or on the

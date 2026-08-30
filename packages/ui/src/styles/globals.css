@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@st/tokens/tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -59,96 +60,10 @@
   --font-sans: var(--font-sans);
 }
 
-/* Brand is indigo, deliberately clear of the semantic hues. Success stays
-   green, warning amber, destructive red — a user must be able to tell "this is
-   our primary action" from "this worked". Every pair below meets WCAG AA (4.5:1)
-   for normal text in its own theme; check any replacement before shipping it. */
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* indigo-600 on white — 6.29:1 */
-  --primary: oklch(0.511 0.23 276.966);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  /* red-600 on white — 4.83:1 */
-  --destructive: oklch(0.577 0.245 27.325);
-  /* green-700 on white — 5.02:1. green-600 fails at 3.30:1. */
-  --success: oklch(0.527 0.137 150.069);
-  --success-foreground: oklch(1 0 0);
-  /* amber-700 on white — 5.02:1. amber-600 fails at 3.19:1. */
-  --warning: oklch(0.555 0.146 48.998);
-  --warning-foreground: oklch(1 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.511 0.23 276.966);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.511 0.23 276.966);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.511 0.23 276.966);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /* indigo-400 on indigo-950 — 5.36:1. indigo-500 on white fails at 4.47:1,
-       which is why dark mode lightens the brand rather than reusing it. */
-  --primary: oklch(0.68 0.158 276.935);
-  --primary-foreground: oklch(0.257 0.086 281.288);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  /* red-400 on red-950 — 5.84:1 */
-  --destructive: oklch(0.704 0.191 22.216);
-  /* green-400 on green-950 — 8.55:1 */
-  --success: oklch(0.8 0.182 151.711);
-  --success-foreground: oklch(0.266 0.063 152.934);
-  /* amber-400 on amber-950 — 8.97:1 */
-  --warning: oklch(0.837 0.164 84.429);
-  --warning-foreground: oklch(0.279 0.074 45.635);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.68 0.158 276.935);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.68 0.158 276.935);
-  --sidebar-primary-foreground: oklch(0.257 0.086 281.288);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.68 0.158 276.935);
-}
+/* Color and radius come from @st/tokens, generated from its TypeScript source
+   so web and native never drift. To change a color, edit
+   packages/tokens/src/theme.ts and regenerate — not this file, and not the
+   generated CSS. */
 
 @layer base {
   * {

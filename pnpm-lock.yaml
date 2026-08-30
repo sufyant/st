@@ -52,11 +52,23 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages/tokens:
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@st/tokens':
+        specifier: workspace:*
+        version: link:../tokens
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

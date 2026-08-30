@@ -48,11 +48,9 @@ Biome replaces both ESLint and Prettier. Do not add either.
 | Strings only this app shows | `messages/**` |
 | Auth | `src/lib/auth/**` — see below |
 
-Of those packages only `@st/ui` exists today. `@st/tokens`, `@st/i18n`,
-`@st/shared` and `@st/api-client` are where that code will live — do not invent a
-local substitute for one, and do not import it before it is built. Colors
-currently live in `@st/ui`'s stylesheet and move to `@st/tokens` when mobile
-starts.
+`@st/ui` and `@st/tokens` exist today. `@st/i18n`, `@st/shared` and
+`@st/api-client` are where that code will live — do not invent a local substitute
+for one, and do not import it before it is built.
 
 A component in `src/components` that turns out to be generic does not move to
 `@st/ui` until a second app needs it. Duplication is cheaper than a premature

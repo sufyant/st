@@ -8,7 +8,11 @@ const semantic = [
   { name: "primary", bg: "bg-primary", fg: "text-primary-foreground" },
   { name: "success", bg: "bg-success", fg: "text-success-foreground" },
   { name: "warning", bg: "bg-warning", fg: "text-warning-foreground" },
-  { name: "destructive", bg: "bg-destructive", fg: "text-white" },
+  {
+    name: "destructive",
+    bg: "bg-destructive",
+    fg: "text-destructive-foreground",
+  },
 ];
 
 export default function Page() {
