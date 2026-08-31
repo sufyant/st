@@ -1,6 +1,7 @@
 import { ClerkProvider, Show } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
-import type { ReactNode } from "react";
+import { type Locale, languageOf } from "@st/shared";
+import type { ComponentProps, ReactNode } from "react";
 
 /**
  * The provider's UI, renamed to ours.
@@ -46,9 +47,75 @@ export {
  * the rest of the page. It is not a second palette to keep in sync; changing a
  * color in packages/tokens/src/theme.ts moves this too.
  */
-export function AuthProvider({ children }: { children: ReactNode }) {
+type ClerkLocalization = ComponentProps<typeof ClerkProvider>["localization"];
+
+/**
+ * Clerk's forms are not translated by our catalogs — the vendor ships its own.
+ *
+ * Its default is `enUS`, and what `localization` receives is merged over that,
+ * so this only has to carry what is actually wrong for us.
+ *
+ * What is wrong is dates. Clerk's own strings pin a locale inside the template
+ * — `{{ date | numeric('en-US') }}` — so its "last active" timestamps render
+ * American regardless of what we render everywhere else. That is the `03/09`
+ * read as the wrong month problem, inside the vendor's UI.
+ *
+ * Clerk also ships `enGB`, and swapping to it wholesale would be the obvious
+ * move and the wrong one. Measured against `enUS`: 57 strings differ, 47 of
+ * them are Organizations and SSO wording for features we do not enable, one is
+ * a regression (`form_username_invalid_length` hardcodes "3 and 20" instead of
+ * interpolating the real limits), and it is 69KB serialized to the client on
+ * every page. It also would not fix this: `enGB` pins `en-GB`, and we are
+ * `en-IE`.
+ *
+ * So the tag is interpolated rather than chosen from a table. This is right for
+ * every locale, including ones nobody has added yet, which is the same reason
+ * catalog folders are named for a language and the region arrives as data.
+ */
+function clerkDates(locale: Locale): ClerkLocalization {
+  return {
+    dates: {
+      lastDay: `Yesterday at {{ date | timeString('${locale}') }}`,
+      next6Days: `{{ date | weekday('${locale}','long') }} at {{ date | timeString('${locale}') }}`,
+      nextDay: `Tomorrow at {{ date | timeString('${locale}') }}`,
+      numeric: `{{ date | numeric('${locale}') }}`,
+      previous6Days: `Last {{ date | weekday('${locale}','long') }} at {{ date | timeString('${locale}') }}`,
+      sameDay: `Today at {{ date | timeString('${locale}') }}`,
+    },
+  };
+}
+
+/**
+ * Wording, as opposed to formatting.
+ *
+ * Empty while English is the only language: English is Clerk's own default, so
+ * there is nothing to override. Adding Turkish is `tr: trTR` from
+ * `@clerk/localizations` here and nothing else — a translation change, not a
+ * refactor. Keyed by language subtag, because vendor catalogs are.
+ */
+const localizations: Partial<Record<string, ClerkLocalization>> = {};
+
+export function AuthProvider({
+  children,
+  locale,
+}: {
+  children: ReactNode;
+  locale: Locale;
+}) {
   return (
-    <ClerkProvider appearance={{ theme: shadcn }}>{children}</ClerkProvider>
+    <ClerkProvider
+      appearance={{ theme: shadcn }}
+      localization={{
+        ...clerkDates(locale),
+        ...localizations[languageOf(locale)],
+      }}
+      // Signing out from a page that requires a session would otherwise leave
+      // the person on it, watching a redirect they did not ask for. Send them
+      // to the one route that means something to a signed-out visitor.
+      afterSignOutUrl="/sign-in"
+    >
+      {children}
+    </ClerkProvider>
   );
 }
 

@@ -1,4 +1,5 @@
 import { Button } from "@st/ui/components/button";
+import { getTranslations } from "next-intl/server";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   SignedIn,
@@ -11,6 +12,8 @@ import { getSession } from "@/lib/auth/server";
 // Temporary scaffolding: proves the token pipeline and both themes render.
 // Delete once the first real screen lands.
 
+// Token and variant names, not copy. They are identifiers that happen to be
+// rendered, and translating them would make the swatch lie about what it shows.
 const semantic = [
   { name: "primary", bg: "bg-primary", fg: "text-primary-foreground" },
   { name: "success", bg: "bg-success", fg: "text-success-foreground" },
@@ -23,21 +26,23 @@ const semantic = [
 ];
 
 export default async function Page() {
-  const session = await getSession();
+  const [session, t, auth] = await Promise.all([
+    getSession(),
+    getTranslations("app.palette"),
+    getTranslations("auth"),
+  ]);
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-10 p-10">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold">Palette check</h1>
-          <p className="text-muted-foreground text-sm">
-            Brand is indigo; success, warning and destructive stay distinct.
-          </p>
+          <h1 className="font-heading text-2xl font-semibold">{t("title")}</h1>
+          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <SignedOut>
             <SignInButton>
-              <Button>Sign in</Button>
+              <Button>{auth("signIn")}</Button>
             </SignInButton>
           </SignedOut>
           <SignedIn>
@@ -49,8 +54,10 @@ export default async function Page() {
 
       <section className="text-muted-foreground rounded-lg border p-4 text-sm">
         {session
-          ? `Signed in as ${session.email ?? session.externalAuthId}.`
-          : "Not signed in. Access is by invitation; tenant and role come from our API, never from the provider."}
+          ? auth("signedInAs", {
+              email: session.email ?? session.externalAuthId,
+            })
+          : `${auth("notSignedIn")} ${auth("byInvitation")} ${t("tenantFromApi")}`}
       </section>
 
       <section className="flex flex-wrap gap-2">

@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  pull_request:
+  # Still here once main is protected: by then a push to main is a merge, and
+  # verifying the merge commit is the point — a PR is only ever tested against
+  # a hypothetical merge that may be stale by the time it lands.
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Which deployables does this change actually affect? ──────────────────
+  #
+  # The dependency graph, written down. AGENTS.md requires that a change to a
+  # package trigger every app that consumes it — that rule is unenforceable if
+  # filters are just directory names, so the filters below compose: `web`
+  # includes `ui`, which includes `tokens`.
+  #
+  # Filtered per job rather than per workflow, deliberately. A workflow skipped
+  # by `on.paths` reports no status at all, and a required status check that
+  # never reports blocks a pull request forever. A job skipped by `if:` reports
+  # as skipped, which GitHub counts as satisfied. This is what makes protecting
+  # main possible at all.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      node: ${{ steps.filter.outputs.node }}
+      tokens: ${{ steps.filter.outputs.tokens }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            toolchain: &toolchain
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'biome.json'
+              - '.nvmrc'
+              - '.github/workflows/ci.yml'
+            tokens: &tokens
+              - 'packages/tokens/**'
+            ui: &ui
+              - *tokens
+              - 'packages/ui/**'
+            shared: &shared
+              - 'packages/shared/**'
+            i18n: &i18n
+              - *shared
+              - 'packages/i18n/**'
+            node:
+              - *toolchain
+              - 'apps/web/**'
+              - 'packages/**'
+            web:
+              - *toolchain
+              - *ui
+              - *i18n
+              - 'apps/web/**'
+
+  # ── Repo-wide, for everything on the Node toolchain ──────────────────────
+  # apps/api is .NET and apps/mobile is Expo; neither belongs here. They get
+  # their own workflows when they exist — see AGENTS.md.
+  quality:
+    name: Lint & typecheck
+    needs: changes
+    if: needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  test:
+    name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  tokens:
+    name: Design tokens
+    needs: changes
+    if: needs.changes.outputs.tokens == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Regenerates the CSS to prove the committed file is current, then fails
+      # if any surface/foreground pair drops below WCAG AA in either theme.
+      - run: pnpm --filter @st/tokens check
+
+  # ── apps/web ─────────────────────────────────────────────────────────────
+  # A second Next.js app (admin, marketing) is a copy of these two jobs with
+  # its own filter. Marketing deploys through Vercel and gets no image job.
+  web-build:
+    name: web · build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders, on purpose. This job compiles the app; it does not talk
+      # to Clerk. src/lib/env.ts only checks these are well-formed, and a real
+      # publishable key here would be inlined into an artifact CI throws away.
+      # The keys that matter are supplied at image build and container start.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2ktcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA
+      CLERK_SECRET_KEY: sk_test_ci_placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @st/web build
+
+  web-image:
+    name: web · image
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Built but never pushed. This job exists so a broken Dockerfile is
+      # found here rather than during a deployment.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Y2ktcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── The one check main is protected on ───────────────────────────────────
+  #
+  # Requiring the jobs above individually would mean editing the branch
+  # protection rule every time an app is added, from a screen nobody reviews.
+  # This job is the single required check: it depends on all of them and fails
+  # if any did. Adding an app means adding it to `needs` here, in the diff.
+  ci:
+    name: CI
+    if: always()
+    needs: [changes, quality, test, tokens, web-build, web-image]
+    runs-on: ubuntu-latest
+    steps:
+      # A skipped job is a job whose filter said it was irrelevant, which is a
+      # pass. Only failure and cancellation are not.
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::One or more CI jobs failed."
+          exit 1
+      - run: echo "All required jobs passed or were not applicable."

@@ -44,10 +44,11 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 | `apps/marketing/*` | `apps/marketing/AGENTS.md` |
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
-Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`. Everything else
-in the layout above is a planned location, not an existing one — do not import
-from a package that has not been built yet, and do not invent a local substitute
-for it either. Say so instead.
+Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`,
+`packages/shared`, `packages/i18n`. Still planned, not existing: `apps/api`,
+`apps/admin`, `apps/marketing`, `apps/mobile`, `packages/api-client`. Do not
+import from a package that has not been built yet, and do not invent a local
+substitute for it either. Say so instead.
 
 ## Cross-Cutting Rules
 
@@ -80,6 +81,41 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   zod schema in `packages/shared`, never a second hand-written check. A duplicate
   validator drifts from the server's rules quietly, and the first evidence of the
   drift is bad data already committed.
+
+### Continuous integration
+
+One workflow, `.github/workflows/ci.yml`, not one per app. Two reasons, and the
+second is the one that bites late:
+
+- The dependency graph belongs in a single file. Split across five workflows,
+  "a package change triggers every app that consumes it" becomes five places to
+  keep in agreement, and nothing fails when they disagree — the app simply
+  stops being built.
+- **A workflow skipped by `on.paths` reports no status at all.** A required
+  status check that never reports blocks a pull request forever. A *job* skipped
+  by `if:` reports as skipped, which GitHub counts as satisfied. Filtering per
+  job rather than per workflow is what makes protecting `main` possible.
+
+The `changes` job holds the graph, as composed path filters: `web` includes
+`ui`, which includes `tokens`. Every other job gates on one of its outputs.
+
+`main` is protected on exactly one required check, the `ci` job. It depends on
+every other job and fails if any of them did. Requiring the jobs individually
+would mean editing a branch-protection screen nobody reviews each time an app
+is added; this way, adding an app to `needs` shows up in the diff.
+
+**Adding an app is not always adding a job to this workflow.** It depends on the
+toolchain, not on the directory:
+
+| App | Where its CI goes |
+|---|---|
+| `apps/admin` | This workflow. Same jobs as `web`, own filter — Next.js, containerized. |
+| `apps/marketing` | This workflow, but build only. Vercel builds and deploys it; an image job would be duplicated work. |
+| `apps/api` | Its own workflow. .NET — `dotnet` restore, build and test share nothing with `pnpm install`, and running the Node jobs for a C# change is waste. |
+| `apps/mobile` | Its own workflow. Expo ships through EAS Build and EAS Update, on its own triggers; a green CI run is not what releases it. |
+
+Whichever it is, add the job to the `ci` aggregator's `needs` so it is covered
+by the branch protection that already exists.
 
 ### Presentation
 
@@ -135,15 +171,30 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   The region is what `Intl` needs: `en` alone silently formats dates and numbers
   the American way, and `03/09` read as the wrong month is an operational error,
   not a cosmetic one.
-- **Message catalogs are keyed by language, formatting by the full tag.** One
-  `en` catalog serves `en-IE` and `en-GB`; maintaining two that differ in a
-  handful of words is a cost with no return. Resolve a catalog by falling back to
-  the language subtag, and hand `Intl` the whole tag.
+- **Message catalogs are keyed by tag, and the tag is as short as it needs to
+  be; formatting always takes the full tag.** One `en` catalog serves `en-IE`
+  and `en-GB`, because maintaining two that differ in a handful of words is a
+  cost with no return. Regional wording that genuinely differs — "organise"
+  against "organize" — goes in an `en-GB` catalog holding *only* those strings,
+  merged on top of `en`. A regional catalog is a layer, never a copy: a copy
+  means every later fix to the base has to be applied twice, and the second
+  application is the one that gets forgotten. Resolution reads the language
+  catalog first and the regional one over it; `Intl` gets the whole tag either
+  way.
 - **Currency comes from the data; the format comes from the viewer.** An amount
   recorded in euro stays euro no matter who opens the page, so every money value
   is stored with its currency beside it. The viewer's locale decides only how it
   is written. Money is minor units in the database — formatting needs both facts
   and may guess neither.
+- **`en` is written in the spelling our users read, and the minority variant
+  gets the override file.** Today `LOCALES` is `en-IE` alone, so `en` is
+  British/Irish English — "organise", "licence". If we ever serve the United
+  States, `en-US` is the file that holds "organize", not the other way round.
+  Getting this backwards is not a style question: it would mean an override
+  file covering one hundred percent of users, which is the base catalog wearing
+  the wrong name. Nothing in the catalogs diverges yet, which is exactly why it
+  is written down now — before someone types "Personalize" into `en` and makes
+  the decision by accident.
 - **English is the only language today, and nothing may assume it is the only
   one.** Adding one must be a config and translation change, never a refactor: no
   literal user-facing strings in components, and no date, number, or currency
@@ -219,6 +270,17 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   in Vitest; the first working authenticated flow pulls in Playwright. Business
   logic lives in `apps/api` and is tested there — the frontend has less to unit
   test than it looks like.
+
+  Vitest is in, on that trigger: catalog resolution in `packages/i18n` and the
+  `Intl` helpers in `packages/shared`. One `vitest.config.ts` at the root, for
+  the same reason there is one `biome.json`, and it collects `packages/**` only.
+  `pnpm test` from the root.
+
+  What is tested there is what would fail silently: a regional catalog dropping
+  the strings it does not override, a money amount divided by the wrong power of
+  ten, a date formatted for the wrong region. Not the wrappers around `Intl` —
+  that is testing the platform. Playwright is still waiting on its own trigger,
+  and the first test it gets is tenant isolation.
 - **The first end-to-end test is tenant isolation.** Whether a user in one tenant
   can ever observe another's data, including through a stale cache. That failure
   is invisible to every test written against a single tenant, which is why it does

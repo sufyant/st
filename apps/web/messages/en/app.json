@@ -1,0 +1,7 @@
+{
+  "palette": {
+    "title": "Palette check",
+    "subtitle": "Brand is indigo; success, warning and destructive stay distinct.",
+    "tenantFromApi": "Tenant and role come from our API, never from the provider."
+  }
+}

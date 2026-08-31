@@ -1,34 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# @st/web
 
-## Getting Started
+The customer-facing dashboard. Everything here sits behind authentication and is
+scoped to one tenant.
 
-First, run the development server:
+## Running it
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+From the repo root, so pnpm resolves the workspace:
+
+```
+pnpm --filter @st/web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+You need `apps/web/.env.local` first — copy `.env.example` and fill it in, or
+run `clerk env pull` from this directory to have the Clerk keys written for you.
+The app will not start without them: `src/lib/env.ts` validates the environment
+before anything else runs.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Other commands:
 
-## Learn More
+```
+pnpm --filter @st/web build      # production build (standalone output)
+pnpm --filter @st/web typecheck
+pnpm lint                        # repo-wide, from the root
+pnpm format                      # repo-wide, from the root
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Everything else
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`AGENTS.md` in this directory is the real documentation: stack, where code goes,
+the auth boundary, rendering rules, i18n, and deployment. Read the repo root's
+`AGENTS.md` first.

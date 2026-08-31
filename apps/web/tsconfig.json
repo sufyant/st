@@ -9,6 +9,10 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
+    // packages/* are consumed as TypeScript source and import each other
+    // with explicit .ts extensions. Safe here because this project never
+    // emits — Next compiles, tsc only checks.
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
