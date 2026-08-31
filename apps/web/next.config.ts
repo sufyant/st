@@ -85,9 +85,9 @@ const nextConfig: NextConfig = {
 };
 
 /**
- * Points next-intl at the per-request config. Without the plugin, `getLocale`
- * and `getTranslations` have nothing to read on the server.
+ * Without the plugin, `getLocale` and `getTranslations` have nothing to read on
+ * the server. It finds `src/i18n/request.ts` by convention.
  */
-const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+const withNextIntl = createNextIntlPlugin();
 
 export default withNextIntl(nextConfig);

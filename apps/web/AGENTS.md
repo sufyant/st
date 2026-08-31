@@ -32,7 +32,7 @@ pnpm --filter @st/web typecheck
 There are no tests in this app. Vitest collects `packages/**` only — what this
 app owns is components and routes, and a component suite is not the trigger the
 root AGENTS.md describes. The pure logic it depends on is tested where it lives,
-in `@st/shared` and `@st/i18n`. `pnpm test` from the root runs it.
+in `@st/shared`. `pnpm test` from the root runs it.
 
 `typecheck` runs `next typegen` first. `LayoutProps`, `PageProps` and the route
 literals are generated into `.next/types`, so on a fresh clone — a colleague's,
@@ -62,9 +62,9 @@ Biome replaces both ESLint and Prettier. Do not add either.
 | Strings only this app shows | `messages/**` |
 | Auth | `src/lib/auth/**` — see below |
 
-`@st/ui` and `@st/tokens` exist today. `@st/i18n`, `@st/shared` and
-`@st/api-client` are where that code will live — do not invent a local substitute
-for one, and do not import it before it is built.
+`@st/ui`, `@st/tokens`, `@st/shared` and `@st/i18n` exist today.
+`@st/api-client` is where that code will live — do not invent a local
+substitute for it, and do not import it before it is built.
 
 A component in `src/components` that turns out to be generic does not move to
 `@st/ui` until a second app needs it. Duplication is cheaper than a premature
@@ -148,9 +148,9 @@ requires it — an error boundary can only catch a render in the tree below it
 from the client. They are the exception this rule allows for, not a precedent.
 
 `global-error.tsx` replaces the root layout, so it has no provider, no fonts, no
-theme class and no stylesheet. Its copy comes from `@st/i18n`'s static English
-export and its styling is inline: it is the page for when the machinery is
-broken, and it must not depend on the machinery.
+theme class and no stylesheet. It imports `@st/i18n`'s English JSON directly
+and its styling is inline: it is the page for when the machinery is broken, and
+it must not depend on the machinery.
 
 There is deliberately no root `loading.tsx`. A suspense boundary with nothing to
 suspend on is a spinner that flashes for no reason. It arrives with the first
@@ -180,9 +180,10 @@ inconvenient hour. Every variable this app reads is declared there, Clerk's
 included — one that is set in a shell and nowhere else exists on exactly one
 machine, which is the failure the schema was written to prevent.
 
-The Clerk keys are required, not optional. The temporary keyless application is
-gone: the app is claimed and linked, `.env.local` holds real keys, and
-`.clerk/keyless.json` has been deleted. A build without keys should fail.
+The Clerk keys are required. The application is claimed and linked, so real
+keys exist and a build without them should fail. Do not reintroduce a keyless
+fallback: it supplies credentials outside the schema, which is the one thing
+the schema is for.
 
 There is deliberately no `NEXT_PUBLIC_CLERK_SIGN_UP_URL`. Setting one re-adds
 "Sign up" links to Clerk's own components, pointing at a route that does not
@@ -226,29 +227,29 @@ Translation runs on `next-intl`, configured without i18n routing:
 | Piece | Where |
 |---|---|
 | Which locale this request is | `src/lib/locale.ts` |
-| Loading and merging catalogs | `src/i18n/request.ts` |
+| Handing the catalogs to next-intl | `src/i18n/request.ts` |
 | Strings shared across apps | `@st/i18n` (`common`, `auth`) |
-| Strings only this app shows | `messages/<language>/app.json` |
-| Date, number and money formatting | `@st/shared` |
+| Strings only this app shows | `messages/<language>.json` |
+| Date, number and money formatting | `@st/shared` — added with the first value that needs it |
 
 `resolveLocale()` in `src/lib/locale.ts` is the single place the locale is
 decided, and today it returns the one locale we support. When `@st/api-client`
 exists it reads the user record instead — that one function is the whole change,
 which is what keeps "adding a language is not a refactor" true.
 
-Catalog folders are named for a BCP-47 tag, as short as it needs to be. `en` is
-the whole English catalog and serves `en-IE` today. If Britain ever needs
-different words, `messages/en-GB/` holds *only* those strings and is merged over
-`en` — `catalogChain("en-GB")` is `["en", "en-GB"]`, in that order. Never copy a
-catalog to change three words in it.
+One JSON file per language, not per locale: `messages/en.json` serves `en-IE`.
+The words are the same; only the formatting differs, and formatting does not
+come from the catalog. `request.ts` imports the app's file and `@st/i18n`'s by
+the language subtag and spreads them together — next-intl's documented shape
+for messages split across packages.
 
-Formatting is the other axis and always takes the full tag: `en` and `en-US`
-write 3 September as `9/3/26`, `en-IE` writes `03/09/2026`. Same words, and a
-date read as the wrong month.
+That is the other axis, and it always takes the full tag: `en` and `en-US` write
+3 September as `9/3/26`, `en-IE` writes `03/09/2026`. Same words, and a date read
+as the wrong month.
 
 Clerk's forms are translated by Clerk, not by our catalogs, and `localization`
-is merged over Clerk's `enUS` default — so `AuthProvider` only passes what is
-actually wrong for us.
+is merged over Clerk's `enUS` default — so `AuthProvider` passes only what is
+actually wrong for us, which is dates.
 
 That is dates. Clerk pins a locale inside its own templates
 (`{{ date | numeric('en-US') }}`), so its timestamps render American no matter
@@ -259,9 +260,8 @@ of its 57 differences from `enUS`, 47 are Organizations and SSO wording we never
 render, one is a regression, it costs 69KB on every page, and it pins `en-GB`
 when we are `en-IE`.
 
-Wording overrides are separate and keyed by language subtag. That map is empty
-while English is the only language. Adding Turkish means adding `tr: trTR` to
-it, not editing the wrapper.
+Wording needs no override: Clerk's default is English and so is ours. A second
+language passes its `@clerk/localizations` resource alongside the date block.
 
 ## Indexing
 

@@ -28,7 +28,7 @@ const semantic = [
 export default async function Page() {
   const [session, t, auth] = await Promise.all([
     getSession(),
-    getTranslations("app.palette"),
+    getTranslations("palette"),
     getTranslations("auth"),
   ]);
 

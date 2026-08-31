@@ -1,6 +1,6 @@
 "use client";
 
-import { fallbackCommon } from "@st/i18n";
+import messages from "@st/i18n/messages/en.json";
 
 /**
  * The boundary for an error in the root layout itself.
@@ -30,9 +30,9 @@ export default function GlobalError() {
       >
         <main style={{ maxWidth: "28rem", padding: "2rem" }}>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            {fallbackCommon.unexpected.title}
+            {messages.common.unexpected.title}
           </h1>
-          <p style={{ opacity: 0.7 }}>{fallbackCommon.unexpected.body}</p>
+          <p style={{ opacity: 0.7 }}>{messages.common.unexpected.body}</p>
         </main>
       </body>
     </html>

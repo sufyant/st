@@ -15,8 +15,14 @@ export default async function NotFound() {
         {t("notFound.title")}
       </h1>
       <p className="text-muted-foreground text-sm">{t("notFound.body")}</p>
-      {/* Base UI composes through `render`, not `asChild`. */}
-      <Button render={<Link href="/" />}>{t("action.goHome")}</Button>
+      {/*
+        Base UI composes through `render`, not `asChild`. `nativeButton={false}`
+        goes with it: this renders an <a>, and leaving the default on makes the
+        component apply native button semantics to an element that has none.
+      */}
+      <Button nativeButton={false} render={<Link href="/" />}>
+        {t("action.goHome")}
+      </Button>
     </main>
   );
 }

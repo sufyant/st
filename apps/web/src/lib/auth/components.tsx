@@ -1,6 +1,6 @@
 import { ClerkProvider, Show } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
-import { type Locale, languageOf } from "@st/shared";
+import type { Locale } from "@st/shared";
 import type { ComponentProps, ReactNode } from "react";
 
 /**
@@ -68,9 +68,10 @@ type ClerkLocalization = ComponentProps<typeof ClerkProvider>["localization"];
  * every page. It also would not fix this: `enGB` pins `en-GB`, and we are
  * `en-IE`.
  *
- * So the tag is interpolated rather than chosen from a table. This is right for
- * every locale, including ones nobody has added yet, which is the same reason
- * catalog folders are named for a language and the region arrives as data.
+ * So the tag is interpolated rather than chosen from a table — right for every
+ * locale, including ones nobody has added yet. Wording is a separate question:
+ * Clerk's default is English and so is ours, so nothing overrides it. A second
+ * language passes its `@clerk/localizations` resource alongside this.
  */
 function clerkDates(locale: Locale): ClerkLocalization {
   return {
@@ -85,16 +86,6 @@ function clerkDates(locale: Locale): ClerkLocalization {
   };
 }
 
-/**
- * Wording, as opposed to formatting.
- *
- * Empty while English is the only language: English is Clerk's own default, so
- * there is nothing to override. Adding Turkish is `tr: trTR` from
- * `@clerk/localizations` here and nothing else — a translation change, not a
- * refactor. Keyed by language subtag, because vendor catalogs are.
- */
-const localizations: Partial<Record<string, ClerkLocalization>> = {};
-
 export function AuthProvider({
   children,
   locale,
@@ -105,10 +96,7 @@ export function AuthProvider({
   return (
     <ClerkProvider
       appearance={{ theme: shadcn }}
-      localization={{
-        ...clerkDates(locale),
-        ...localizations[languageOf(locale)],
-      }}
+      localization={clerkDates(locale)}
       // Signing out from a page that requires a session would otherwise leave
       // the person on it, watching a redirect they did not ask for. Send them
       // to the one route that means something to a signed-out visitor.

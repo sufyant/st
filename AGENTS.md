@@ -171,30 +171,20 @@ by the branch protection that already exists.
   The region is what `Intl` needs: `en` alone silently formats dates and numbers
   the American way, and `03/09` read as the wrong month is an operational error,
   not a cosmetic one.
-- **Message catalogs are keyed by tag, and the tag is as short as it needs to
-  be; formatting always takes the full tag.** One `en` catalog serves `en-IE`
-  and `en-GB`, because maintaining two that differ in a handful of words is a
-  cost with no return. Regional wording that genuinely differs — "organise"
-  against "organize" — goes in an `en-GB` catalog holding *only* those strings,
-  merged on top of `en`. A regional catalog is a layer, never a copy: a copy
-  means every later fix to the base has to be applied twice, and the second
-  application is the one that gets forgotten. Resolution reads the language
-  catalog first and the regional one over it; `Intl` gets the whole tag either
-  way.
+- **Message catalogs are keyed by language, formatting by the full tag.** One
+  `en` catalog serves `en-IE` and `en-GB`; maintaining two that differ in a
+  handful of words is a cost with no return. Resolve a catalog by falling back to
+  the language subtag, and hand `Intl` the whole tag.
 - **Currency comes from the data; the format comes from the viewer.** An amount
   recorded in euro stays euro no matter who opens the page, so every money value
   is stored with its currency beside it. The viewer's locale decides only how it
   is written. Money is minor units in the database — formatting needs both facts
   and may guess neither.
-- **`en` is written in the spelling our users read, and the minority variant
-  gets the override file.** Today `LOCALES` is `en-IE` alone, so `en` is
-  British/Irish English — "organise", "licence". If we ever serve the United
-  States, `en-US` is the file that holds "organize", not the other way round.
-  Getting this backwards is not a style question: it would mean an override
-  file covering one hundred percent of users, which is the base catalog wearing
-  the wrong name. Nothing in the catalogs diverges yet, which is exactly why it
-  is written down now — before someone types "Personalize" into `en` and makes
-  the decision by accident.
+- **`en` is written in the spelling our users read.** `LOCALES` is `en-IE`
+  alone, so `en` is British/Irish English — "organise", "licence", never
+  "organize". Nothing in the catalogs diverges yet, which is why it is written
+  down: otherwise the decision gets made by accident, by whoever first types
+  "Personalize" into a catalog.
 - **English is the only language today, and nothing may assume it is the only
   one.** Adding one must be a config and translation change, never a refactor: no
   literal user-facing strings in components, and no date, number, or currency
