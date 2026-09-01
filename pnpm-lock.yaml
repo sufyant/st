@@ -23,9 +23,6 @@ importers:
       '@clerk/ui':
         specifier: ^1.31.0
         version: 1.31.0(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(@types/react@19.2.18)(bs58@6.0.0)(bufferutil@4.1.0)(react-dom@19.2.8(react@19.2.8))(react-native@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.18)(bufferutil@4.1.0)(react@19.2.8)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.2.8)(supports-color@8.1.1)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@st/i18n':
-        specifier: workspace:*
-        version: link:../../packages/i18n
       '@st/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -75,8 +72,6 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
-
-  packages/i18n: {}
 
   packages/shared:
     devDependencies:

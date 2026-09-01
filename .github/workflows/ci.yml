@@ -52,9 +52,6 @@ jobs:
               - 'packages/ui/**'
             shared: &shared
               - 'packages/shared/**'
-            i18n: &i18n
-              - *shared
-              - 'packages/i18n/**'
             node:
               - *toolchain
               - 'apps/web/**'
@@ -62,7 +59,7 @@ jobs:
             web:
               - *toolchain
               - *ui
-              - *i18n
+              - *shared
               - 'apps/web/**'
 
   # ── Repo-wide, for everything on the Node toolchain ──────────────────────

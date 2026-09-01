@@ -58,13 +58,12 @@ Biome replaces both ESLint and Prettier. Do not add either.
 | Components that know our domain | `src/components/**` |
 | Generic primitives (Button, Dialog) | `@st/ui` — never redefined here |
 | Colors, spacing, typography | `@st/tokens` — never a hardcoded hex or px |
-| Shared strings | `@st/i18n` |
-| Strings only this app shows | `messages/**` |
+| Every user-facing string | `messages/<language>.json` |
 | Auth | `src/lib/auth/**` — see below |
 
-`@st/ui`, `@st/tokens`, `@st/shared` and `@st/i18n` exist today.
-`@st/api-client` is where that code will live — do not invent a local
-substitute for it, and do not import it before it is built.
+`@st/ui`, `@st/tokens` and `@st/shared` exist today. `@st/api-client` is where
+that code will live — do not invent a local substitute for it, and do not import
+it before it is built.
 
 A component in `src/components` that turns out to be generic does not move to
 `@st/ui` until a second app needs it. Duplication is cheaper than a premature
@@ -148,9 +147,9 @@ requires it — an error boundary can only catch a render in the tree below it
 from the client. They are the exception this rule allows for, not a precedent.
 
 `global-error.tsx` replaces the root layout, so it has no provider, no fonts, no
-theme class and no stylesheet. It imports `@st/i18n`'s English JSON directly
-and its styling is inline: it is the page for when the machinery is broken, and
-it must not depend on the machinery.
+theme class and no stylesheet. It imports `messages/en.json` directly and its
+styling is inline: it is the page for when the machinery is broken, and it must
+not depend on the machinery.
 
 There is deliberately no root `loading.tsx`. A suspense boundary with nothing to
 suspend on is a spinner that flashes for no reason. It arrives with the first
@@ -228,8 +227,7 @@ Translation runs on `next-intl`, configured without i18n routing:
 |---|---|
 | Which locale this request is | `src/lib/locale.ts` |
 | Handing the catalogs to next-intl | `src/i18n/request.ts` |
-| Strings shared across apps | `@st/i18n` (`common`, `auth`) |
-| Strings only this app shows | `messages/<language>.json` |
+| Every string this app shows | `messages/<language>.json` |
 | Date, number and money formatting | `@st/shared` — added with the first value that needs it |
 
 `resolveLocale()` in `src/lib/locale.ts` is the single place the locale is
@@ -239,9 +237,12 @@ which is what keeps "adding a language is not a refactor" true.
 
 One JSON file per language, not per locale: `messages/en.json` serves `en-IE`.
 The words are the same; only the formatting differs, and formatting does not
-come from the catalog. `request.ts` imports the app's file and `@st/i18n`'s by
-the language subtag and spreads them together — next-intl's documented shape
-for messages split across packages.
+come from the catalog. `request.ts` imports it by the language subtag, which is
+next-intl's documented shape.
+
+This app owns every string it shows; there is no shared catalog. What would have
+to be true before one existed is in the root AGENTS.md, and it is a shared
+contract, not shared words.
 
 That is the other axis, and it always takes the full tag: `en` and `en-US` write
 3 September as `9/3/26`, `en-IE` writes `03/09/2026`. Same words, and a date read

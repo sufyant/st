@@ -1,6 +1,6 @@
 "use client";
 
-import messages from "@st/i18n/messages/en.json";
+import messages from "../../messages/en.json";
 
 /**
  * The boundary for an error in the root layout itself.

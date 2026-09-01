@@ -10,22 +10,19 @@ import { resolveLocale } from "@/lib/locale";
  * this next-intl has nothing to infer from. It is the full tag — `Intl` needs
  * the region, and `en` alone formats the American way.
  *
- * Catalogs are keyed by language, so the import takes the subtag: one `en`
+ * Catalogs are keyed by language, so the import takes the subtag: one `en.json`
  * serves `en-IE` and `en-GB`.
  *
- * Two of them, merged. `@st/i18n` holds the strings that repeat across apps;
- * `messages/` here holds the ones only this app shows. A single shared catalog
- * would make a copy fix in web force a redeploy of admin and marketing.
+ * This app owns every string it shows. There is no shared catalog — see the
+ * Language section of the root AGENTS.md for what would have to be true before
+ * one existed.
  */
 export default getRequestConfig(async () => {
   const locale = await resolveLocale();
-  const language = languageOf(locale);
 
   return {
     locale,
-    messages: {
-      ...(await import(`@st/i18n/messages/${language}.json`)).default,
-      ...(await import(`../../messages/${language}.json`)).default,
-    },
+    messages: (await import(`../../messages/${languageOf(locale)}.json`))
+      .default,
   };
 });

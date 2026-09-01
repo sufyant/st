@@ -22,7 +22,6 @@ packages/
   shared       types, zod schemas, Intl formatters — every app
   api-client   generated from the API's OpenAPI schema — every app
   tokens       design tokens as plain data — every app, mobile included
-  i18n         message catalogs as plain JSON — every app
   ui           shadcn components — web, admin, marketing only (needs a DOM)
 docs/          cross-cutting notes and decisions
 scripts/       repo-wide tooling
@@ -45,8 +44,8 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
 Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`,
-`packages/shared`, `packages/i18n`. Still planned, not existing: `apps/api`,
-`apps/admin`, `apps/marketing`, `apps/mobile`, `packages/api-client`. Do not
+`packages/shared`. Still planned, not existing: `apps/api`, `apps/admin`,
+`apps/marketing`, `apps/mobile`, `packages/api-client`. Do not
 import from a package that has not been built yet, and do not invent a local
 substitute for it either. Say so instead.
 
@@ -160,13 +159,23 @@ by the branch protection that already exists.
 
 ### Language
 
-- **Translations are namespaced by owner.** Strings that genuinely repeat across
-  apps live in `packages/i18n` (`common`, `errors`, `auth`). Everything else
-  lives in the app that displays it. A single shared catalog would mean a copy fix
-  in `web` forces a redeploy of `admin` and `marketing`.
+- **Every app owns every string it shows.** There is no shared catalog, and the
+  bar for creating one is a shared *contract*, not shared words: the API's
+  `Entity.ErrorName` codes existing, and a second localized app translating the
+  same codes. Two apps happening to write "Sign in" is not that.
+
+  The words look shared and are not. `web`'s 404 says "you no longer have access
+  to it", which is meaningless on a public marketing page; its "Back to the
+  dashboard" has nowhere to go there; marketing may well prefer "Get started" to
+  "Sign in". A shared catalog turns each of those into either worse copy or a
+  near-duplicate key, and it reintroduces the coupling the whole layout exists to
+  avoid — a copy fix in `web` redeploying `marketing`.
 - **The API returns error codes, never user-facing prose.** `Entity.ErrorName`
-  maps onto the `errors.*` namespace, so `web` and `admin` translate the same code
-  from the same catalog. An English sentence in an API response is a bug.
+  maps onto an `errors.*` namespace in whichever app renders it. An English
+  sentence in an API response is a bug. This is the one thing that could earn a
+  shared catalog later — the same code translated by two apps is a contract, not
+  a coincidence — but `apps/admin` is not localized, so today there is only one
+  translator of those codes.
 - **A locale is always a full tag, never a bare language.** `en-IE`, not `en`.
   The region is what `Intl` needs: `en` alone silently formats dates and numbers
   the American way, and `03/09` read as the wrong month is an operational error,
@@ -261,16 +270,14 @@ by the branch protection that already exists.
   logic lives in `apps/api` and is tested there — the frontend has less to unit
   test than it looks like.
 
-  Vitest is in, on that trigger: catalog resolution in `packages/i18n` and the
-  `Intl` helpers in `packages/shared`. One `vitest.config.ts` at the root, for
-  the same reason there is one `biome.json`, and it collects `packages/**` only.
-  `pnpm test` from the root.
+  Vitest is in, on that trigger: locale handling in `packages/shared`. One
+  `vitest.config.ts` at the root, for the same reason there is one `biome.json`,
+  and it collects `packages/**` only. `pnpm test` from the root.
 
-  What is tested there is what would fail silently: a regional catalog dropping
-  the strings it does not override, a money amount divided by the wrong power of
-  ten, a date formatted for the wrong region. Not the wrappers around `Intl` —
-  that is testing the platform. Playwright is still waiting on its own trigger,
-  and the first test it gets is tenant isolation.
+  What is tested there is what would fail silently — a locale tag parsed by
+  splitting on a hyphen instead of by `Intl.Locale`. Not the wrappers around a
+  platform API; that is testing the platform. Playwright is still waiting on its
+  own trigger, and the first test it gets is tenant isolation.
 - **The first end-to-end test is tenant isolation.** Whether a user in one tenant
   can ever observe another's data, including through a stale cache. That failure
   is invisible to every test written against a single tenant, which is why it does
