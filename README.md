@@ -11,7 +11,6 @@ apps/
   marketing    Next.js
   mobile       Expo
 packages/
-  shared       Paylaşılan tipler, zod şemaları
   api-client   OpenAPI'den üretilen TypeScript istemcisi
 docs/          Dokümantasyon
 scripts/       Yardımcı script'ler

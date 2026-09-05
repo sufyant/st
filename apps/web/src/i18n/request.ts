@@ -1,6 +1,5 @@
-import { languageOf } from "@st/shared";
 import { getRequestConfig } from "next-intl/server";
-import { resolveLocale } from "@/lib/locale";
+import { languageOf, resolveLocale } from "@/lib/locale";
 
 /**
  * next-intl's per-request configuration.

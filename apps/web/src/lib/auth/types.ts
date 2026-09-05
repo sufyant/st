@@ -5,8 +5,9 @@
  * makes the identity provider replaceable: swapping vendors changes the mapping
  * in this folder and nothing else.
  *
- * When packages/shared exists, this moves there so apps/admin and apps/mobile
- * describe a session the same way.
+ * It stays in this app. apps/admin authenticates against a different Clerk
+ * instance, and a session type shared between them is exactly where an
+ * "if admin, skip tenancy" branch would eventually appear.
  */
 export type Session = {
   /**

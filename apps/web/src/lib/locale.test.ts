@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LOCALE, isLocale, LOCALES, languageOf } from "./locale.ts";
+import { DEFAULT_LOCALE, isLocale, LOCALES, languageOf } from "./locale";
 
 describe("locale", () => {
   it("has no bare language in LOCALES", () => {

@@ -19,7 +19,6 @@ apps/
   marketing    Next.js               deploys to Vercel
   mobile       Expo                  ships via EAS Build / EAS Update
 packages/
-  shared       types, zod schemas, Intl formatters — every app
   api-client   generated from the API's OpenAPI schema — every app
   tokens       design tokens as plain data — every app, mobile included
   ui           shadcn components — web, admin, marketing only (needs a DOM)
@@ -43,11 +42,12 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 | `apps/marketing/*` | `apps/marketing/AGENTS.md` |
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
-Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`,
-`packages/shared`. Still planned, not existing: `apps/api`, `apps/admin`,
-`apps/marketing`, `apps/mobile`, `packages/api-client`. Do not
-import from a package that has not been built yet, and do not invent a local
-substitute for it either. Say so instead.
+Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`. Still planned,
+not existing: `apps/api`, `apps/admin`, `apps/marketing`, `apps/mobile`,
+`packages/api-client`. Do not import from a package that has not been built yet,
+and do not invent a local substitute for it either. Say so instead.
+
+That list is short on purpose — see When a package exists.
 
 ## Cross-Cutting Rules
 
@@ -66,9 +66,23 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   OpenAPI schema. To change what the frontends see, change the .NET contract and
   regenerate. Never hand-edit generated output, and never work around a stale
   client by patching the consumer.
+- **When a package exists.** A package is created when a *second* consumer
+  actually needs the code, not when one is imagined. Extraction inside a
+  workspace is a single commit — no publish, no version, no semver — so
+  deferring it costs almost nothing, while extracting early means designing an
+  interface against one hypothetical caller and then bending it when the real
+  second one arrives. `packages/i18n` and `packages/shared` were both built that
+  way and both deleted. Until then the code lives in the app that uses it, and
+  duplication between two apps is the cheaper mistake.
+
+  Two exceptions, and only these two: **generated code** (`api-client`), which
+  has no interface to guess wrong, and **a value that must be identical
+  everywhere or it is a bug** (`tokens`). The test is not "might this be reused"
+  — it is "does a second copy of this break something silently." A color does. A
+  helper function does not.
 - **Dependency direction is one-way.** `apps/*` may import from `packages/*`.
   `packages/*` must never import from `apps/*`, and apps must never import each
-  other. Shared logic moves into `packages/shared`.
+  other.
 - **Each app deploys independently.** A change under one app must not require
   redeploying another. CI triggers on paths — but a change to a package must
   trigger every app that consumes it, so path filters follow the dependency
@@ -76,10 +90,11 @@ subtree belong in that subtree's `AGENTS.md`, not here.
 - **Never call the API by hand.** Every request goes through `packages/api-client`.
   A hand-written `fetch` outlives the contract it was written against without
   saying so — which is the exact failure the generated client exists to prevent.
-- **One validation schema, shared with the API.** Client-side validation uses the
-  zod schema in `packages/shared`, never a second hand-written check. A duplicate
-  validator drifts from the server's rules quietly, and the first evidence of the
-  drift is bad data already committed.
+- **One validation schema, shared with the API.** Client-side validation derives
+  from what the API publishes — the generated `packages/api-client` — never from
+  a second hand-written check. A duplicate validator drifts from the server's
+  rules quietly, and the first evidence of the drift is bad data already
+  committed.
 
 ### Continuous integration
 
@@ -126,9 +141,9 @@ by the branch protection that already exists.
   anticipation. This is what keeps "each app deploys independently" honest:
   primitives change rarely, and the components that change daily never leave
   their app.
-- **`packages/ui` must not depend on `packages/shared`.** It is the layer test in
-  executable form: if a component needs a domain type, it is a product component
-  and belongs in an app.
+- **`packages/ui` must not know a domain type.** It is the layer test in
+  executable form: if a component needs to be told what a tenant or an invoice
+  is, it is a product component and belongs in an app.
 - **shadcn is not a dependency.** The CLI copies source files that we then own.
   Components are added into `packages/ui`, not into an app, and are edited freely
   afterward.
@@ -197,7 +212,7 @@ by the branch protection that already exists.
 - **English is the only language today, and nothing may assume it is the only
   one.** Adding one must be a config and translation change, never a refactor: no
   literal user-facing strings in components, and no date, number, or currency
-  formatting outside the `Intl` helpers in `packages/shared`.
+  formatting outside each app's own `Intl` helpers.
 - **`apps/admin` is not localized.** Its users are our own staff. English only, no
   locale routing, no catalogs.
 - **`apps/web` carries no locale in the URL.** It sits behind auth and is not
@@ -251,8 +266,8 @@ by the branch protection that already exists.
   cache key. Replacing the provider is then a backfill of one column, not a
   migration.
 - **Only `lib/auth/**` may import the provider SDK.** Each app wraps the vendor
-  behind a local module exporting our own session shape, typed in
-  `packages/shared`. Enforce it with a lint rule so CI catches a stray import,
+  behind a local module exporting our own session shape, typed in that app.
+  Enforce it with a lint rule so CI catches a stray import,
   rather than trusting the convention. There is deliberately no `packages/auth`:
   `web` and `admin` authenticate against different directories, and a shared auth
   module is precisely where an "if admin, skip tenancy" branch would eventually
@@ -270,9 +285,11 @@ by the branch protection that already exists.
   logic lives in `apps/api` and is tested there — the frontend has less to unit
   test than it looks like.
 
-  Vitest is in, on that trigger: locale handling in `packages/shared`. One
+  Vitest is in, on that trigger: locale handling in `apps/web`. One
   `vitest.config.ts` at the root, for the same reason there is one `biome.json`,
-  and it collects `packages/**` only. `pnpm test` from the root.
+  and it collects `apps/*/src` and `packages/*/src` alike — a test belongs next
+  to the code it pins down, wherever that currently lives. `pnpm test` from the
+  root.
 
   What is tested there is what would fail silently — a locale tag parsed by
   splitting on a hyphen instead of by `Intl.Locale`. Not the wrappers around a

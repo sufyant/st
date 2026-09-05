@@ -29,10 +29,10 @@ pnpm --filter @st/web build
 pnpm --filter @st/web typecheck
 ```
 
-There are no tests in this app. Vitest collects `packages/**` only — what this
-app owns is components and routes, and a component suite is not the trigger the
-root AGENTS.md describes. The pure logic it depends on is tested where it lives,
-in `@st/shared`. `pnpm test` from the root runs it.
+Tests are collected from `src/**/*.test.ts` by the root `vitest.config.ts`, and
+the trigger is the one the root AGENTS.md describes: pure logic that would fail
+silently. `src/lib/locale.test.ts` is the only suite today. Components and routes
+are not unit tested here. `pnpm test` from the root runs it.
 
 `typecheck` runs `next typegen` first. `LayoutProps`, `PageProps` and the route
 literals are generated into `.next/types`, so on a fresh clone — a colleague's,
@@ -61,13 +61,15 @@ Biome replaces both ESLint and Prettier. Do not add either.
 | Every user-facing string | `messages/<language>.json` |
 | Auth | `src/lib/auth/**` — see below |
 
-`@st/ui`, `@st/tokens` and `@st/shared` exist today. `@st/api-client` is where
-that code will live — do not invent a local substitute for it, and do not import
-it before it is built.
+`@st/ui` and `@st/tokens` exist today. `@st/api-client` is where the API access
+will live — do not invent a local substitute for it, and do not import it before
+it is built. There is no `@st/shared`: it held one file with one consumer, which
+is this app, so the file lives here.
 
 A component in `src/components` that turns out to be generic does not move to
-`@st/ui` until a second app needs it. Duplication is cheaper than a premature
-shared abstraction that every app must then be redeployed for.
+`@st/ui` until a second app needs it, and the same goes for anything else that
+looks shareable. Duplication is cheaper than a premature shared abstraction that
+every app must then be redeployed for.
 
 ## Auth
 
@@ -215,7 +217,7 @@ scrollbars — render dark, and `themeColor` is the mobile address bar.
 
 The locale is `en-IE`, not `en`. No user-facing literal belongs in a component —
 all strings come from a catalog. Dates, numbers, and currency go
-through the `Intl` helpers in `@st/shared`; a raw `toLocaleString()` or a
+through the `Intl` helpers in `src/lib/locale.ts`; a raw `toLocaleString()` or a
 hand-built date format is a bug.
 
 There is no locale segment in this app's URLs. Language comes from the user
@@ -225,10 +227,10 @@ Translation runs on `next-intl`, configured without i18n routing:
 
 | Piece | Where |
 |---|---|
-| Which locale this request is | `src/lib/locale.ts` |
+| Supported locales, and which one this request is | `src/lib/locale.ts` |
 | Handing the catalogs to next-intl | `src/i18n/request.ts` |
 | Every string this app shows | `messages/<language>.json` |
-| Date, number and money formatting | `@st/shared` — added with the first value that needs it |
+| Date, number and money formatting | `src/lib/locale.ts` — added with the first value that needs it |
 
 `resolveLocale()` in `src/lib/locale.ts` is the single place the locale is
 decided, and today it returns the one locale we support. When `@st/api-client`

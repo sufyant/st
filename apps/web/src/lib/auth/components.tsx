@@ -1,7 +1,7 @@
 import { ClerkProvider, Show } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
-import type { Locale } from "@st/shared";
 import type { ComponentProps, ReactNode } from "react";
+import type { Locale } from "@/lib/locale";
 
 /**
  * The provider's UI, renamed to ours.
