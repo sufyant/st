@@ -80,12 +80,18 @@ Turbo gorev adlari paket script adlariyla birebir eslesmek zorunda. Sablon
 eklenir:
 
 ```
-apps/web:  dev, build, start, lint, format, check-types
-kok:       dev, build, lint, format, check-types  (hepsi turbo uzerinden)
+apps/web:  dev, build, start, check-types
+kok:       dev, build, check-types  (turbo uzerinden) + lint, format (dogrudan biome)
 ```
 
 `check-types` icerigi `next typegen && tsc --noEmit`. `next typegen`, Next'in
 urettigi tipler olmadan `tsc`'nin yanlis hata vermesini onler.
+
+Lint ve format turbo gorevi degil. Biome tek binary ve kokte tek konfig ile tum
+repoyu tek gecisde tariyor; paket basina gorev tanimlamak her pakete Biome
+bagimliligi eklemeyi gerektirir ve karsiliginda bir sey kazandirmaz. Bu yuzden
+`@biomejs/biome` sadece kok devDependency'sidir ve `apps/web`'de lint/format
+scripti bulunmaz.
 
 ## Sablon ciktisina yapilacak dort duzeltme
 
@@ -136,7 +142,7 @@ Ikisi de commit edilir.
 |---|---|
 | Kurulum | Kokte `pnpm install` biter, lock dosyasi tek ve kokte |
 | Build | `pnpm turbo build` hatasiz |
-| Lint | `pnpm turbo lint` temiz |
+| Lint | `pnpm lint` temiz |
 | Tip | `pnpm turbo check-types` temiz |
 | Dev | `pnpm --filter @st/web dev` ile sayfa 3000'de acilir, tarayicidan dogrulanir |
 | Temizlik | `next dev` calistiktan sonra `git status` temiz |
