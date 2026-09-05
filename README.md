@@ -8,10 +8,11 @@ Multi-tenant uygulama monorepo'su.
 apps/
   api          .NET 10 Web API (EF Core, PostgreSQL)
   web          Next.js
+  admin        Next.js (platform back-office)
   marketing    Next.js
   mobile       Expo
 packages/
-  api-client   OpenAPI'den üretilen TypeScript istemcisi
+  ui           shadcn bileşenleri (web, admin, marketing)
 docs/          Dokümantasyon
 scripts/       Yardımcı script'ler
 ```

@@ -19,8 +19,6 @@ apps/
   marketing    Next.js               deploys to Vercel
   mobile       Expo                  ships via EAS Build / EAS Update
 packages/
-  api-client   generated from the API's OpenAPI schema — every app
-  tokens       design tokens as plain data — every app, mobile included
   ui           shadcn components — web, admin, marketing only (needs a DOM)
 docs/          cross-cutting notes and decisions
 scripts/       repo-wide tooling
@@ -42,12 +40,13 @@ running commands or changing code under one, load and follow its `AGENTS.md`:
 | `apps/marketing/*` | `apps/marketing/AGENTS.md` |
 | `apps/mobile/*` | `apps/mobile/AGENTS.md` |
 
-Scaffolded so far: `apps/web`, `packages/ui`, `packages/tokens`. Still planned,
-not existing: `apps/api`, `apps/admin`, `apps/marketing`, `apps/mobile`,
-`packages/api-client`. Do not import from a package that has not been built yet,
-and do not invent a local substitute for it either. Say so instead.
+Scaffolded so far: `apps/web` and `packages/ui`. Still planned, not existing:
+`apps/api`, `apps/admin`, `apps/marketing`, `apps/mobile`. Do not import
+something that has not been built yet, and do not invent a local substitute for
+it either. Say so instead.
 
-That list is short on purpose — see When a package exists.
+`packages/` holds exactly one thing today and the bar for a second is high — see
+When a package exists.
 
 ## Cross-Cutting Rules
 
@@ -62,10 +61,18 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   shared only among apps on the same platform, which is why `packages/ui` serves
   the three Next.js apps and nothing else. When a new package is proposed, decide
   which of the two it is before writing any of it.
-- **The API is the contract.** `packages/api-client` is generated from the API's
-  OpenAPI schema. To change what the frontends see, change the .NET contract and
-  regenerate. Never hand-edit generated output, and never work around a stale
-  client by patching the consumer.
+- **The API is the contract.** The frontends talk to it through a client
+  generated from its OpenAPI schema, never a hand-written one. To change what
+  they see, change the .NET contract and regenerate. Never hand-edit generated
+  output, and never work around a stale client by patching the consumer.
+
+  It arrives as `packages/api-client` the day `apps/api` publishes a schema, and
+  not a day earlier — an empty folder is not a decision. It is a package rather
+  than a copy per app for the same reason `tokens` was not: this is *derived*
+  output, not a choice. Four apps generating their own would produce four copies
+  of one file, from four generator configs that can sit on four schema versions,
+  and the drift is invisible until a request 400s in production. It is also plain
+  types and `fetch`, so `apps/mobile` consumes it like everything else.
 - **When a package exists.** A package is created when a *second* consumer
   actually needs the code, not when one is imagined. Extraction inside a
   workspace is a single commit — no publish, no version, no semver — so
@@ -75,11 +82,11 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   way and both deleted. Until then the code lives in the app that uses it, and
   duplication between two apps is the cheaper mistake.
 
-  Two exceptions, and only these two: **generated code** (`api-client`), which
-  has no interface to guess wrong, and **a value that must be identical
-  everywhere or it is a bug** (`tokens`). The test is not "might this be reused"
-  — it is "does a second copy of this break something silently." A color does. A
-  helper function does not.
+  `packages/` therefore holds one thing: `ui`, the shadcn primitives, because
+  the same Button genuinely renders in web, admin and marketing and we did not
+  design its API — shadcn did. Everything else an app needs, that app owns,
+  including its own palette. `packages/i18n`, `packages/shared` and
+  `packages/tokens` were all built ahead of a second consumer and all deleted.
 - **Dependency direction is one-way.** `apps/*` may import from `packages/*`.
   `packages/*` must never import from `apps/*`, and apps must never import each
   other.
@@ -87,12 +94,12 @@ subtree belong in that subtree's `AGENTS.md`, not here.
   redeploying another. CI triggers on paths — but a change to a package must
   trigger every app that consumes it, so path filters follow the dependency
   graph, not just directory names.
-- **Never call the API by hand.** Every request goes through `packages/api-client`.
-  A hand-written `fetch` outlives the contract it was written against without
-  saying so — which is the exact failure the generated client exists to prevent.
+- **Never call the API by hand.** Every request goes through the generated
+  client. A hand-written `fetch` outlives the contract it was written against
+  without saying so — which is the exact failure generating the client prevents.
 - **One validation schema, shared with the API.** Client-side validation derives
-  from what the API publishes — the generated `packages/api-client` — never from
-  a second hand-written check. A duplicate validator drifts from the server's
+  from what the API publishes, through the generated client — never from a
+  second hand-written check. A duplicate validator drifts from the server's
   rules quietly, and the first evidence of the drift is bad data already
   committed.
 
@@ -133,10 +140,10 @@ by the branch protection that already exists.
 
 ### Presentation
 
-- **UI lives in three layers.** Design tokens in `packages/tokens`; primitives
-  with no domain knowledge (the shadcn output — Button, Input, Dialog) in
-  `packages/ui`; product components that understand the domain (a tenant
-  switcher, an invite form) inside the app that shows them. A product component moves into
+- **UI lives in two layers.** Primitives with no domain knowledge (the shadcn
+  output — Button, Input, Dialog) in `packages/ui`; product components that
+  understand the domain (a tenant switcher, an invite form) inside the app that
+  shows them. A product component moves into
   `packages/ui` only when a *second* app actually needs it — never in
   anticipation. This is what keeps "each app deploys independently" honest:
   primitives change rarely, and the components that change daily never leave
@@ -147,17 +154,18 @@ by the branch protection that already exists.
 - **shadcn is not a dependency.** The CLI copies source files that we then own.
   Components are added into `packages/ui`, not into an app, and are edited freely
   afterward.
-- **Tokens are platform-neutral data.** A color exists in exactly one file,
-  `packages/tokens/src/theme.ts`, authored as hex. The web's CSS variables are
-  generated from it and committed; native reads the same values as TypeScript.
-  Never write a color into a component, a stylesheet, or the generated
-  `tokens.css` — the last of those is silently discarded on the next
-  regeneration, taking native out of step with web.
-- **Contrast is measured, not judged.** `pnpm --filter @st/tokens check`
-  regenerates the CSS to prove it is current, then fails if any surface and its
-  paired foreground drops below WCAG AA in either theme. Run it after touching a
-  color. Every accessible-looking palette that shipped inaccessible was approved
-  by someone confident it looked fine.
+- **Each app owns its palette.** `packages/ui` declares which CSS variables its
+  components read — `--primary`, `--background`, `--radius` — and never what
+  they are. The values live in the consuming app's own stylesheet, so a color
+  change in one app is a change to that app. Within an app a color still exists
+  in exactly one place: that `:root`/`.dark` block. Never write a hex into a
+  component.
+- **Contrast is measured, not judged.** A surface and the foreground on it clear
+  WCAG AA (4.5:1) in both themes, and the measured ratio is written next to the
+  value so the next change has a number to beat. Measure before changing one —
+  `green-600` on white reads as an obvious success color and fails at 3.30:1.
+  Every accessible-looking palette that shipped inaccessible was approved by
+  someone confident it looked fine.
 - **Locale is a property of the person; theme is a property of the device.** A
   user's language lives in our database, because email rendered by the API must
   match what the app shows them. Theme preference lives in the browser or on the
