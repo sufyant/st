@@ -1,0 +1,9 @@
+{
+  "name": "st",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22"
+  }
+}

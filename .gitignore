@@ -36,6 +36,8 @@ Thumbs.db
 .idea/
 
 # Build output
+# Turborepo
+.turbo/
 dist/
 build/
 
