@@ -45,3 +45,6 @@ build/
 # agent/ for agents we do not use. Neither belongs in the repo if it reappears.
 .agents/
 agent/
+
+# Superpowers subagent-driven-development scratch
+.superpowers/
