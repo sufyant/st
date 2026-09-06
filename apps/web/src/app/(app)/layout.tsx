@@ -1,15 +1,43 @@
-import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { AppSidebar } from "@st/ui/components/app-sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@st/ui/components/ui/breadcrumb";
+import { Separator } from "@st/ui/components/ui/separator";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@st/ui/components/ui/sidebar";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   await auth.protect();
 
   return (
-    <>
-      <header className="flex justify-end gap-4 p-4">
-        <UserButton />
-      </header>
-      {children}
-    </>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
+        {children}
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
