@@ -9,6 +9,8 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.1",
+    "@clerk/ui": "^1.32.2",
     "@st/ui": "workspace:*",
     "next": "16.3.4",
     "react": "19.2.8",

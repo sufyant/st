@@ -1,3 +1,4 @@
 @import "@st/ui/globals.css";
+@import "@clerk/ui/themes/shadcn.css";
 
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
