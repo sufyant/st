@@ -10,6 +10,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
     "lint": "biome check",
     "format": "biome check --write"
   },
