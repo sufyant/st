@@ -35,9 +35,10 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 
-# Build output
 # Turborepo
 .turbo/
+
+# Build output
 dist/
 build/
 

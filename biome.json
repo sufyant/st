@@ -30,7 +30,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "recommended"
     },
     "domains": {
       "next": "recommended",
@@ -46,7 +46,7 @@
   },
   "overrides": [
     {
-      "includes": ["apps/web/public/**/*.svg"],
+      "includes": ["**/public/**/*.svg"],
       "linter": {
         "rules": {
           "a11y": {

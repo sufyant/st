@@ -111,6 +111,15 @@ scripti bulunmaz.
    urettigi her seyi korur. Next `dev` sirasinda bu dosyaya dokunuyor, o yuzden
    urettikleri silinmez.
 
+Not: Yukaridaki liste ilk implementasyon anindaki farki anlatiyor, kokteki
+`biome.json`'un guncel hali degil. Uygulama sonrasi bir duzeltme turu ve
+son inceleme duzeltme dalgasi `biome.json`'a uc sey daha ekledi: `.claude`
+disariya alma (`!.claude` — vendor edilmis arac dizini, workspace kaynagi
+degil), SVG a11y override'i (artik `**/public/**/*.svg` ile genellestirildi,
+tek app'e ozel degil), ve `linter.rules.recommended` yerine `linter.rules.preset`
+alanina gecis (Biome'un kendi migrasyon araciyla). Guncel icerik icin dosyanin
+kendisine bakilmali.
+
 ## Silinmeyen sablon dosyalari
 
 `apps/web/AGENTS.md` ve `apps/web/CLAUDE.md` sablonla geliyor.
