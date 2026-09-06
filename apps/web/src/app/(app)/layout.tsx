@@ -1,10 +1,4 @@
 import { auth } from "@clerk/nextjs/server";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@st/ui/components/ui/breadcrumb";
 import { Separator } from "@st/ui/components/ui/separator";
 import {
   SidebarInset,
@@ -12,6 +6,7 @@ import {
   SidebarTrigger,
 } from "@st/ui/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   await auth.protect();
@@ -27,13 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
             />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+            <DynamicBreadcrumb />
           </div>
         </header>
         {children}
