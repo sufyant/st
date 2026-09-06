@@ -1,5 +1,4 @@
 import { auth } from "@clerk/nextjs/server";
-import { AppSidebar } from "@st/ui/components/app-sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,6 +11,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@st/ui/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   await auth.protect();
