@@ -6,7 +6,15 @@
   "engines": {
     "node": ">=22"
   },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "lint": "biome check",
+    "format": "biome format --write"
+  },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.12"
+    "@biomejs/biome": "^2.5.12",
+    "turbo": "^2.10.12"
   }
 }
