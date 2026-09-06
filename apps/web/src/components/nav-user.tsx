@@ -27,6 +27,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@st/ui/components/ui/sidebar";
+import { Skeleton } from "@st/ui/components/ui/skeleton";
 import {
   BadgeCheck,
   Bell,
@@ -47,7 +48,21 @@ export function NavUser() {
   const { signOut } = useClerk();
   const { theme, setTheme } = useTheme();
 
-  if (!clerkUser) return null;
+  if (!clerkUser) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" className="pointer-events-none">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="grid flex-1 gap-1">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
 
   const name = clerkUser.fullName ?? clerkUser.username ?? "Account";
   const email = clerkUser.primaryEmailAddress?.emailAddress ?? "";
