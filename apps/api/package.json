@@ -1,0 +1,9 @@
+{
+  "name": "api",
+  "private": true,
+  "scripts": {
+    "dev": "dotnet watch --project src/Api.Host run",
+    "build": "dotnet build Api.sln",
+    "test": "dotnet test Api.sln"
+  }
+}
