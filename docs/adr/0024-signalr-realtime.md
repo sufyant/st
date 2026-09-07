@@ -13,7 +13,10 @@ tercih ediliyor.
 ## Decision
 
 SignalR kullanılır (native .NET real-time kütüphanesi), Socket.IO
-değil.
+değil. Bildirimler outbox üzerinden değil, başarılı bir commit'in
+hemen ardından doğrudan, aynı process içinde (in-process) tetiklenir
+([ADR 0018](0018-outbox-pattern.md)) — açık bir bağlantının, email/
+webhook'un aksine, dayanıklı (durable) teslimata ihtiyacı yok.
 
 ## Consequences
 

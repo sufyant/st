@@ -17,8 +17,9 @@ Backend ve veritabanı her zaman UTC kullanır (Postgres `timestamptz`,
 kullanıcının yerel zamanını UTC'ye çevirip gönderir. `created_at`/
 `updated_at` gibi alanlar asla istemciden gelmez — backend, işlemi
 işlerken `UtcNow` ile üretir. Kullanıcının IANA timezone kimliği (örn.
-`Europe/Istanbul`) `User` entity'sinde saklanır, görüntüleme sırasında
-UTC→local çevrimi için kullanılır.
+`Europe/Istanbul`) `admin` schema'sındaki `Users` tablosunda
+([ADR 0002](0002-control-plane-admin-schema.md)) saklanır, görüntüleme
+sırasında UTC→local çevrimi için kullanılır.
 
 ## Consequences
 

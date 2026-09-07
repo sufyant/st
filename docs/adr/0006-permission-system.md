@@ -16,11 +16,10 @@ kullanılır. `admin` schema'sındaki Role→Permission eşleşmesi, tenant
 çözümleme sırasında kullanıcının `ClaimsPrincipal`'ına permission
 claim'leri olarak yazılır. Command/query pipeline'ında bir
 `[RequiresPermission("...")]` attribute'u/pipeline behavior'ı bu
-claim'leri kontrol eder. İstek işleme sırası: Auth (Clerk JWT doğrulama)
-→ Tenant çözümleme ([ADR 0004](0004-path-based-tenant-resolution.md)) →
-Membership kontrolü ([ADR 0005](0005-membership-and-invitation.md)) →
-Permission kontrolü → Validation (FluentValidation) → Handler →
-SaveChanges (Unit of Work,
+claim'leri kontrol eder. İstek işleme sırası: Auth (Clerk JWT doğrulama) → Tenant çözümleme +
+Membership kontrolü (tek middleware,
+[ADR 0004](0004-path-based-tenant-resolution.md)) → Permission kontrolü
+→ Validation (FluentValidation) → Handler → SaveChanges (Unit of Work,
 [ADR 0010](0010-hand-rolled-mediator-pipeline.md)).
 
 ## Consequences

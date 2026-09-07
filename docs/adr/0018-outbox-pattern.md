@@ -7,8 +7,7 @@
 
 Bir command handler hem işletme verisini değiştirmeli hem de bu
 değişikliğe bağlı bir yan etkiyi (örn. bir email gönderme isteği, bir
-SignalR bildirimi, bir webhook tetikleme) güvenilir şekilde
-tetiklemeli. Bu iki işlemi ayrı transaction'larda yapmak, "işletme
+webhook tetikleme) güvenilir şekilde tetiklemeli. Bu iki işlemi ayrı transaction'larda yapmak, "işletme
 verisi değişti ama yan etki hiç tetiklenmedi" (veya tam tersi)
 senaryosuna açık kapı bırakır.
 
@@ -41,7 +40,10 @@ mesajlarını okuyup işler.
 ### Trade-offs
 - Outbox mesajları gerçek zamanlı değil, en fazla 5-10 saniyelik bir
   gecikmeyle işlenir — gerçek zamanlı gereksinimi olan senaryolar
-  (varsa) bu deseni kullanmamalı.
+  (varsa) bu deseni kullanmamalı. Bu yüzden SignalR gibi düşük gecikmeli,
+  in-process bildirimler outbox üzerinden değil, commit sonrası eş
+  zamanlı (senkron) olarak doğrudan tetiklenir
+  ([ADR 0024](0024-signalr-realtime.md)).
 - `BackgroundService`, API process'iyle aynı yaşam döngüsünü paylaşır;
   API process'i deploy sırasında yeniden başlatıldığında, o anda
   işlenmekte olan bir mesaj yarım kalabilir (bu yüzden

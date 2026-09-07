@@ -16,9 +16,10 @@ kurmak bugünün ölçeğine göre fazla.
 Serilog (yapılandırılmış loglama kütüphanesi) + Seq (log görüntüleme/
 arama arayüzü, solo/küçük ekip için ücretsiz tier) kullanılır. Her log
 satırı, merkezi pipeline'da
-([ADR 0006](0006-permission-system.md)'daki sıralamanın bir parçası
-olarak) otomatik olarak tenant_id, request_id ve user_id ile enrich
-edilir — her log çağrısında bu alanları elle eklemeye gerek yok.
+([ADR 0010](0010-hand-rolled-mediator-pipeline.md)'daki pipeline
+behavior zincirinin bir parçası olarak) otomatik olarak tenant_id,
+request_id ve user_id ile enrich edilir — her log çağrısında bu
+alanları elle eklemeye gerek yok.
 
 ## Consequences
 
@@ -31,7 +32,7 @@ edilir — her log çağrısında bu alanları elle eklemeye gerek yok.
 - Otomatik enrichment, her log çağrısında
   `logger.LogError("...", tenantId, requestId, userId)` gibi tekrar
   eden, unutulmaya açık bir kalıp yazma ihtiyacını ortadan kaldırır —
-  enrichment bir kere, merkezi middleware'de tanımlanır.
+  enrichment bir kere, merkezi pipeline'da tanımlanır.
 - Seq'in ücretsiz tier'ı solo/küçük ekibin bugünkü ihtiyacına yetiyor;
   ekip büyürse Grafana+Loki gibi daha ölçeklenebilir bir alternatife
   geçiş, Serilog'un sink (çıktı hedefi) soyutlaması sayesinde loglama

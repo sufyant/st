@@ -15,7 +15,13 @@ eklemek) tüm tenant şemalarına uygulanmalı, sadece bir tanesine değil.
 EF Core code-first migration'lar kullanılır. Deploy sürecinde,
 `admin.tenants` tablosundaki tenant listesi gezilir ve her tenant
 schema'sı için `DbContext`'in `HasDefaultSchema` değeri o tenant'ın
-schema adına dinamik olarak ayarlanarak migration uygulanır.
+schema adına dinamik olarak ayarlanarak migration uygulanır. Bu
+`HasDefaultSchema` mekanizması yalnızca migration zamanında, deploy
+sırasında tenant başına oluşturulan kısa ömürlü bir `DbContext`
+örneği için kullanılır; runtime'da istek işleyen `DbContext` bundan
+ayrıdır ve şema seçimi için
+[ADR 0001](0001-tenant-isolation-schema-per-tenant.md)'deki
+`search_path` mekanizmasına dayanır.
 
 ## Consequences
 

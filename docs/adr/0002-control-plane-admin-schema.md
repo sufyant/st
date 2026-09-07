@@ -13,12 +13,17 @@ state'i.
 
 ## Decision
 
-Ayrı bir `admin` schema'sı tanımlanır; tenant kaydı (`Tenants`), üyelik
-(`Memberships`) ve davet (`Invitations`) tabloları burada tutulur. Tüm
-tenant şemalarından bağımsız, tek bir kopya olarak var olur ve tenant
-çözümleme ([ADR 0004](0004-path-based-tenant-resolution.md)) ile
-membership kontrolü ([ADR 0006](0006-permission-system.md)) bu şemaya
-sorgu atarak çalışır.
+Ayrı bir `admin` schema'sı tanımlanır; tenant kaydı (`Tenants`), kullanıcı
+(`Users` — tenant'lar arası kullanıcı profili, Clerk kullanıcı id'siyle
+anahtarlanır ve [ADR 0016](0016-utc-timezone-policy.md)'ya göre
+kullanıcının IANA timezone'unu da tutar), üyelik (`Memberships`), davet
+(`Invitations`) ve rol→izin eşlemesi (`RolePermissions`) tabloları
+burada tutulur. Tüm tenant şemalarından bağımsız, tek bir kopya olarak
+var olur ve tenant çözümleme
+([ADR 0004](0004-path-based-tenant-resolution.md)) ile membership
+kontrolü ([ADR 0005](0005-membership-and-invitation.md)) ve permission
+kontrolü ([ADR 0006](0006-permission-system.md)) bu şemaya sorgu atarak
+çalışır.
 
 ## Consequences
 

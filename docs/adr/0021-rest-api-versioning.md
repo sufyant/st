@@ -14,7 +14,12 @@ REST kullanılır, tüm endpoint'ler `/api/v1` altında yaşar. Versiyonlama
 additive-only disiplinine tabidir: mevcut bir endpoint'e yeni, opsiyonel
 alan eklemek serbesttir, ama breaking change (bir alanı kaldırmak,
 tipini değiştirmek, zorunlu hale getirmek) her zaman yeni bir versiyona
-(`/api/v2`) gider.
+(`/api/v2`) gider. Tenant çözümlemesiyle
+([ADR 0004](0004-path-based-tenant-resolution.md)) birleştiğinde
+kanonik URL şekli `/{tenant-alias}/api/v1/...` olur; davet kabulü gibi
+kullanıcının henüz bir membership'i olmadığı birkaç endpoint bu tenant
+prefix'inin dışında yaşamak zorundadır
+([ADR 0005](0005-membership-and-invitation.md)'deki davet kabul akışı).
 
 ## Consequences
 
