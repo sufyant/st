@@ -75,11 +75,17 @@ ince wrapper):
 }
 ```
 
-`turbo.json`'daki mevcut `dev`/`build`/`test` görevleri bu script'leri
-otomatik olarak devreye alır — turbo.json'da ekstra bir değişiklik
-gerekmiyor (paket bazlı script eşleşmesi zaten var olan task
-tanımlarıyla çalışır). `check-types` ve `test:e2e` görevleri bu pakette
-tanımlı değil, turbo bunları bu paket için otomatik atlar.
+Kök `turbo.json`'daki mevcut `dev`/`build`/`test` görevleri bu
+script'leri otomatik olarak devreye alır — paket bazlı script eşleşmesi
+zaten var olan task tanımlarıyla çalışır. Ancak `build`/`test`
+görevlerinin `apps/api` için Turborepo tarafından cache'lenmemesi
+gerekiyor ([ADR 0029](../../adr/0029-monorepo-tooling.md)'un "Turborepo'nun
+cache mekanizmasına .NET build'ini dahil etmeye çalışmıyoruz" ilkesi) —
+bu yüzden `apps/api/turbo.json` içinde bu iki görev için `cache: false`
+override'ı ayrıca tanımlanır (aksi halde warm cache'te `dotnet build`/
+`dotnet test` hiç çalışmadan "başarılı" sonucu tekrar oynatılabilir).
+`check-types` ve `test:e2e` görevleri bu pakette tanımlı değil, turbo
+bunları bu paket için otomatik atlar.
 
 `global.json`, SDK'yı `10.0.102`'ye (mevcut ortamda kurulu sürüm) `latestFeature`
 roll-forward politikasıyla pinler — böylece `9.0.302` da kurulu olsa
