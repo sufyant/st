@@ -10,9 +10,19 @@ superpowers:subagent-driven-development. Environment verified before start:
 ## Phases
 
 1. Bootstrap — .NET 10 solution structure, monorepo wrapper (ADR 0028, 0029)
-2. Domain + Persistence foundation — Entity/AggregateRoot/ValueObject/DomainEvent,
-   EF Core DbContext, schema-per-tenant, admin schema, migrations, dual ID
-   (ADR 0001, 0002, 0007, 0008, 0012, 0014, 0015, 0016)
+2. Domain + Persistence foundation — split into two sub-phases (this phase
+   alone bundled too much for one SDD plan, same reasoning as the ADR
+   suite's grouping):
+   - **2a. Domain building blocks** — Entity/AggregateRoot/ValueObject/
+     DomainEvent, Email/Money/TenantSlug value objects (ADR 0007, 0008).
+     Pure domain layer, no EF, no DB, no Testcontainers needed yet.
+   - **2b. Persistence foundation** — EF Core DbContext, admin schema
+     (Tenants/Users/Memberships/Invitations/RolePermissions per ADR 0002
+     as amended), schema-per-tenant runtime `search_path` (ADR 0001),
+     migrations (ADR 0014), dual ID sequence generation (ADR 0008),
+     RowVersion optimistic concurrency example (ADR 0015), UTC timestamp
+     convention (ADR 0016). First phase needing Testcontainers + real
+     Postgres (ADR 0025) — this is the security-critical layer.
 3. Auth + Tenant middleware — JWT/JWKS, path-based resolution, membership,
    permission system (ADR 0003, 0004, 0005, 0006, 0013)
 4. CQRS-lite + pipeline — hand-rolled mediator, pipeline behaviors, Result
@@ -24,7 +34,9 @@ superpowers:subagent-driven-development. Environment verified before start:
 
 ## Status
 
-- Phase 1: not started
+- Phase 1: COMPLETE (commits 8143c9a..89e9d61 — solution skeleton, /health
+  endpoint, pnpm/Turborepo wiring incl. turbo cache:false override for
+  api#build/api#test found necessary during final review; pushed to origin)
 - Phase 2: not started
 - Phase 3: not started
 - Phase 4: not started
