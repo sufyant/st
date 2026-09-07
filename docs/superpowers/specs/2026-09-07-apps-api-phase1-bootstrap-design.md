@@ -45,7 +45,7 @@ apps/api/
       appsettings.json
   tests/
     Api.Tests.Unit/
-      Api.Tests.Unit.csproj            # -> references Api.Domain
+      Api.Tests.Unit.csproj            # -> references Api.Host
 ```
 
 Bu fazda her katman projesi neredeyse boş kalır — sadece referans
@@ -110,7 +110,8 @@ testleri, test edilecek gerçek bir persistence katmanı ortaya çıkınca
 1. `cd apps/api && dotnet build Api.sln` başarılı.
 2. `cd apps/api && dotnet test Api.sln` başarılı, 1 test geçiyor.
 3. `pnpm --filter api build` ve `pnpm --filter api test` kökten
-   çalışıyor (turbo üzerinden).
+   çalışıyor; kök `pnpm build`/`pnpm test` de Turborepo üzerinden aynı
+   script'lere ulaşıyor.
 4. `dotnet watch --project src/Api.Host run` ile host ayağa kalkıp
    `GET /health` çağrısına `{"status":"ok"}` döner (manuel/otomatik
    doğrulama — arka planda başlatıp curl ile kontrol edilecek, sonra
