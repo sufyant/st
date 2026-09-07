@@ -58,4 +58,34 @@ public class AggregateRootTests
         // Assert
         Assert.InRange(domainEvent.OccurredOnUtc, before, after);
     }
+
+    [Fact]
+    public void DomainEvent_SeparatelyRaisedEvents_HaveDifferentIds()
+    {
+        // Arrange
+        var aggregate = new TestAggregate(Guid.NewGuid());
+
+        // Act
+        aggregate.DoSomething("first");
+        aggregate.DoSomething("second");
+
+        // Assert
+        Assert.NotEqual(aggregate.DomainEvents[0].Id, aggregate.DomainEvents[1].Id);
+    }
+
+    [Fact]
+    public void IHasDomainEvents_ReferencedThroughInterface_ExposesDomainEventsAndClear()
+    {
+        // Arrange
+        var aggregate = new TestAggregate(Guid.NewGuid());
+        aggregate.DoSomething("first");
+
+        // Act
+        IHasDomainEvents asInterface = aggregate;
+
+        // Assert
+        Assert.Single(asInterface.DomainEvents);
+        asInterface.ClearDomainEvents();
+        Assert.Empty(asInterface.DomainEvents);
+    }
 }

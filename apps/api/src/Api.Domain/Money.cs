@@ -13,12 +13,19 @@ public sealed class Money : ValueObject
 
     public static Money Create(decimal amount, string currency)
     {
-        if (string.IsNullOrWhiteSpace(currency) || currency.Length != 3)
+        if (string.IsNullOrWhiteSpace(currency))
         {
             throw new ArgumentException("Currency must be a 3-letter ISO code.", nameof(currency));
         }
 
-        return new Money(amount, currency.ToUpperInvariant());
+        var trimmed = currency.Trim();
+
+        if (trimmed.Length != 3 || !trimmed.All(char.IsLetter))
+        {
+            throw new ArgumentException("Currency must be a 3-letter ISO code.", nameof(currency));
+        }
+
+        return new Money(amount, trimmed.ToUpperInvariant());
     }
 
     public static Money Zero(string currency) => Create(0m, currency);

@@ -16,6 +16,11 @@ public sealed partial class Email : ValueObject
 
     public static Email Create(string value)
     {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Email cannot be empty.", nameof(value));
+        }
+
         var trimmed = value.Trim();
 
         if (string.IsNullOrWhiteSpace(trimmed))

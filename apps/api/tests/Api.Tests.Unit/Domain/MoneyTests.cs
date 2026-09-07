@@ -20,6 +20,8 @@ public class MoneyTests
     [InlineData("")]
     [InlineData("US")]
     [InlineData("USDD")]
+    [InlineData("1 2")]
+    [InlineData("12A")]
     public void Create_InvalidCurrency_ThrowsArgumentException(string currency)
     {
         // Act & Assert
@@ -60,5 +62,16 @@ public class MoneyTests
         // Assert
         Assert.Equal(0m, zero.Amount);
         Assert.Equal("EUR", zero.Currency);
+    }
+
+    [Fact]
+    public void EqualityOperator_StructurallyEqualInstances_ReturnsTrue()
+    {
+        // Arrange
+        var first = Money.Create(10m, "USD");
+        var second = Money.Create(10m, "USD");
+
+        // Act & Assert
+        Assert.True(first == second);
     }
 }

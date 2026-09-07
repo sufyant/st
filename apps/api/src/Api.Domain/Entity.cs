@@ -26,7 +26,7 @@ public abstract class Entity<TId> : IEquatable<Entity<TId>>
             return true;
         }
 
-        return GetType() == other.GetType() && Id.Equals(other.Id);
+        return GetType() == other.GetType() && EqualityComparer<TId>.Default.Equals(Id, other.Id);
     }
 
     public override bool Equals(object? obj) => Equals(obj as Entity<TId>);

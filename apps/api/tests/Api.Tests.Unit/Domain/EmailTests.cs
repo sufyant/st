@@ -40,4 +40,22 @@ public class EmailTests
         // Act & Assert
         Assert.Equal(first, second);
     }
+
+    [Fact]
+    public void Create_NullInput_ThrowsArgumentException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => Email.Create(null!));
+    }
+
+    [Fact]
+    public void EqualityOperator_StructurallyEqualInstances_ReturnsTrue()
+    {
+        // Arrange
+        var first = Email.Create("user@example.com");
+        var second = Email.Create("user@example.com");
+
+        // Act & Assert
+        Assert.True(first == second);
+    }
 }

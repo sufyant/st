@@ -6,6 +6,8 @@ public sealed partial class TenantSlug : ValueObject
 {
     private const int PostgresSchemaNameMaxLength = 63;
 
+    private static readonly HashSet<string> ReservedSlugs = ["admin", "public"];
+
     [GeneratedRegex(@"^[a-z0-9]+(-[a-z0-9]+)*$")]
     private static partial Regex SlugPattern();
 
@@ -35,6 +37,11 @@ public sealed partial class TenantSlug : ValueObject
             throw new ArgumentException(
                 $"'{value}' is not a valid tenant slug (lowercase letters, digits, single hyphens only, no leading/trailing hyphen).",
                 nameof(value));
+        }
+
+        if (ReservedSlugs.Contains(value))
+        {
+            throw new ArgumentException($"'{value}' is a reserved tenant slug.", nameof(value));
         }
 
         return new TenantSlug(value);

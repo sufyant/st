@@ -25,6 +25,8 @@ public class TenantSlugTests
     [InlineData("-acme")]
     [InlineData("acme-")]
     [InlineData("acme--corp")]
+    [InlineData("admin")]
+    [InlineData("public")]
     public void Create_InvalidInput_ThrowsArgumentException(string input)
     {
         // Act & Assert
