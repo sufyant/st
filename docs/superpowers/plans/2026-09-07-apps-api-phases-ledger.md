@@ -37,7 +37,11 @@ superpowers:subagent-driven-development. Environment verified before start:
 - Phase 1: COMPLETE (commits 8143c9a..89e9d61 — solution skeleton, /health
   endpoint, pnpm/Turborepo wiring incl. turbo cache:false override for
   api#build/api#test found necessary during final review; pushed to origin)
-- Phase 2: not started
+- Phase 2a: COMPLETE (commits 4be50f2..a3bfe16 — Entity, AggregateRoot,
+  ValueObject, DomainEvent base classes plus Email, Money, TenantSlug
+  value objects; final-review fixes for reserved tenant slugs, non-generic
+  IHasDomainEvents, and validation edge cases)
+- Phase 2b: not started
 - Phase 3: not started
 - Phase 4: not started
 - Phase 5: not started
