@@ -5,6 +5,8 @@ using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddMemoryCache();
+
 builder.Services.AddDbContext<Api.Infrastructure.AdminDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("AdminDb"),

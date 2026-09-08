@@ -137,4 +137,43 @@ public class TenantResolutionMiddlewareTests : IDisposable
         // Assert
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetWhoAmI_RepeatedRequestsToSameTenant_BothSucceedFromCachedResolution()
+    {
+        // Arrange: the tenant-resolution lookup (alias -> tenant) is cached via IMemoryCache
+        // (ADR 0017). Two consecutive requests to the same tenant alias must both resolve
+        // correctly - the second one exercising the cached path.
+        await using var dbContext = CreateDbContext();
+        var provisioningService = new TenantProvisioningService(dbContext);
+        var tenant = await provisioningService.ProvisionAsync(
+            TenantSlug.Create($"cached-{Guid.NewGuid():N}"[..20]), "Cached Tenant");
+
+        var clerkUserId = $"clerk_cached_{Guid.NewGuid():N}";
+        var user = User.Create(clerkUserId, Email.Create($"{Guid.NewGuid():N}@example.com"));
+        dbContext.Users.Add(user);
+        var membership = Membership.Create(user.Id, tenant.Id, "member");
+        dbContext.Memberships.Add(membership);
+
+        var hasPermission = await dbContext.RolePermissions
+            .AnyAsync(rp => rp.Role == "member" && rp.Permission == "tenant.whoami");
+        if (!hasPermission)
+        {
+            dbContext.RolePermissions.Add(RolePermission.Create("member", "tenant.whoami"));
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var token = TestJwtTokenFactory.CreateToken(clerkUserId);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var firstResponse = await client.GetAsync($"/{tenant.Slug.Value}/api/v1/whoami");
+        var secondResponse = await client.GetAsync($"/{tenant.Slug.Value}/api/v1/whoami");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+    }
 }

@@ -3,12 +3,13 @@ using Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Api.Infrastructure;
 
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, AdminDbContext dbContext)
+    public async Task InvokeAsync(HttpContext context, AdminDbContext dbContext, IMemoryCache cache)
     {
         var alias = context.GetRouteValue("tenant") as string;
 
@@ -29,8 +30,15 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        var tenant = await dbContext.Tenants.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Slug == slug);
+        var cacheKey = $"tenant-resolution:{slug.Value}";
+        if (!cache.TryGetValue(cacheKey, out Tenant? tenant))
+        {
+            tenant = await dbContext.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
+            if (tenant is not null)
+            {
+                cache.Set(cacheKey, tenant, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromMinutes(5) });
+            }
+        }
 
         if (tenant is null)
         {
