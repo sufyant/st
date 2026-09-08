@@ -87,9 +87,45 @@ superpowers:subagent-driven-development. Environment verified before start:
   exist; RenameTenantCommandEndToEndTests' own test harness still has
   un-swapped behavior order, harmless today but align later. Pushed to
   origin.)
-- Phase 5: in progress (spec+plan committed 6eef2a1 — REST endpoint for
-  RenameTenantCommand, OpenAPI generation, packages/api-client TS codegen,
-  SignalR TenantHub)
+- Phase 5: COMPLETE (commits e7d25fb..de17143 — real `PUT
+  /{tenant-alias}/api/v1/tenant` endpoint wired to Phase 4's
+  RenameTenantCommand via ResultHttpMapper; OpenAPI generation
+  (Microsoft.AspNetCore.OpenApi + Microsoft.Extensions.ApiDescription.Server,
+  runtime doc at /openapi/v1.json, build-time file at
+  apps/api/openapi/Api.Host.json — note: filename is Api.Host.json, not
+  v1.json); packages/api-client scaffolded and generating a real TypeScript
+  client via openapi-typescript + openapi-fetch (committed, not gitignored);
+  SignalR TenantHub at /{tenant-alias}/hubs/tenant. 134 tests (86 unit + 48
+  integration). Final review (opus) found 0 Critical, 5 Important: (1)
+  OpenAPI doc omitted the tenant-alias path parameter, making the generated
+  TS client unable to address any tenant-scoped route — fixed by binding
+  [FromRoute(Name="tenant-alias")] on both handlers; (2) SignalR JWT auth
+  had no query-string access_token support real browser clients need —
+  fixed via JwtBearerEvents.OnMessageReceived, but round-1's fix collided
+  with finding (3)'s route change and needed a round-2 correction; (3)
+  /hubs/tenant bypassed TenantResolutionMiddleware entirely (no
+  tenant-alias route segment) — fixed by moving the hub under
+  /{tenant-alias}/hubs/tenant; (4) ResultHttpMapper's unknown-error 500
+  branch had no logging and leaked internal Error.Message to clients —
+  fixed with ILogger + a generic 500 detail message; (5)
+  packages/api-client's build script raced apps/api's own dotnet build
+  under Turborepo (no workspace dependency declared) — fixed with an
+  "api": "workspace:*" dependency. Two fix rounds plus a post-hoc fix: an
+  automated background security scan caught round-2's own fix for (2)
+  using an unanchored Contains("/hubs/") substring match (a tenant slug of
+  literally "hubs" would make /hubs/api/v1/whoami match too, leaking
+  query-string tokens onto the REST surface) — corrected to an exact
+  path-segment check. Parked Minor findings (not fixed, non-blocking):
+  OpenAPI doc's PUT only documents 200 (actual: 204/400/403/404/500, no
+  .Produces() annotations); no securitySchemes in the OpenAPI doc (three
+  authenticated endpoints appear public in the schema); MapOpenApi() is
+  unconditional rather than gated to Development; a pre-existing (Phase 3)
+  tenant-slug-enumeration timing difference (404 vs 401) was extended to
+  the new endpoint, not introduced by it. Also noted: the design spec's
+  acceptance criterion 1 still says the old `/tenants/{tenantId}` route
+  shape; the plan's Global Constraint (singular `/tenant`, no client-
+  supplied id) is what was actually built and is the right call — the spec
+  doc itself was never updated to match, cosmetic only. Pushed to origin.)
 - Phase 6: not started
 
 ## Notes
