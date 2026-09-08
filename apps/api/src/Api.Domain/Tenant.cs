@@ -31,4 +31,15 @@ public sealed class Tenant : AggregateRoot<Guid>, IAuditable
 
         return new Tenant(Guid.NewGuid(), slug, name);
     }
+
+    public void Rename(string newName)
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            throw new ArgumentException("Tenant name cannot be empty.", nameof(newName));
+        }
+
+        Name = newName;
+        Raise(new TenantRenamedDomainEvent(Id, newName));
+    }
 }
