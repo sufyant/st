@@ -6,6 +6,7 @@ using System.Security.Claims;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMemoryCache();
+builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<Api.Infrastructure.AdminDbContext>(options =>
     options.UseNpgsql(
@@ -64,6 +65,7 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHand
 var app = builder.Build();
 
 app.UseRouting();
+app.MapOpenApi();
 app.UseAuthentication();
 app.UseMiddleware<Api.Infrastructure.TenantResolutionMiddleware>();
 app.UseAuthorization();
