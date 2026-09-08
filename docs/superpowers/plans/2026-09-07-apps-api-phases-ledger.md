@@ -49,7 +49,7 @@ superpowers:subagent-driven-development. Environment verified before start:
   Testcontainers-backed integration suite; final review found and fixed
   a Critical tenant-schema-name-collision bug (TenantSlug max length
   63->56) plus 5 Important findings; pushed to origin)
-- Phase 3: not started
+- Phase 3: in progress (spec+plan committed, docs/superpowers/plans/2026-09-08-apps-api-phase3-auth-tenant-middleware.md)
 - Phase 4: not started
 - Phase 5: not started
 - Phase 6: not started
