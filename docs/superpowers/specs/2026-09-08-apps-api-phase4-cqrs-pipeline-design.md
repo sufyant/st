@@ -19,18 +19,40 @@ outbox pattern ([ADR 0018](../../adr/0018-outbox-pattern.md)). Faz
 API yüzeyi (REST endpoint'leri, OpenAPI) Faz 5'in işi. Bu faz mediator
 + pipeline'ı HTTP'nin üzerinden değil, doğrudan `IMediator.Send(...)`
 çağrılarıyla test eder — Faz 2b'nin servisleri HTTP'siz test etmesiyle
-aynı disiplin. Gerçek bir command/query göstermek için sahte bir iş
-kavramı uydurmak yerine, Faz 2b'nin zaten var olan
-`TenantProvisioningService`'ini bir `ProvisionTenantCommand` + handler
-ile sarmalıyoruz — bu gerçek, zaten ihtiyaç duyulan bir yetenek,
-sadece mediator'ün arkasına taşınıyor.
+aynı disiplin.
 
-## Pipeline sırası (ADR 0006 ile birebir)
+**Sonradan güncelleme (as-built notu):** İlk tasarımda demo command
+olarak Faz 2b'nin `TenantProvisioningService`'ini saran bir
+`ProvisionTenantCommand` planlanmıştı. Uygulama sırasında bundan
+vazgeçildi: `TenantProvisioningService.ProvisionAsync` kendi
+transaction'ını (`BeginTransactionAsync`/`SaveChangesAsync`/
+`CommitAsync`) kendi içinde yönetiyor — bu, pipeline'ın
+`SaveChangesUnitOfWorkBehavior`'ının transaction/outbox atomicity
+sahipliğiyle çakışırdı (aynı SaveChanges çağrısında hem iş
+değişikliğinin hem outbox mesajının yazılması garantisi bozulurdu).
+Bunun yerine gerçek, sahte olmayan başka bir yetenek seçildi:
+`RenameTenantCommand` — `Tenant.Rename(string)` domain metodunu
+(bu fazda eklendi) EF Core'un normal tracked-entity mekanizmasıyla
+çağıran, saf bir command. Ayrıca handler'ın `Api.Application`'da
+kalıp `AdminDbContext`'e (EF Core) doğrudan bağımlı olmaması için
+`ITenantRepository` arayüzü (Application'da tanımlı, Infrastructure'da
+`TenantRepository` ile implemente edilir) eklendi — bu, Faz 3'ün
+final review'ının "Application katmanı EF Core'dan bağımsız kalsın"
+kararını korur.
 
-`Validation (FluentValidation) → Permission → Handler → SaveChanges
-(Unit of Work)`. Logging behavior tüm zincirin dışını sarar (en dışta).
-Auth/Tenant/Membership zaten HTTP katmanında (Faz 3) çözüldüğü için
-mediator pipeline'ı sadece Validation'dan başlar.
+## Pipeline sırası
+
+`Logging (en dışta) → Permission → Validation (FluentValidation) →
+Handler → SaveChanges (Unit of Work)`. Auth/Tenant/Membership zaten
+HTTP katmanında (Faz 3) çözüldüğü için mediator pipeline'ı Permission'dan
+başlar.
+
+**Sonradan güncelleme:** İlk uygulamada Validation, Permission'dan önce
+kaydedilmişti (ADR 0006'nın sırasının tersi) — final review bunu
+yakaladı (hem ADR'ye aykırıydı hem de yetkisiz bir çağıranın validation
+hata detaylarını, permission reddinden önce görebilmesi gibi küçük bir
+bilgi sızıntısı riski taşıyordu) ve ADR 0006 ile birebir eşleşecek
+şekilde (`Permission → Validation`) düzeltildi.
 
 ## Eklenecek dosyalar (üst düzey)
 
@@ -41,10 +63,15 @@ mediator pipeline'ı sadece Validation'dan başlar.
 - `IPipelineBehavior.cs`, `LoggingBehavior.cs`, `ValidationBehavior.cs`
   (FluentValidation), `PermissionBehavior.cs` (Faz 3'ün `"permission"`
   claim'lerini `IHttpContextAccessor` üzerinden okur).
-- `Tenants/ProvisionTenantCommand.cs` + handler + validator —
-  `TenantProvisioningService`'i mediator arkasına sarar.
+- `Tenants/RenameTenantCommand.cs` + handler + validator + `ITenantRepository`
+  — `Tenant.Rename(string)`'i mediator arkasına sarar (bkz. yukarıdaki
+  as-built notu).
 - `RequiresPermissionAttribute.cs` — command/query'lere permission
   string'i bağlamak için.
+- `ITenantScopedRequest.cs` — final review sonrası eklendi (bkz. Kabul
+  kriterleri altındaki not): bir command'ın hedef aldığı tenant ile
+  çağıranın authenticated `tenant_id` claim'inin eşleştiğini
+  `PermissionBehavior`'a doğrulatmak için.
 
 `Api.Infrastructure/`:
 - `OutboxMessage.cs` (Domain) + EF config + migration.
@@ -69,25 +96,33 @@ mediator pipeline'ı sadece Validation'dan başlar.
   (yerleşik .NET logging) kullanır, Faz 6 Serilog'a geçirir
   ([ADR 0026](../../adr/0026-structured-logging.md)).
 - Gerçek domain event tüketen bir outbox mesajı içeriği — outbox
-  mekanizması bu fazda `ProvisionTenantCommand`'ın ürettiği (varsa)
-  domain event'leri taşıyacak şekilde kurulur, ama event'in taşıdığı
-  veri yine spekülatif bir iş özelliği icat etmeden minimal tutulur
-  (örn. `TenantProvisionedDomainEvent { TenantId, SchemaName }`).
+  mekanizması bu fazda `RenameTenantCommand`'ın ürettiği
+  `TenantRenamedDomainEvent`'i taşıyacak şekilde kurulur, gerçek bir
+  tüketici (dispatcher) henüz yok — `OutboxProcessor` mesajı sadece
+  "processed" işaretler, kapsam dışı iş sonradan eklenecek.
 
 ## Kabul kriterleri
 
-1. `IMediator.Send(new ProvisionTenantCommand(...))` gerçek bir
-   `Tenant` + Postgres schema'sı oluşturuyor (Faz 2b'nin servisini
-   sarmalıyor).
-2. Geçersiz input (`ProvisionTenantCommand` boş isimle) `ValidationBehavior`
+1. `IMediator.Send(new RenameTenantCommand(...))` gerçek bir `Tenant`
+   satırını EF Core'un tracked-entity mekanizmasıyla günceller
+   (as-built notu: artık `ProvisionTenantCommand`/schema oluşturma
+   değil, `RenameTenantCommand`).
+2. Geçersiz input (`RenameTenantCommand` boş isimle) `ValidationBehavior`
    tarafından yakalanıp `Result` başarısızlığı olarak dönüyor,
    handler'a hiç ulaşmıyor.
 3. Gerekli permission'a sahip olmayan bir `ClaimsPrincipal` ile
-   çağrıldığında `PermissionBehavior` isteği reddediyor.
-4. Command başarıyla işlendiğinde, aynı transaction içinde bir
-   `OutboxMessage` satırı yazılıyor.
+   çağrıldığında `PermissionBehavior` isteği reddediyor. Ayrıca
+   (final review sonrası eklendi): permission'a sahip ama BAŞKA bir
+   tenant için (`ITenantScopedRequest.TenantId` ≠ çağıranın `tenant_id`
+   claim'i) çağrıldığında da reddediyor — cross-tenant yazma riski
+   kapatıldı.
+4. Command başarıyla işlendiğinde, aynı `SaveChanges` çağrısında bir
+   `OutboxMessage` satırı yazılıyor — bu, gerçek DI-wired mediator
+   pipeline'ı üzerinden (bir test'in kendi kopyaladığı mantıkla değil)
+   doğrulanıyor.
 5. `OutboxProcessor` (BackgroundService), bekleyen outbox mesajlarını
    `SELECT ... FOR UPDATE SKIP LOCKED` ile işleyip "processed" olarak
    işaretliyor; iki instance'ın aynı mesajı iki kez işlemediği
-   kanıtlanıyor.
+   kanıtlanıyor; bu, `OutboxProcessor`'ın gerçek production kodu
+   çağrılarak doğrulanıyor.
 6. `pnpm --filter api build` ve `pnpm --filter api test` başarılı.
