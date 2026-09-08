@@ -49,7 +49,23 @@ superpowers:subagent-driven-development. Environment verified before start:
   Testcontainers-backed integration suite; final review found and fixed
   a Critical tenant-schema-name-collision bug (TenantSlug max length
   63->56) plus 5 Important findings; pushed to origin)
-- Phase 3: in progress (spec+plan committed, docs/superpowers/plans/2026-09-08-apps-api-phase3-auth-tenant-middleware.md)
+- Phase 3: COMPLETE (commits 1aaccce..0af9f1d — JWT Bearer auth with
+  locally-signed test tokens, path-based tenant resolution + membership
+  enforcement, RolePermission-based endpoint authorization, all proven
+  via /{tenant-alias}/api/v1/whoami; 100 tests incl. Testcontainers
+  suite. Final review found and fixed a Critical claim-shadowing
+  vulnerability (JWT-supplied claims could shadow DB-derived tenant/
+  role claims) — took 2 fix rounds since round 1's regression test
+  proof was itself too weak, closed properly in round 2 with
+  independently-reproduced RED/GREEN evidence. Also: aligned permission
+  checking with ADR 0006 (claims loaded at tenant-resolution time, not
+  queried at authorization time), added the IMemoryCache tenant lookup
+  ADR 0017 mandates, renamed the route param to match ADR 0004's
+  {tenant-alias}. Architectural question (Api.Infrastructure now
+  depends on ASP.NET Core) resolved: leave as-is, no move warranted.
+  Non-blocking follow-up noted: a membership_role/role leak-symmetry
+  test (mirroring the tenant_id one) could be added later. Pushed to
+  origin.)
 - Phase 4: not started
 - Phase 5: not started
 - Phase 6: not started
