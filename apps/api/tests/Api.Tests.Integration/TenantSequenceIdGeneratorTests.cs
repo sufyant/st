@@ -32,6 +32,7 @@ public class TenantSequenceIdGeneratorTests(PostgresContainerFixture fixture)
     [InlineData("bad schema")]
     [InlineData("bad;schema")]
     [InlineData("BadSchema")]
+    [InlineData("this_schema_name_is_way_too_long_and_exceeds_the_sixty_three_character_postgres_identifier_limit")]
     public async Task NextAsync_UnsafeSchemaName_ThrowsArgumentException(string schemaName)
     {
         // Arrange

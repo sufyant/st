@@ -4,7 +4,11 @@ namespace Api.Domain;
 
 public sealed partial class TenantSlug : ValueObject
 {
-    private const int PostgresSchemaNameMaxLength = 63;
+    // Postgres identifiers are truncated at 63 bytes, and Tenant.SchemaName prepends
+    // a "tenant_" (7-char) prefix to the slug, so the slug itself must leave room for
+    // that prefix to avoid two different tenants silently colliding onto the same
+    // truncated schema name.
+    private const int PostgresSchemaNameMaxLength = 63 - 7; // 63 - "tenant_".Length
 
     private static readonly HashSet<string> ReservedSlugs = ["admin", "public"];
 
@@ -28,7 +32,8 @@ public sealed partial class TenantSlug : ValueObject
         if (value.Length > PostgresSchemaNameMaxLength)
         {
             throw new ArgumentException(
-                $"Tenant slug cannot exceed {PostgresSchemaNameMaxLength} characters (Postgres schema name limit).",
+                $"Tenant slug cannot exceed {PostgresSchemaNameMaxLength} characters " +
+                "(Postgres's 63-byte identifier limit minus the 7-character \"tenant_\" schema-name prefix).",
                 nameof(value));
         }
 

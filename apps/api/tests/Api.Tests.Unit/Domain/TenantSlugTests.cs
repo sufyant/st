@@ -34,10 +34,23 @@ public class TenantSlugTests
     }
 
     [Fact]
+    public void Create_AtPostgresSchemaNameLimit_Succeeds()
+    {
+        // Arrange: 56 chars + "tenant_" (7 chars) prefix == 63-byte Postgres identifier limit.
+        var atLimit = new string('a', 56);
+
+        // Act
+        var slug = TenantSlug.Create(atLimit);
+
+        // Assert
+        Assert.Equal(atLimit, slug.Value);
+    }
+
+    [Fact]
     public void Create_ExceedsPostgresSchemaNameLimit_ThrowsArgumentException()
     {
-        // Arrange
-        var tooLong = new string('a', 64);
+        // Arrange: 57 chars would produce a 64-byte "tenant_"-prefixed schema name.
+        var tooLong = new string('a', 57);
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => TenantSlug.Create(tooLong));
