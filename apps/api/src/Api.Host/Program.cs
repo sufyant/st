@@ -53,6 +53,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             NameClaimType = "sub",
         };
+        options.Events = new JwtBearerEvents
+        {
+            // Browsers cannot set an Authorization header on a WebSocket/SSE handshake, so the
+            // @microsoft/signalr JS client sends the token as ?access_token=... instead. Only
+            // honor that convention under /hubs so it can't be used to bypass header-based auth
+            // on the plain REST surface.
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -71,11 +88,13 @@ app.UseAuthentication();
 app.UseMiddleware<Api.Infrastructure.TenantResolutionMiddleware>();
 app.UseAuthorization();
 
-app.MapHub<Api.Host.Hubs.TenantHub>("/hubs/tenant");
+app.MapHub<Api.Host.Hubs.TenantHub>("/{tenant-alias}/hubs/tenant");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/{tenant-alias}/api/v1/whoami", (HttpContext context) =>
+app.MapGet("/{tenant-alias}/api/v1/whoami", (
+    [Microsoft.AspNetCore.Mvc.FromRoute(Name = "tenant-alias")] string tenantAlias,
+    HttpContext context) =>
 {
     var userId = context.User.FindFirstValue("sub");
     var tenantId = context.User.FindFirstValue("tenant_id");
@@ -84,9 +103,11 @@ app.MapGet("/{tenant-alias}/api/v1/whoami", (HttpContext context) =>
 }).RequireAuthorization("tenant.whoami");
 
 app.MapPut("/{tenant-alias}/api/v1/tenant", async (
+    [Microsoft.AspNetCore.Mvc.FromRoute(Name = "tenant-alias")] string tenantAlias,
     HttpContext context,
     Api.Host.RenameTenantRequestBody body,
     Api.Application.IMediator mediator,
+    ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
     var tenantIdClaim = context.User.FindFirstValue("tenant_id");
@@ -98,7 +119,7 @@ app.MapPut("/{tenant-alias}/api/v1/tenant", async (
 
     var result = await mediator.Send(
         new Api.Application.Tenants.RenameTenantCommand(tenantId, body.NewName), cancellationToken);
-    return Api.Host.ResultHttpMapper.ToHttpResult(result);
+    return Api.Host.ResultHttpMapper.ToHttpResult(result, logger);
 })
 .RequireAuthorization();
 

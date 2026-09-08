@@ -22,6 +22,16 @@
         "tags": [
           "Api.Host"
         ],
+        "parameters": [
+          {
+            "name": "tenant-alias",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -33,6 +43,16 @@
       "put": {
         "tags": [
           "Api.Host"
+        ],
+        "parameters": [
+          {
+            "name": "tenant-alias",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {

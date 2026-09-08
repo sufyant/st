@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using Xunit;
@@ -25,7 +26,27 @@ public class OpenApiDocumentTests(PostgresContainerFixture fixture) : IDisposabl
         var body = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
         var paths = document.RootElement.GetProperty("paths");
-        Assert.True(paths.TryGetProperty("/{tenant-alias}/api/v1/tenant", out _));
-        Assert.True(paths.TryGetProperty("/{tenant-alias}/api/v1/whoami", out _));
+        Assert.True(paths.TryGetProperty("/{tenant-alias}/api/v1/tenant", out var tenantPath));
+        Assert.True(paths.TryGetProperty("/{tenant-alias}/api/v1/whoami", out var whoamiPath));
+
+        AssertHasRequiredTenantAliasParameter(tenantPath, "put");
+        AssertHasRequiredTenantAliasParameter(whoamiPath, "get");
+    }
+
+    private static void AssertHasRequiredTenantAliasParameter(JsonElement pathItem, string httpMethod)
+    {
+        var operation = pathItem.GetProperty(httpMethod);
+        Assert.True(
+            operation.TryGetProperty("parameters", out var parameters),
+            $"Expected a 'parameters' array on the {httpMethod} operation.");
+
+        var tenantAliasParameter = parameters.EnumerateArray()
+            .FirstOrDefault(p => p.GetProperty("name").GetString() == "tenant-alias");
+
+        Assert.True(
+            tenantAliasParameter.ValueKind != JsonValueKind.Undefined,
+            $"Expected a 'tenant-alias' parameter on the {httpMethod} operation.");
+        Assert.Equal("path", tenantAliasParameter.GetProperty("in").GetString());
+        Assert.True(tenantAliasParameter.GetProperty("required").GetBoolean());
     }
 }

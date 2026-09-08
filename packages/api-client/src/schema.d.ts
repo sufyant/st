@@ -48,7 +48,9 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    "tenant-alias": string;
+                };
                 cookie?: never;
             };
             requestBody?: never;
@@ -82,7 +84,9 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    "tenant-alias": string;
+                };
                 cookie?: never;
             };
             requestBody: {
