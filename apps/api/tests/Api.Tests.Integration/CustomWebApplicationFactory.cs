@@ -40,6 +40,12 @@ public sealed class CustomWebApplicationFactory(string connectionString) : WebAp
 
             services.RemoveAll<DbContextOptions<AdminDbContext>>();
             services.AddDbContext<AdminDbContext>(options => options.UseNpgsql(connectionString));
+
+            // Hosted services (e.g. OutboxProcessor) fire their first poll immediately
+            // on host startup, which would drain/mark-process any pending outbox rows
+            // in the shared test database. HTTP-pipeline tests using this factory
+            // don't need the outbox to run, so remove all hosted services here.
+            services.RemoveAll<IHostedService>();
         });
     }
 }
