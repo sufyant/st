@@ -1,9 +1,15 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.Seq(context.Configuration["Seq:ServerUrl"] ?? "http://localhost:5341"));
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
@@ -22,7 +28,7 @@ builder.Services.AddScoped<Api.Application.IMediator, Api.Application.Mediator>(
 // -> SaveChanges, matching ADR 0006 (first-registered runs outermost, per
 // Mediator.Send's .Reverse() composition).
 builder.Services.AddScoped(
-    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.LoggingBehavior<,>));
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.LoggingBehavior<,>));
 builder.Services.AddScoped(
     typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.PermissionBehavior<,>));
 builder.Services.AddScoped(

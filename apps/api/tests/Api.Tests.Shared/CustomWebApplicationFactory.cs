@@ -8,10 +8,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using Serilog.Core;
 
 namespace Api.Tests.Shared;
 
-public sealed class CustomWebApplicationFactory(string connectionString) : WebApplicationFactory<Program>
+/// <param name="testLogSink">
+/// Optional Serilog sink for tests that need to assert on log output (e.g. enrichment
+/// properties). When supplied, it is appended to the app's own <c>UseSerilog</c>
+/// configuration for this factory instance only, via a second <c>UseSerilog</c> call in
+/// <see cref="ConfigureWebHost"/> — Serilog.AspNetCore's bootstrap-logger mechanism means the
+/// last <c>UseSerilog</c> call to run wins, so this reconfigures the same reloadable logger
+/// Program.cs already created rather than replacing it.
+/// </param>
+public sealed class CustomWebApplicationFactory(string connectionString, ILogEventSink? testLogSink = null)
+    : WebApplicationFactory<Program>
 {
     public static readonly RsaSecurityKey SigningKey = new(RSA.Create(2048));
 
@@ -47,5 +58,21 @@ public sealed class CustomWebApplicationFactory(string connectionString) : WebAp
             // don't need the outbox to run, so remove all hosted services here.
             services.RemoveAll<IHostedService>();
         });
+    }
+
+    // ConfigureWebHost only exposes IWebHostBuilder, which Serilog.AspNetCore doesn't add a
+    // UseSerilog overload for (only IHostBuilder gets one). CreateHost hands us the underlying
+    // IHostBuilder before it's built, so a second UseSerilog call can be appended here.
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        if (testLogSink is not null)
+        {
+            builder.UseSerilog((context, services, configuration) => configuration
+                .Enrich.FromLogContext()
+                .WriteTo.Console()
+                .WriteTo.Sink(testLogSink));
+        }
+
+        return base.CreateHost(builder);
     }
 }
