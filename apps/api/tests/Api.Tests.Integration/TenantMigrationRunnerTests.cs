@@ -69,4 +69,18 @@ public class TenantMigrationRunnerTests(PostgresContainerFixture fixture)
             Assert.Equal(1, tableCount);
         }
     }
+
+    [Fact]
+    public async Task MigrateTenantAsync_UnsafeSchemaName_ThrowsArgumentException()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<AdminDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .Options;
+        await using var dbContext = new AdminDbContext(options);
+        var runner = new TenantMigrationRunner(dbContext, fixture.ConnectionString);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => runner.MigrateTenantAsync("Bad Schema"));
+    }
 }

@@ -7,6 +7,9 @@ public sealed class TenantMigrationRunner(AdminDbContext adminDbContext, string 
 {
     public async Task MigrateAllTenantsAsync(CancellationToken cancellationToken = default)
     {
+        // SchemaName is an EF Ignore()'d computed property, so this projection only works
+        // because it's evaluated client-side after materialization - a .Where() on it
+        // would throw at runtime instead of translating to SQL.
         var schemaNames = await adminDbContext.Tenants
             .AsNoTracking()
             .Select(t => t.SchemaName)
@@ -20,6 +23,8 @@ public sealed class TenantMigrationRunner(AdminDbContext adminDbContext, string 
 
     public async Task MigrateTenantAsync(string schemaName, CancellationToken cancellationToken = default)
     {
+        SafePostgresIdentifier.EnsureSafe(schemaName, nameof(schemaName));
+
         // Npgsql defaults the __EFMigrationsHistory table to the "public" schema
         // regardless of TenantDbContext.OnModelCreating's HasDefaultSchema() call, so
         // it must be routed to the tenant schema explicitly here - otherwise every
