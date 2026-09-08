@@ -20,11 +20,16 @@ public class MembershipConcurrencyTests(PostgresContainerFixture fixture)
     [Fact]
     public async Task ConcurrentRoleChange_SecondSaveThrowsDbUpdateConcurrencyException()
     {
-        // Arrange
-        var membership = Membership.Create(Guid.NewGuid(), Guid.NewGuid(), "member");
+        // Arrange: Memberships.TenantId/UserId are now FK-constrained (Finding 5), so the
+        // referenced Tenant/User rows must exist first.
+        var tenant = Tenant.Create(TenantSlug.Create($"concur-{Guid.NewGuid():N}"[..15]), "Concurrency Test Tenant");
+        var user = User.Create($"clerk_{Guid.NewGuid():N}", Email.Create($"{Guid.NewGuid():N}@example.com"));
+        var membership = Membership.Create(user.Id, tenant.Id, "member");
 
         await using (var seedContext = CreateContext())
         {
+            seedContext.Tenants.Add(tenant);
+            seedContext.Users.Add(user);
             seedContext.Memberships.Add(membership);
             await seedContext.SaveChangesAsync();
         }

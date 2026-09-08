@@ -2,7 +2,7 @@ using Api.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Api.Infrastructure.Configurations;
+namespace Api.Infrastructure.Configurations.Admin;
 
 public sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
 {
@@ -26,5 +26,9 @@ public sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitatio
             .IsRequired();
 
         builder.HasIndex(i => i.Token).IsUnique();
+
+        // Shadow foreign key - see MembershipConfiguration for why there's no navigation
+        // property on Invitation/Tenant.
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(i => i.TenantId).OnDelete(DeleteBehavior.Cascade);
     }
 }
