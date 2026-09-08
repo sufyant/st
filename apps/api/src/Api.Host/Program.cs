@@ -16,12 +16,15 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<Api.Application.IMediator, Api.Application.Mediator>();
 
+// Registration order = execution order Logging -> Permission -> Validation -> Handler
+// -> SaveChanges, matching ADR 0006 (first-registered runs outermost, per
+// Mediator.Send's .Reverse() composition).
 builder.Services.AddScoped(
     typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.LoggingBehavior<,>));
 builder.Services.AddScoped(
-    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.ValidationBehavior<,>));
-builder.Services.AddScoped(
     typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.PermissionBehavior<,>));
+builder.Services.AddScoped(
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.ValidationBehavior<,>));
 builder.Services.AddScoped(
     typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.SaveChangesUnitOfWorkBehavior<,>));
 
