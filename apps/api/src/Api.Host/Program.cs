@@ -56,14 +56,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.Events = new JwtBearerEvents
         {
             // Browsers cannot set an Authorization header on a WebSocket/SSE handshake, so the
-            // @microsoft/signalr JS client sends the token as ?access_token=... instead. Only
-            // honor that convention under /hubs so it can't be used to bypass header-based auth
-            // on the plain REST surface.
+            // @microsoft/signalr JS client sends the token as ?access_token=... instead. Hub
+            // routes are tenant-scoped (/{tenant-alias}/hubs/tenant), so match on the "/hubs/"
+            // segment rather than a fixed prefix. Only honor that convention for hub routes so
+            // it can't be used to bypass header-based auth on the plain REST surface.
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                if (!string.IsNullOrEmpty(accessToken) && path.Value is not null && path.Value.Contains("/hubs/"))
                 {
                     context.Token = accessToken;
                 }

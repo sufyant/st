@@ -60,6 +60,34 @@ public class TenantHubTests(PostgresContainerFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task Connect_WithTokenInQueryString_ReachesConnectedState()
+    {
+        // Arrange: append the token directly to the connection URL's query string instead of
+        // using AccessTokenProvider (which sends it as an Authorization header). This mirrors
+        // how a real browser SignalR client authenticates, since a WebSocket/SSE handshake
+        // can't carry an Authorization header, and exercises the JwtBearerEvents.OnMessageReceived
+        // query-string path specifically rather than header-based auth.
+        var clerkUserId = $"clerk_hub_{Guid.NewGuid():N}";
+        var tenant = await ProvisionTenantWithMembershipAsync(clerkUserId);
+        var token = TestJwtTokenFactory.CreateToken(clerkUserId);
+        var connection = new HubConnectionBuilder()
+            .WithUrl($"http://localhost/{tenant.Slug.Value}/hubs/tenant?access_token={token}", options =>
+            {
+                options.HttpMessageHandlerFactory = _ => _factory.Server.CreateHandler();
+            })
+            .Build();
+
+        // Act
+        await connection.StartAsync();
+
+        // Assert
+        Assert.Equal(HubConnectionState.Connected, connection.State);
+
+        // Cleanup
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Connect_WithoutToken_Fails()
     {
         // Arrange: provision the tenant (but no membership/token) so the connection fails on
