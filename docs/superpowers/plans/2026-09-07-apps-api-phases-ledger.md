@@ -126,7 +126,9 @@ superpowers:subagent-driven-development. Environment verified before start:
   shape; the plan's Global Constraint (singular `/tenant`, no client-
   supplied id) is what was actually built and is the right call — the spec
   doc itself was never updated to match, cosmetic only. Pushed to origin.)
-- Phase 6: not started
+- Phase 6: in progress (spec+plan committed 8b3ed72..4728fb7 — Serilog+Seq
+  log enrichment via a relocated LoggingBehavior, shared test infra
+  extraction, dedicated Api.Tests.TenantIsolation project)
 
 ## Notes
 
