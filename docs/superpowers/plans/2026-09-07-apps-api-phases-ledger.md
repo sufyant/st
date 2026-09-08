@@ -66,7 +66,7 @@ superpowers:subagent-driven-development. Environment verified before start:
   Non-blocking follow-up noted: a membership_role/role leak-symmetry
   test (mirroring the tenant_id one) could be added later. Pushed to
   origin.)
-- Phase 4: not started
+- Phase 4: in progress (spec+plan committed, docs/superpowers/plans/2026-09-08-apps-api-phase4-cqrs-pipeline.md)
 - Phase 5: not started
 - Phase 6: not started
 
