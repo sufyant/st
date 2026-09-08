@@ -57,14 +57,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             // Browsers cannot set an Authorization header on a WebSocket/SSE handshake, so the
             // @microsoft/signalr JS client sends the token as ?access_token=... instead. Hub
-            // routes are tenant-scoped (/{tenant-alias}/hubs/tenant), so match on the "/hubs/"
-            // segment rather than a fixed prefix. Only honor that convention for hub routes so
-            // it can't be used to bypass header-based auth on the plain REST surface.
+            // routes are tenant-scoped (/{tenant-alias}/hubs/tenant): match the literal "hubs"
+            // path segment, not a substring, so a tenant whose slug itself contains "hubs" (e.g.
+            // alias "hubs" producing "/hubs/api/v1/whoami") can't make this apply to the plain
+            // REST surface.
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.Value is not null && path.Value.Contains("/hubs/"))
+                var segments = context.HttpContext.Request.Path.Value?
+                    .Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (!string.IsNullOrEmpty(accessToken) && segments is { Length: >= 2 } && segments[1] == "hubs")
                 {
                     context.Token = accessToken;
                 }
