@@ -34,7 +34,7 @@ public sealed class OutboxProcessor(IServiceScopeFactory scopeFactory, ILogger<O
         }
     }
 
-    private async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
+    internal async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
@@ -53,6 +53,9 @@ public sealed class OutboxProcessor(IServiceScopeFactory scopeFactory, ILogger<O
                 """)
             .ToListAsync(cancellationToken);
 
+        // "Processing" in this phase only means marking the row processed -- no
+        // actual consumer/dispatcher exists yet; that's future work once something
+        // needs to react to outbox events.
         foreach (var message in messages)
         {
             message.MarkProcessed(DateTimeOffset.UtcNow);

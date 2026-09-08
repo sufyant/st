@@ -1,6 +1,8 @@
 using Api.Domain;
 using Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Api.Tests.Integration;
@@ -35,9 +37,16 @@ public class OutboxTests(PostgresContainerFixture fixture)
         tenant.ClearDomainEvents();
         await dbContext.SaveChangesAsync();
 
-        // Assert
+        // Assert — scoped to this test's own tenant, since PostgresContainerFixture
+        // shares one database across the whole collection and other tests (e.g.
+        // RenameTenantCommandEndToEndTests) also leave unprocessed
+        // TenantRenamedDomainEvent rows behind; an unscoped SingleAsync here is
+        // order-dependently flaky across test classes.
         var message = await dbContext.OutboxMessages
-            .SingleAsync(m => m.Type == nameof(TenantRenamedDomainEvent) && m.ProcessedAtUtc == null);
+            .SingleAsync(m =>
+                m.Type == nameof(TenantRenamedDomainEvent)
+                && m.ProcessedAtUtc == null
+                && m.Content.Contains(tenant.Id.ToString()));
         Assert.Contains("Renamed via outbox test", message.Content);
     }
 
@@ -102,5 +111,34 @@ public class OutboxTests(PostgresContainerFixture fixture)
         // Assert
         Assert.Contains(firstBatch, m => m.Id == message.Id);
         Assert.DoesNotContain(secondBatch, m => m.Id == message.Id);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessagesAsync_RealProcessor_MarksSeededMessageProcessed()
+    {
+        // Arrange — exercise the REAL OutboxProcessor's constructor and SQL
+        // (SELECT ... FOR UPDATE SKIP LOCKED), not a test-local copy of its logic.
+        var services = new ServiceCollection();
+        services.AddDbContext<AdminDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
+        var provider = services.BuildServiceProvider();
+        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+
+        await using var seedContext = CreateDbContext();
+        var message = OutboxMessage.FromDomainEvent(
+            new TenantRenamedDomainEvent(Guid.NewGuid(), "Processed via real processor"),
+            typeof(TenantRenamedDomainEvent).FullName!,
+            "{}");
+        seedContext.OutboxMessages.Add(message);
+        await seedContext.SaveChangesAsync();
+
+        var processor = new OutboxProcessor(scopeFactory, NullLogger<OutboxProcessor>.Instance);
+
+        // Act
+        await processor.ProcessPendingMessagesAsync(CancellationToken.None);
+
+        // Assert
+        await using var verifyContext = CreateDbContext();
+        var reloaded = await verifyContext.OutboxMessages.SingleAsync(m => m.Id == message.Id);
+        Assert.NotNull(reloaded.ProcessedAtUtc);
     }
 }

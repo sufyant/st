@@ -26,7 +26,8 @@ public sealed class SaveChangesUnitOfWorkBehavior<TRequest, TResponse>(AdminDbCo
                 var content = System.Text.Json.JsonSerializer.Serialize(
                     domainEvent, domainEvent.GetType(), SerializerOptions);
                 dbContext.OutboxMessages.Add(
-                    OutboxMessage.FromDomainEvent(domainEvent, domainEvent.GetType().Name, content));
+                    OutboxMessage.FromDomainEvent(
+                        domainEvent, domainEvent.GetType().FullName ?? domainEvent.GetType().Name, content));
             }
 
             entry.Entity.ClearDomainEvents();
