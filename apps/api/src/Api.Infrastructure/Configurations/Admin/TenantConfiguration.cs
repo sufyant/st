@@ -2,7 +2,7 @@ using Api.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Api.Infrastructure.Configurations;
+namespace Api.Infrastructure.Configurations.Admin;
 
 public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {

@@ -14,7 +14,7 @@ public sealed class AdminDbContextFactory : IDesignTimeDbContextFactory<AdminDbC
         var optionsBuilder = new DbContextOptionsBuilder<AdminDbContext>();
         optionsBuilder.UseNpgsql(
             "Host=localhost;Database=api;Username=postgres;Password=postgres",
-            npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"));
+            npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", AdminDbContext.SchemaName));
 
         return new AdminDbContext(optionsBuilder.Options);
     }

@@ -8,11 +8,12 @@ namespace Api.Tests.Integration;
 [Collection(nameof(PostgresCollection))]
 public class AuditableInterceptorTests(PostgresContainerFixture fixture)
 {
+    // AdminDbContext.OnConfiguring attaches AuditableSaveChangesInterceptor automatically,
+    // so no explicit .AddInterceptors(...) call is needed here.
     private AdminDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AdminDbContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .AddInterceptors(new AuditableSaveChangesInterceptor())
             .Options;
 
         return new AdminDbContext(options);

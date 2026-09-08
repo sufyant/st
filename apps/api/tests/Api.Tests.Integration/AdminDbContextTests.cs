@@ -82,4 +82,26 @@ public class AdminDbContextTests(PostgresContainerFixture fixture)
         Assert.Equal(slug, reloaded.Slug);
         Assert.Equal("Test Tenant", reloaded.Name);
     }
+
+    [Fact]
+    public async Task AddTenant_WithNoExplicitInterceptorRegistration_StillSetsCreatedAtUtc()
+    {
+        // Arrange: CreateContext() above builds DbContextOptionsBuilder<AdminDbContext>
+        // with no .AddInterceptors(...) call - the audit interceptor must come from
+        // AdminDbContext.OnConfiguring itself.
+        var before = DateTimeOffset.UtcNow;
+        var slug = Api.Domain.TenantSlug.Create($"test-{Guid.NewGuid():N}"[..20]);
+        var tenant = Api.Domain.Tenant.Create(slug, "Test Tenant");
+
+        // Act
+        await using var writeContext = CreateContext();
+        writeContext.Tenants.Add(tenant);
+        await writeContext.SaveChangesAsync();
+        var after = DateTimeOffset.UtcNow;
+
+        // Assert
+        Assert.NotEqual(default, tenant.CreatedAtUtc);
+        Assert.InRange(tenant.CreatedAtUtc, before, after);
+        Assert.InRange(tenant.UpdatedAtUtc, before, after);
+    }
 }
