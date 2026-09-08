@@ -12,6 +12,27 @@ builder.Services.AddDbContext<Api.Infrastructure.AdminDbContext>(options =>
         builder.Configuration.GetConnectionString("AdminDb"),
         npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", Api.Infrastructure.AdminDbContext.SchemaName)));
 
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<Api.Application.IMediator, Api.Application.Mediator>();
+
+builder.Services.AddScoped(
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.LoggingBehavior<,>));
+builder.Services.AddScoped(
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Application.ValidationBehavior<,>));
+builder.Services.AddScoped(
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.PermissionBehavior<,>));
+builder.Services.AddScoped(
+    typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.SaveChangesUnitOfWorkBehavior<,>));
+
+builder.Services.AddScoped<Api.Application.Tenants.ITenantRepository, Api.Infrastructure.TenantRepository>();
+builder.Services.AddScoped<
+    Api.Application.IRequestHandler<Api.Application.Tenants.RenameTenantCommand, Api.Application.Result>,
+    Api.Application.Tenants.RenameTenantCommandHandler>();
+builder.Services.AddScoped<
+    FluentValidation.IValidator<Api.Application.Tenants.RenameTenantCommand>,
+    Api.Application.Tenants.RenameTenantCommandValidator>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
