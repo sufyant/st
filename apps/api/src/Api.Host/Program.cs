@@ -78,6 +78,25 @@ app.MapGet("/{tenant-alias}/api/v1/whoami", (HttpContext context) =>
     return Results.Ok(new { userId, tenantId, role });
 }).RequireAuthorization("tenant.whoami");
 
+app.MapPut("/{tenant-alias}/api/v1/tenant", async (
+    HttpContext context,
+    Api.Host.RenameTenantRequestBody body,
+    Api.Application.IMediator mediator,
+    CancellationToken cancellationToken) =>
+{
+    var tenantIdClaim = context.User.FindFirstValue("tenant_id");
+
+    if (tenantIdClaim is null || !Guid.TryParse(tenantIdClaim, out var tenantId))
+    {
+        return Results.Forbid();
+    }
+
+    var result = await mediator.Send(
+        new Api.Application.Tenants.RenameTenantCommand(tenantId, body.NewName), cancellationToken);
+    return Api.Host.ResultHttpMapper.ToHttpResult(result);
+})
+.RequireAuthorization();
+
 app.Run();
 
 public partial class Program;
