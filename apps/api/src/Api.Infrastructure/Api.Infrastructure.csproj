@@ -5,6 +5,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Needed for TenantResolutionMiddleware, which uses ASP.NET Core's
+         HttpContext/RequestDelegate types (Microsoft.AspNetCore.Http). This
+         project uses the plain Microsoft.NET.Sdk, which doesn't pull in the
+         ASP.NET Core shared framework the way Microsoft.NET.Sdk.Web does. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

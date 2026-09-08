@@ -29,15 +29,19 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<Api.Infrastructure.TenantResolutionMiddleware>();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/api/v1/whoami", (HttpContext context) =>
+app.MapGet("/{tenant}/api/v1/whoami", (HttpContext context) =>
 {
     var userId = context.User.FindFirstValue("sub");
-    return Results.Ok(new { userId });
+    var tenantId = context.User.FindFirstValue("tenant_id");
+    var role = context.User.FindFirstValue("membership_role");
+    return Results.Ok(new { userId, tenantId, role });
 }).RequireAuthorization();
 
 app.Run();
