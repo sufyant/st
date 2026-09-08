@@ -35,6 +35,6 @@ public sealed class AdminDbContext(DbContextOptions<AdminDbContext> options) : D
         // TenantDbContext) isn't silently picked up here too.
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(AdminDbContext).Assembly,
-            type => type.Namespace != null && type.Namespace.Contains(".Configurations.Admin"));
+            type => type.Namespace == "Api.Infrastructure.Configurations.Admin");
     }
 }
