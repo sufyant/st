@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using Api.Domain;
 using Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -101,5 +102,39 @@ public class TenantResolutionMiddlewareTests : IDisposable
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetWhoAmI_TokenClaimsCannotOverrideDatabaseDerivedRole_UsesRealMembershipRole()
+    {
+        // Arrange: real membership role is "guest" (no tenant.whoami permission), but the
+        // JWT itself also carries a "membership_role" claim of "owner" - and "owner" DOES
+        // have the tenant.whoami permission granted elsewhere in this test's seed data. If
+        // the JWT-supplied claim were allowed to shadow the DB-derived one, this request
+        // would incorrectly succeed with 200 instead of 403.
+        await using var dbContext = CreateDbContext();
+        var provisioningService = new TenantProvisioningService(dbContext);
+        var tenant = await provisioningService.ProvisionAsync(
+            TenantSlug.Create($"shadow-{Guid.NewGuid():N}"[..20]), "Claim Shadow Tenant");
+
+        var clerkUserId = $"clerk_claim_shadow_{Guid.NewGuid():N}";
+        var user = User.Create(clerkUserId, Email.Create($"{Guid.NewGuid():N}@example.com"));
+        dbContext.Users.Add(user);
+        var membership = Membership.Create(user.Id, tenant.Id, "guest");
+        dbContext.Memberships.Add(membership);
+        dbContext.RolePermissions.Add(RolePermission.Create("owner", "tenant.whoami"));
+        await dbContext.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var token = TestJwtTokenFactory.CreateToken(
+            clerkUserId,
+            extraClaims: [new Claim("membership_role", "owner")]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync($"/{tenant.Slug.Value}/api/v1/whoami");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

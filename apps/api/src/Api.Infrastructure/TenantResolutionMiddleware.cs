@@ -59,9 +59,27 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
             if (context.User.Identity is ClaimsIdentity identity)
             {
+                foreach (var claimType in new[] { "tenant_id", "tenant_slug", "membership_role", "permission" })
+                {
+                    foreach (var existingClaim in identity.FindAll(claimType).ToList())
+                    {
+                        identity.TryRemoveClaim(existingClaim);
+                    }
+                }
+
                 identity.AddClaim(new Claim("tenant_id", tenant.Id.ToString()));
                 identity.AddClaim(new Claim("tenant_slug", tenant.Slug.Value));
                 identity.AddClaim(new Claim("membership_role", membership.Role));
+
+                var permissions = await dbContext.RolePermissions.AsNoTracking()
+                    .Where(rp => rp.Role == membership.Role)
+                    .Select(rp => rp.Permission)
+                    .ToListAsync();
+
+                foreach (var permission in permissions)
+                {
+                    identity.AddClaim(new Claim("permission", permission));
+                }
             }
         }
 
