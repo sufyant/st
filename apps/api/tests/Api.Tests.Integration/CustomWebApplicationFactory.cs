@@ -24,6 +24,7 @@ public sealed class CustomWebApplicationFactory(string connectionString) : WebAp
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 options.Authority = null;
+                options.ConfigurationManager = null;
                 options.RequireHttpsMetadata = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
