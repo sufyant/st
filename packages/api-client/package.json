@@ -1,0 +1,20 @@
+{
+  "name": "@st/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/client.ts",
+  "types": "./src/client.ts",
+  "scripts": {
+    "build:openapi": "cd ../../apps/api && dotnet build Api.sln --nologo -v quiet && cd ../../packages/api-client && openapi-typescript ../../apps/api/openapi/Api.Host.json -o src/schema.d.ts",
+    "build": "pnpm run build:openapi && tsc --noEmit",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.8"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0",
+    "typescript": "^5.7.0"
+  }
+}
