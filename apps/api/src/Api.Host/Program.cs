@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 
 builder.Services.AddDbContext<Api.Infrastructure.AdminDbContext>(options =>
     options.UseNpgsql(
@@ -69,6 +70,8 @@ app.MapOpenApi();
 app.UseAuthentication();
 app.UseMiddleware<Api.Infrastructure.TenantResolutionMiddleware>();
 app.UseAuthorization();
+
+app.MapHub<Api.Host.Hubs.TenantHub>("/hubs/tenant");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
