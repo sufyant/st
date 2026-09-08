@@ -36,4 +36,19 @@ public class SchemaAwareModelCacheKeyFactoryTests
 
         Assert.Equal(keyFirst, keySecond);
     }
+
+    [Fact]
+    public void Create_ReturnsDifferentKeys_ForDifferentNonTenantContextTypes()
+    {
+        var factory = new SchemaAwareModelCacheKeyFactory();
+        using var admin = new AdminDbContext(new DbContextOptionsBuilder<AdminDbContext>().Options);
+        using var other = new OtherFakeDbContext(new DbContextOptionsBuilder<OtherFakeDbContext>().Options);
+
+        var adminKey = factory.Create(admin, designTime: false);
+        var otherKey = factory.Create(other, designTime: false);
+
+        Assert.NotEqual(adminKey, otherKey);
+    }
+
+    private sealed class OtherFakeDbContext(DbContextOptions<OtherFakeDbContext> options) : DbContext(options);
 }

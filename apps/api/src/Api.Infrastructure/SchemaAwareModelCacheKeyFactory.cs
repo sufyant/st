@@ -8,5 +8,5 @@ public sealed class SchemaAwareModelCacheKeyFactory : IModelCacheKeyFactory
     public object Create(DbContext context, bool designTime) =>
         context is TenantDbContext tenantDbContext
             ? (tenantDbContext.SchemaName, designTime)
-            : (object)designTime;
+            : (context.GetType(), designTime);
 }
