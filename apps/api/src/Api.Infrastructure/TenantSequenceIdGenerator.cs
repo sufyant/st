@@ -1,21 +1,19 @@
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Infrastructure;
 
-public sealed partial class TenantSequenceIdGenerator(AdminDbContext dbContext)
+public sealed class TenantSequenceIdGenerator(AdminDbContext dbContext)
 {
-    [GeneratedRegex(@"^[a-z_][a-z0-9_]*$")]
-    private static partial Regex SafeIdentifierPattern();
-
     public async Task<string> NextAsync(
         string schemaName, string sequenceName, string prefix, CancellationToken cancellationToken = default)
     {
-        EnsureSafeIdentifier(schemaName, nameof(schemaName));
-        EnsureSafeIdentifier(sequenceName, nameof(sequenceName));
+        SafePostgresIdentifier.EnsureSafe(schemaName, nameof(schemaName));
+        SafePostgresIdentifier.EnsureSafe(sequenceName, nameof(sequenceName));
 
+#pragma warning disable EF1002 // Value is validated via SafePostgresIdentifier.EnsureSafe before this call
         await dbContext.Database.ExecuteSqlRawAsync(
             $"CREATE SEQUENCE IF NOT EXISTS \"{schemaName}\".\"{sequenceName}\"", cancellationToken);
+#pragma warning restore EF1002
 
         var connection = dbContext.Database.GetDbConnection();
         var shouldClose = connection.State != System.Data.ConnectionState.Open;
@@ -39,14 +37,6 @@ public sealed partial class TenantSequenceIdGenerator(AdminDbContext dbContext)
             {
                 await connection.CloseAsync();
             }
-        }
-    }
-
-    private static void EnsureSafeIdentifier(string value, string paramName)
-    {
-        if (!SafeIdentifierPattern().IsMatch(value))
-        {
-            throw new ArgumentException($"'{value}' is not a safe Postgres identifier.", paramName);
         }
     }
 }
