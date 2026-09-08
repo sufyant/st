@@ -17,7 +17,7 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
         await _container.StartAsync();
 
         var options = new DbContextOptionsBuilder<AdminDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(ConnectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"))
             .Options;
 
         await using var context = new AdminDbContext(options);

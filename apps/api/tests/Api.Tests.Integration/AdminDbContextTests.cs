@@ -44,6 +44,24 @@ public class AdminDbContextTests(PostgresContainerFixture fixture)
     }
 
     [Fact]
+    public async Task Migration_PutsEFMigrationsHistoryTableInAdminSchema()
+    {
+        // Arrange
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+
+        // Act
+        await using var command = new NpgsqlCommand(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'admin' AND table_name = '__EFMigrationsHistory'",
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        var found = await reader.ReadAsync();
+
+        // Assert
+        Assert.True(found, "__EFMigrationsHistory should live in the admin schema, not public.");
+    }
+
+    [Fact]
     public async Task AddTenant_PersistsAndReloads()
     {
         // Arrange
