@@ -41,7 +41,14 @@ superpowers:subagent-driven-development. Environment verified before start:
   ValueObject, DomainEvent base classes plus Email, Money, TenantSlug
   value objects; final-review fixes for reserved tenant slugs, non-generic
   IHasDomainEvents, and validation edge cases)
-- Phase 2b: not started
+- Phase 2b: COMPLETE (commits 76e6772..bbd6972 — AdminDbContext, admin
+  schema entities + migrations incl. FK constraints, TenantDbContext,
+  tenant provisioning, dual-ID sequence generator, per-tenant migration
+  runner, xmin optimistic concurrency on Membership, UTC audit
+  interceptor, SafePostgresIdentifier shared validation; 86 tests incl.
+  Testcontainers-backed integration suite; final review found and fixed
+  a Critical tenant-schema-name-collision bug (TenantSlug max length
+  63->56) plus 5 Important findings; pushed to origin)
 - Phase 3: not started
 - Phase 4: not started
 - Phase 5: not started
