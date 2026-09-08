@@ -3,6 +3,18 @@
 Date: 2026-09-08
 Status: approved (autonomous run, no interactive review — see phase ledger)
 
+**Sonradan güncelleme (as-built notu):** Uygulama sırasında `ApiDbContext`
+adı `AdminDbContext` olarak değiştirildi (tenant-scoped `TenantDbContext`
+ile isim simetrisi için — bkz. Kabul kriterleri sonrası eklenen dosyalar).
+Final review sonrası ayrıca şunlar eklendi: `SafePostgresIdentifier`
+(paylaşımlı raw-SQL identifier doğrulama), `Configurations/Admin/` alt
+namespace'i (assembly-wide config scan riskini kapatmak için),
+`Memberships`/`Invitations` üzerinde shadow foreign key'ler (yeni bir
+migration ile), ve `TenantSlug`'ın maksimum uzunluğu 63'ten 56'ya indi
+(`"tenant_"` prefix'iyle toplamda 63 byte Postgres limitini aşmamak
+için). Detaylar için `docs/superpowers/plans/2026-09-07-apps-api-phase2b-persistence.md`
+ve commit geçmişi.
+
 ## Amaç
 
 EF Core + Npgsql ile gerçek bir Postgres'e karşı çalışan persistence
