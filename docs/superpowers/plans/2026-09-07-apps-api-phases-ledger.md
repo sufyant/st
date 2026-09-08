@@ -66,7 +66,27 @@ superpowers:subagent-driven-development. Environment verified before start:
   Non-blocking follow-up noted: a membership_role/role leak-symmetry
   test (mirroring the tenant_id one) could be added later. Pushed to
   origin.)
-- Phase 4: in progress (spec+plan committed, docs/superpowers/plans/2026-09-08-apps-api-phase4-cqrs-pipeline.md)
+- Phase 4: COMPLETE (commits 37b2d3f..68259db — Result<T>, hand-rolled
+  mediator (reflection-dispatched, dynamic fell back due to DLR
+  accessibility rules), Logging/Validation/Permission pipeline
+  behaviors, RenameTenantCommand (chosen over reusing Phase 2b's
+  TenantProvisioningService, whose self-managed transaction would
+  conflict with pipeline UoW ownership), ITenantRepository to keep EF
+  Core out of Api.Application, outbox pattern with SELECT FOR UPDATE
+  SKIP LOCKED; 124 tests. Final review found and fixed a Critical
+  cross-tenant write vulnerability (RenameTenantCommand had no check
+  that the caller's tenant_id claim matched the target tenant —
+  closed with ITenantScopedRequest), a reproduced flaky test from an
+  unscoped shared-DB query, OutboxProcessor's real code path never
+  being exercised by any test, pipeline order contradicting ADR 0006
+  (Permission must run before Validation), and OutboxProcessor as a
+  global hosted service contaminating every host-booting test. Noted
+  for Phase 5: PermissionBehavior (mediator) and
+  PermissionAuthorizationHandler (Phase 3 HTTP policy) both check the
+  same claim via different mechanisms — reconcile once real endpoints
+  exist; RenameTenantCommandEndToEndTests' own test harness still has
+  un-swapped behavior order, harmless today but align later. Pushed to
+  origin.)
 - Phase 5: not started
 - Phase 6: not started
 
