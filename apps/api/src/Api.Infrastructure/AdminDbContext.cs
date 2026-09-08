@@ -17,6 +17,8 @@ public sealed class AdminDbContext(DbContextOptions<AdminDbContext> options) : D
 
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Attach the audit interceptor here so every AdminDbContext instance gets it

@@ -25,6 +25,8 @@ builder.Services.AddScoped(
 builder.Services.AddScoped(
     typeof(Api.Application.IPipelineBehavior<,>), typeof(Api.Infrastructure.SaveChangesUnitOfWorkBehavior<,>));
 
+builder.Services.AddHostedService<Api.Infrastructure.OutboxProcessor>();
+
 builder.Services.AddScoped<Api.Application.Tenants.ITenantRepository, Api.Infrastructure.TenantRepository>();
 builder.Services.AddScoped<
     Api.Application.IRequestHandler<Api.Application.Tenants.RenameTenantCommand, Api.Application.Result>,
