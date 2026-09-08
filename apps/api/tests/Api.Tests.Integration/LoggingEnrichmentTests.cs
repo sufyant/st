@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Api.Domain;
@@ -15,7 +16,7 @@ public sealed class LoggingEnrichmentTests : IDisposable
 {
     private sealed class CapturingSink : ILogEventSink
     {
-        public List<LogEvent> Events { get; } = [];
+        public ConcurrentBag<LogEvent> Events { get; } = [];
         public void Emit(LogEvent logEvent) => Events.Add(logEvent);
     }
 
@@ -66,7 +67,12 @@ public sealed class LoggingEnrichmentTests : IDisposable
         await client.PutAsJsonAsync($"/{tenant.Slug.Value}/api/v1/tenant", new { NewName = "Renamed" });
 
         // Assert
-        Assert.Contains(_sink.Events, e =>
+        // Snapshot into an array before asserting: ConcurrentBag<T>'s enumerator is safe
+        // against concurrent Emit() calls, but taking an explicit snapshot avoids enumerating
+        // a live collection while ASP.NET Core's own request-pipeline logging may still be
+        // writing to it.
+        var events = _sink.Events.ToArray();
+        Assert.Contains(events, e =>
             e.Properties.TryGetValue("tenant_id", out var tenantIdProp)
             && tenantIdProp.ToString().Contains(tenant.Id.ToString())
             && e.Properties.ContainsKey("request_id")
