@@ -25,7 +25,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("tenant.whoami", policy =>
+        policy.Requirements.Add(new Api.Infrastructure.PermissionRequirement("tenant.whoami")));
+});
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    Api.Infrastructure.PermissionAuthorizationHandler>();
 
 var app = builder.Build();
 
@@ -42,7 +48,7 @@ app.MapGet("/{tenant}/api/v1/whoami", (HttpContext context) =>
     var tenantId = context.User.FindFirstValue("tenant_id");
     var role = context.User.FindFirstValue("membership_role");
     return Results.Ok(new { userId, tenantId, role });
-}).RequireAuthorization();
+}).RequireAuthorization("tenant.whoami");
 
 app.Run();
 

@@ -80,6 +80,18 @@ public class TenantResolutionMiddlewareTests : IDisposable
         dbContext.Memberships.Add(membership);
         await dbContext.SaveChangesAsync();
 
+        // "member" must also be granted the "tenant.whoami" permission for this
+        // request to succeed now that the endpoint enforces PermissionAuthorizationHandler.
+        // Check-then-add: RolePermission.(Role, Permission) has a unique index and
+        // PermissionAuthorizationTests seeds this same pair.
+        var hasPermission = await dbContext.RolePermissions
+            .AnyAsync(rp => rp.Role == "member" && rp.Permission == "tenant.whoami");
+        if (!hasPermission)
+        {
+            dbContext.RolePermissions.Add(RolePermission.Create("member", "tenant.whoami"));
+            await dbContext.SaveChangesAsync();
+        }
+
         var client = _factory.CreateClient();
         var token = TestJwtTokenFactory.CreateToken(clerkUserId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
