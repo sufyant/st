@@ -87,7 +87,9 @@ superpowers:subagent-driven-development. Environment verified before start:
   exist; RenameTenantCommandEndToEndTests' own test harness still has
   un-swapped behavior order, harmless today but align later. Pushed to
   origin.)
-- Phase 5: not started
+- Phase 5: in progress (spec+plan committed 6eef2a1 — REST endpoint for
+  RenameTenantCommand, OpenAPI generation, packages/api-client TS codegen,
+  SignalR TenantHub)
 - Phase 6: not started
 
 ## Notes
