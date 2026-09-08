@@ -1,5 +1,6 @@
 using Api.Domain;
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

@@ -1,4 +1,5 @@
 using Npgsql;
+using Api.Tests.Shared;
 using Xunit;
 
 namespace Api.Tests.Integration;

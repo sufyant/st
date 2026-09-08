@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Api.Tests.Integration;
+namespace Api.Tests.Shared;
 
 public sealed class CustomWebApplicationFactory(string connectionString) : WebApplicationFactory<Program>
 {

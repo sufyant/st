@@ -1,5 +1,6 @@
 using Api.Domain;
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

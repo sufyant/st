@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Api.Domain;
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

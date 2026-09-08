@@ -3,6 +3,7 @@ using Api.Application;
 using Api.Application.Tenants;
 using Api.Domain;
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

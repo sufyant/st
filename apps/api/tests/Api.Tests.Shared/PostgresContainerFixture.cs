@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using Xunit;
 
-namespace Api.Tests.Integration;
+namespace Api.Tests.Shared;
 
 public sealed class PostgresContainerFixture : IAsyncLifetime
 {
@@ -26,6 +26,3 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 }
-
-[CollectionDefinition(nameof(PostgresCollection))]
-public sealed class PostgresCollection : ICollectionFixture<PostgresContainerFixture>;

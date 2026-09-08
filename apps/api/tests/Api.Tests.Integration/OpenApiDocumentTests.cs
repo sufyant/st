@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Net;
 using System.Text.Json;
+using Api.Tests.Shared;
 using Xunit;
 
 namespace Api.Tests.Integration;

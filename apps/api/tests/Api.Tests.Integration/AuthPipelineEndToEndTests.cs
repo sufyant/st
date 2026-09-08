@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using Api.Domain;
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

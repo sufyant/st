@@ -1,4 +1,5 @@
 using Api.Infrastructure;
+using Api.Tests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Api.Tests.Integration;
+namespace Api.Tests.Shared;
 
 public static class TestJwtTokenFactory
 {
