@@ -1,4 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<Api.Infrastructure.AdminDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AdminDb"))
+        .AddInterceptors(new Api.Infrastructure.AuditableSaveChangesInterceptor()));
 
 var app = builder.Build();
 

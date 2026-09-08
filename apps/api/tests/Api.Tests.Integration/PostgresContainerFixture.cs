@@ -1,3 +1,5 @@
+using Api.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -10,7 +12,17 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public Task InitializeAsync() => _container.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+
+        var options = new DbContextOptionsBuilder<AdminDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options;
+
+        await using var context = new AdminDbContext(options);
+        await context.Database.MigrateAsync();
+    }
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 }
