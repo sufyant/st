@@ -44,7 +44,7 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/{tenant}/api/v1/whoami", (HttpContext context) =>
+app.MapGet("/{tenant-alias}/api/v1/whoami", (HttpContext context) =>
 {
     var userId = context.User.FindFirstValue("sub");
     var tenantId = context.User.FindFirstValue("tenant_id");

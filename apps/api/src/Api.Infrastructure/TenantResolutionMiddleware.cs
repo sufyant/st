@@ -7,11 +7,19 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Api.Infrastructure;
 
+/// <summary>
+/// Read this before adding a new tenant-scoped route: this middleware only resolves
+/// tenant/membership for routes whose template declares a route parameter named exactly
+/// "tenant-alias" (see <c>context.GetRouteValue("tenant-alias")</c> below). A tenant-scoped
+/// route that uses a different parameter name will silently bypass both tenant resolution
+/// and membership enforcement, with no error - the request proceeds as if it were not
+/// tenant-scoped at all.
+/// </summary>
 public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, AdminDbContext dbContext, IMemoryCache cache)
     {
-        var alias = context.GetRouteValue("tenant") as string;
+        var alias = context.GetRouteValue("tenant-alias") as string;
 
         if (string.IsNullOrEmpty(alias))
         {
