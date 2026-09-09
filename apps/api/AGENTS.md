@@ -8,6 +8,8 @@
 - Use EF Core by default; introduce Dapper for justified query needs.
 - Avoid generic repositories and speculative abstractions.
 - Store tenant business data in separate schemas; keep shared tenant, membership, invitation, and access-control records in the `admin` schema.
+- Treat tenant aliases as mutable path identifiers. Use each tenant's immutable GUID in `N` format as its schema name and always quote it as a PostgreSQL identifier; never derive a schema name from an alias.
+- Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
 - Tenant-scoped endpoints use `/{tenant-alias}/api/v{version}/...`.
 - Resolve tenants from trusted control-plane data; fail closed on missing context.
@@ -28,4 +30,5 @@ Run from `apps/api`:
 - Test: `dotnet test --solution Api.slnx`
 - Start API: `dotnet run --project src/Api --urls http://localhost:5000`
 
-`/health` currently checks application liveness only; it does not check PostgreSQL.
+- `/health` checks application liveness only.
+- `/health/ready` checks PostgreSQL readiness and requires `ConnectionStrings__Postgres`.
