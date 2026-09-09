@@ -11,6 +11,8 @@
 - Treat tenant aliases as mutable path identifiers. Use each tenant's immutable GUID in `N` format in its database name, `tenant_<guid-N>`; never derive a database name from an alias.
 - Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
+- Create database roles with the bootstrap script, never in EF migrations; the API runtime role never holds DDL privileges.
+- Serve tenant requests through the read-only control plane credential; writes to the control plane belong to `/admin` endpoints.
 - Tenant-scoped endpoints use `/{tenant-alias}/api/v{version}/...`.
 - Resolve tenants from trusted control-plane data; fail closed on missing context.
 - A membership record only grants entry to a tenant; remove it to revoke access. Check the tenant-database user status after membership and reject disabled users before permission checks.
@@ -30,6 +32,8 @@ Run from `apps/api`:
 - Start PostgreSQL: `docker compose up -d`
 - Stop PostgreSQL: `docker compose down`
 - Reset PostgreSQL (drops all local data): `docker compose down -v && docker compose up -d`
+- Create database roles (once per environment, superuser): `docker exec -i st-postgres psql -U postgres -v migrator_password=dev_migrator -v provisioner_password=dev_provisioner -v control_password=dev_control -v tenant_password=dev_tenant -f - < scripts/bootstrap-roles.sql`
+- Grant control plane access (after the control plane migration): `docker exec -i st-postgres psql -U postgres -d control_plane -f - < scripts/grant-control-plane.sql`
 - Build: `dotnet build Api.slnx`
 - Test: `dotnet test --solution Api.slnx`
 - Start API: `dotnet run --project src/Api --urls http://localhost:5000`
