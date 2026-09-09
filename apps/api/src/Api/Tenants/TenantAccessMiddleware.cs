@@ -2,8 +2,8 @@ using System.Security.Claims;
 using Domain.Access;
 using Domain.Access.Users;
 using Domain.Tenants;
-using Infrastructure.Persistence.Admin;
 using Infrastructure.Persistence.Tenants;
+using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,8 +35,6 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var services = context.RequestServices;
-        var adminDbContext = services.GetRequiredService<AdminDbContext>();
         TenantAlias alias;
 
         try
@@ -49,20 +47,30 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var tenant = await adminDbContext.Tenants.SingleOrDefaultAsync(
-            candidate => candidate.Alias == alias,
-            context.RequestAborted);
+        var services = context.RequestServices;
+        var resolver = services.GetRequiredService<TenantResolver>();
+        var tenant = await resolver.ResolveAsync(alias.Value, context.RequestAborted);
 
-        if (tenant is null)
+        if (tenant is null || tenant.Status is TenantStatus.Deprovisioning or TenantStatus.Deleted)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
 
-        var userId = ExternalUserId.Create(externalUserId);
-        var hasMembership = await adminDbContext.Memberships.AnyAsync(
-            membership => membership.TenantId == tenant.Id && membership.ExternalUserId == userId,
-            context.RequestAborted);
+        if (tenant.Status is TenantStatus.Provisioning)
+        {
+            context.Response.Headers.RetryAfter = "10";
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return;
+        }
+
+        if (tenant.Status is TenantStatus.Suspended)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        var hasMembership = await resolver.HasMembershipAsync(tenant.Id, externalUserId, context.RequestAborted);
 
         if (!hasMembership)
         {
@@ -70,8 +78,9 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
+        var userId = ExternalUserId.Create(externalUserId);
         var tenantDbContextFactory = services.GetRequiredService<TenantDbContextFactory>();
-        await using var tenantDbContext = tenantDbContextFactory.Create(tenant);
+        await using var tenantDbContext = tenantDbContextFactory.Create(tenant.DatabaseName);
         var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
             user => user.ExternalUserId == userId,
             context.RequestAborted);
@@ -82,7 +91,7 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        tenantContext.Set(tenant);
+        tenantContext.Set(tenant.Id, tenant.Alias);
         context.User.AddIdentity(new ClaimsIdentity([new Claim("tenant_id", tenant.Id.ToString("N"))], "Tenant"));
 
         await next(context);

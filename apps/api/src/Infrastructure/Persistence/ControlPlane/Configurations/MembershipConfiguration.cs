@@ -3,7 +3,7 @@ using Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.Persistence.Admin.Configurations;
+namespace Infrastructure.Persistence.ControlPlane.Configurations;
 
 public sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {

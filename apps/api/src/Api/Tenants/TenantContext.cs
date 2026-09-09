@@ -1,17 +1,17 @@
-using Domain.Tenants;
-
 namespace Api.Tenants;
 
 public sealed class TenantContext
 {
-    private Tenant? tenant;
+    private Guid? tenantId;
+    private string? alias;
 
-    public Guid TenantId => tenant?.Id ?? throw new InvalidOperationException("Tenant context has not been resolved.");
+    public Guid TenantId => tenantId ?? throw new InvalidOperationException("Tenant context has not been resolved.");
 
-    public string Alias => tenant?.Alias.Value ?? throw new InvalidOperationException("Tenant context has not been resolved.");
+    public string Alias => alias ?? throw new InvalidOperationException("Tenant context has not been resolved.");
 
-    internal void Set(Tenant resolvedTenant)
+    internal void Set(Guid resolvedTenantId, string resolvedAlias)
     {
-        tenant ??= resolvedTenant;
+        tenantId = resolvedTenantId;
+        alias = resolvedAlias;
     }
 }

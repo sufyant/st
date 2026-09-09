@@ -1,11 +1,11 @@
 using Domain.Access;
 using Domain.Tenants;
-using Infrastructure.Persistence.Admin.Configurations;
+using Infrastructure.Persistence.ControlPlane.Configurations;
 using Microsoft.EntityFrameworkCore;
 
-namespace Infrastructure.Persistence.Admin;
+namespace Infrastructure.Persistence.ControlPlane;
 
-public sealed class AdminDbContext(DbContextOptions<AdminDbContext> options) : DbContext(options)
+public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
@@ -13,9 +13,9 @@ public sealed class AdminDbContext(DbContextOptions<AdminDbContext> options) : D
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema("admin");
+        modelBuilder.HasDefaultSchema("control");
         modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(AdminDbContext).Assembly,
+            typeof(ControlPlaneDbContext).Assembly,
             type => type.Namespace == typeof(TenantConfiguration).Namespace);
     }
 }

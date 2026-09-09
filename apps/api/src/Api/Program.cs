@@ -1,6 +1,7 @@
 using Api.Tenants;
 using System.Security.Claims;
 using Infrastructure.Persistence;
+using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
@@ -8,7 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPostgresReadiness(builder.Configuration);
 builder.Services.AddTenantPersistence(builder.Configuration);
 builder.Services.AddOpenApi();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TenantContext>();
+builder.Services.AddScoped<TenantResolver>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

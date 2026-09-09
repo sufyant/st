@@ -22,7 +22,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Access.TenantPermission", b =>
+            modelBuilder.Entity("Domain.Access.Permissions.TenantPermission", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -54,7 +54,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("permissions", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantRole", b =>
+            modelBuilder.Entity("Domain.Access.Roles.TenantRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -85,7 +85,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("roles", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantRolePermission", b =>
+            modelBuilder.Entity("Domain.Access.Roles.TenantRolePermission", b =>
                 {
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uuid")
@@ -102,7 +102,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("role_permissions", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantUser", b =>
+            modelBuilder.Entity("Domain.Access.Users.TenantUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -128,7 +128,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantUserRole", b =>
+            modelBuilder.Entity("Domain.Access.Users.TenantUserRole", b =>
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -145,30 +145,30 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantRolePermission", b =>
+            modelBuilder.Entity("Domain.Access.Roles.TenantRolePermission", b =>
                 {
-                    b.HasOne("Domain.Access.TenantPermission", null)
+                    b.HasOne("Domain.Access.Permissions.TenantPermission", null)
                         .WithMany()
                         .HasForeignKey("PermissionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Access.TenantRole", null)
+                    b.HasOne("Domain.Access.Roles.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Access.TenantUserRole", b =>
+            modelBuilder.Entity("Domain.Access.Users.TenantUserRole", b =>
                 {
-                    b.HasOne("Domain.Access.TenantRole", null)
+                    b.HasOne("Domain.Access.Roles.TenantRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Access.TenantUser", null)
+                    b.HasOne("Domain.Access.Users.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)

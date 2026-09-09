@@ -1,4 +1,3 @@
-using Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -8,13 +7,13 @@ namespace Infrastructure.Persistence.Tenants;
 
 public sealed class TenantDbContextFactory(string connectionString)
 {
-    public TenantDbContext Create(Tenant tenant)
+    public TenantDbContext Create(string databaseName)
     {
-        ArgumentNullException.ThrowIfNull(tenant);
+        ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
         {
-            Database = tenant.DatabaseName
+            Database = databaseName
         };
         var options = new DbContextOptionsBuilder<TenantDbContext>()
             .UseNpgsql(builder.ConnectionString)
@@ -35,10 +34,9 @@ public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFacto
             .AddUserSecrets<TenantDesignTimeDbContextFactory>()
             .AddEnvironmentVariables()
             .Build();
-        var connectionString = configuration.GetConnectionString("Postgres")
-            ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
+        var connectionString = configuration.GetConnectionString("TenantData")
+            ?? throw new InvalidOperationException("Connection string 'TenantData' is not configured.");
 
-        return new TenantDbContextFactory(connectionString).Create(
-            Tenant.Create(Guid.Parse("11111111-1111-1111-1111-111111111111"), TenantAlias.Create("design-time")));
+        return new TenantDbContextFactory(connectionString).Create("design_time");
     }
 }

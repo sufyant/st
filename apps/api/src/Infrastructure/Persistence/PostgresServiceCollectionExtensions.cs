@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Infrastructure.Persistence.Admin;
+using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 
 namespace Infrastructure.Persistence;
@@ -14,25 +14,16 @@ public static class PostgresServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddDbContext<AdminDbContext>(options =>
-        {
-            var connectionString = configuration.GetConnectionString("Postgres")
-                ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
-            var systemDatabaseConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
-            {
-                Database = "systemdb"
-            }.ConnectionString;
-            options.UseNpgsql(systemDatabaseConnectionString, npgsql =>
-                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"));
-        });
-        services.AddScoped(_ =>
-        {
-            var connectionString = configuration
-                .GetConnectionString("Postgres")
-                ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
+        services.AddDbContext<ControlPlaneDbContext>(options =>
+            options.UseNpgsql(
+                RequiredConnectionString(configuration, "ControlPlane"),
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control")));
 
-            return new TenantDbContextFactory(connectionString);
-        });
+        services.AddScoped(_ => new TenantDbContextFactory(
+            RequiredConnectionString(configuration, "TenantData")));
+
+        services.AddKeyedSingleton<NpgsqlDataSource>("control-plane-read", (_, _) =>
+            NpgsqlDataSource.Create(RequiredConnectionString(configuration, "ControlPlaneRead")));
 
         return services;
     }
@@ -42,7 +33,7 @@ public static class PostgresServiceCollectionExtensions
         IConfiguration configuration)
     {
         var healthChecks = services.AddHealthChecks();
-        var connectionString = configuration.GetConnectionString("Postgres");
+        var connectionString = configuration.GetConnectionString("ControlPlane");
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -54,13 +45,13 @@ public static class PostgresServiceCollectionExtensions
             return services;
         }
 
-        var systemDatabaseConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
-        {
-            Database = "systemdb"
-        }.ConnectionString;
-        services.AddSingleton(NpgsqlDataSource.Create(systemDatabaseConnectionString));
+        services.AddSingleton(NpgsqlDataSource.Create(connectionString));
         healthChecks.AddCheck<PostgresReadinessHealthCheck>("postgres", tags: ["ready"]);
 
         return services;
     }
+
+    internal static string RequiredConnectionString(IConfiguration configuration, string name) =>
+        configuration.GetConnectionString(name)
+            ?? throw new InvalidOperationException($"Connection string '{name}' is not configured.");
 }

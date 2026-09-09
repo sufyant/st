@@ -18,13 +18,16 @@ public sealed class PostgresReadinessEndpointTests
         await using (var connection = new NpgsqlConnection(postgres.GetConnectionString()))
         {
             await connection.OpenAsync(TestContext.Current.CancellationToken);
-            await using var command = new NpgsqlCommand("CREATE DATABASE systemdb", connection);
+            await using var command = new NpgsqlCommand("CREATE DATABASE control_plane", connection);
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
         await using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.UseSetting(
-                "ConnectionStrings:Postgres",
-                postgres.GetConnectionString()));
+                "ConnectionStrings:ControlPlane",
+                new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
+                {
+                    Database = "control_plane"
+                }.ConnectionString));
         using var client = factory.CreateClient();
 
         // Act
