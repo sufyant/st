@@ -1,3 +1,5 @@
+using Domain.Tenants;
+using Infrastructure.Persistence.Admin;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -9,13 +11,46 @@ namespace IntegrationTests;
 public sealed class TenantSchemaProvisionerTests
 {
     [Fact]
-    public void Create_WithNonTenantSchemaName_ThrowsArgumentException()
+    public async Task MigrateAsync_AppliesTenantMigrationsForEveryControlPlaneTenant()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var options = new DbContextOptionsBuilder<AdminDbContext>()
+            .UseNpgsql(postgres.GetConnectionString(), npgsql =>
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"))
+            .Options;
+        await using var adminContext = new AdminDbContext(options);
+        await adminContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
+        var firstTenant = Tenant.Create(Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9"), TenantAlias.Create("acme"));
+        var secondTenant = Tenant.Create(Guid.Parse("b31ee8a6-6411-4aa5-a5a9-1e6bbf92f2ce"), TenantAlias.Create("globex"));
+        adminContext.Tenants.AddRange(firstTenant, secondTenant);
+        await adminContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await using var dataSource = NpgsqlDataSource.Create(postgres.GetConnectionString());
+        var migrator = new PostgresTenantSchemaMigrator(
+            adminContext,
+            new PostgresTenantSchemaProvisioner(dataSource),
+            new TenantDbContextFactory(postgres.GetConnectionString()));
+
+        // Act
+        await migrator.MigrateAsync(TestContext.Current.CancellationToken);
+        await using var connection = await dataSource.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        var firstTenantHasUsersTable = await HasUsersTableAsync(connection, firstTenant.SchemaName);
+        var secondTenantHasUsersTable = await HasUsersTableAsync(connection, secondTenant.SchemaName);
+
+        // Assert
+        Assert.True(firstTenantHasUsersTable);
+        Assert.True(secondTenantHasUsersTable);
+    }
+
+    [Fact]
+    public void Create_WithEmptyTenantId_ThrowsArgumentException()
     {
         // Arrange
         var factory = new TenantDbContextFactory("Host=localhost;Database=st");
 
         // Act
-        var action = () => factory.Create("public");
+        var action = () => factory.Create(Guid.Empty);
 
         // Assert
         Assert.Throws<ArgumentException>(action);
@@ -34,8 +69,8 @@ public sealed class TenantSchemaProvisionerTests
         var contextFactory = new TenantDbContextFactory(postgres.GetConnectionString());
         await provisioner.CreateAsync(firstTenantId, TestContext.Current.CancellationToken);
         await provisioner.CreateAsync(secondTenantId, TestContext.Current.CancellationToken);
-        await using var firstTenantContext = contextFactory.Create(firstTenantId.ToString("N"));
-        await using var secondTenantContext = contextFactory.Create(secondTenantId.ToString("N"));
+        await using var firstTenantContext = contextFactory.Create(firstTenantId);
+        await using var secondTenantContext = contextFactory.Create(secondTenantId);
         await firstTenantContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
         await secondTenantContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
         var userId = Guid.Parse("c9f47e68-86a2-4e18-a51c-46afce941d95");
@@ -83,5 +118,15 @@ public sealed class TenantSchemaProvisionerTests
         // Assert
         Assert.Contains(firstTenantId.ToString("N"), schemas);
         Assert.Contains(secondTenantId.ToString("N"), schemas);
+    }
+
+    private static async Task<bool> HasUsersTableAsync(NpgsqlConnection connection, string schemaName)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = @schema AND table_name = 'users')",
+            connection);
+        command.Parameters.AddWithValue("schema", schemaName);
+
+        return (bool)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
 }

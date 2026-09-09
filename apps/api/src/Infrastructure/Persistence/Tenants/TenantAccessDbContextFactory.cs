@@ -7,11 +7,11 @@ namespace Infrastructure.Persistence.Tenants;
 
 public sealed class TenantDbContextFactory(string connectionString)
 {
-    public TenantDbContext Create(string schemaName)
+    public TenantDbContext Create(Guid tenantId)
     {
-        if (!Guid.TryParseExact(schemaName, "N", out var tenantId) || tenantId == Guid.Empty)
+        if (tenantId == Guid.Empty)
         {
-            throw new ArgumentException("Tenant schema name must be a non-empty GUID in N format.", nameof(schemaName));
+            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
         }
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
@@ -40,6 +40,6 @@ public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFacto
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
 
-        return new TenantDbContextFactory(connectionString).Create(Guid.Parse("11111111-1111-1111-1111-111111111111").ToString("N"));
+        return new TenantDbContextFactory(connectionString).Create(Guid.Parse("11111111-1111-1111-1111-111111111111"));
     }
 }
