@@ -1,3 +1,4 @@
+using Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -7,16 +8,13 @@ namespace Infrastructure.Persistence.Tenants;
 
 public sealed class TenantDbContextFactory(string connectionString)
 {
-    public TenantDbContext Create(Guid tenantId)
+    public TenantDbContext Create(Tenant tenant)
     {
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
-        }
+        ArgumentNullException.ThrowIfNull(tenant);
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
         {
-            SearchPath = $"\"{tenantId:N}\""
+            Database = tenant.DatabaseName
         };
         var options = new DbContextOptionsBuilder<TenantDbContext>()
             .UseNpgsql(builder.ConnectionString)
@@ -40,6 +38,7 @@ public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFacto
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
 
-        return new TenantDbContextFactory(connectionString).Create(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        return new TenantDbContextFactory(connectionString).Create(
+            Tenant.Create(Guid.Parse("11111111-1111-1111-1111-111111111111"), TenantAlias.Create("design-time")));
     }
 }

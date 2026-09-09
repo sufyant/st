@@ -1,12 +1,28 @@
+using Api.Tenants;
+using System.Security.Claims;
 using Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPostgresReadiness(builder.Configuration);
+builder.Services.AddTenantPersistence(builder.Configuration);
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<TenantContext>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.Authority = builder.Configuration["Clerk:Issuer"];
+        options.Audience = builder.Configuration["Clerk:Audience"];
+    });
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseAuthentication();
+app.UseMiddleware<TenantAccessMiddleware>();
+app.UseAuthorization();
 app.MapOpenApi();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
@@ -16,6 +32,12 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready")
 });
+app.MapGet("/{tenantAlias}/api/v1/whoami", (TenantContext tenantContext, ClaimsPrincipal user) => Results.Ok(new
+{
+    tenantId = tenantContext.TenantId,
+    tenantAlias = tenantContext.Alias,
+    userId = user.FindFirstValue("sub")
+})).RequireAuthorization();
 
 app.Run();
 

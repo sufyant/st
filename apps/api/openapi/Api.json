@@ -4,5 +4,23 @@
     "title": "Api | v1",
     "version": "1.0.0"
   },
-  "paths": { }
+  "paths": {
+    "/{tenantAlias}/api/v1/whoami": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Api"
+    }
+  ]
 }

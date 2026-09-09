@@ -6,7 +6,7 @@ namespace UnitTests.Tenants;
 public sealed class TenantTests
 {
     [Fact]
-    public void Create_UsesTenantIdInNFormatAsSchemaName()
+    public void Create_UsesTenantIdInNFormatAsDatabaseName()
     {
         // Arrange
         var id = Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9");
@@ -16,11 +16,11 @@ public sealed class TenantTests
         var tenant = Tenant.Create(id, alias);
 
         // Assert
-        Assert.Equal("018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.SchemaName);
+        Assert.Equal("tenant_018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.DatabaseName);
     }
 
     [Fact]
-    public void RenameAlias_ChangesAliasWithoutChangingSchemaName()
+    public void RenameAlias_ChangesAliasWithoutChangingDatabaseName()
     {
         // Arrange
         var tenant = Tenant.Create(Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9"), TenantAlias.Create("acme"));
@@ -30,7 +30,7 @@ public sealed class TenantTests
 
         // Assert
         Assert.Equal("acme-finance", tenant.Alias.Value);
-        Assert.Equal("018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.SchemaName);
+        Assert.Equal("tenant_018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.DatabaseName);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Infrastructure.Persistence.Admin;
 
@@ -17,9 +18,13 @@ public sealed class AdminDbContextFactory : IDesignTimeDbContextFactory<AdminDbC
             .Build();
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
+        var systemDatabaseConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Database = "systemdb"
+        }.ConnectionString;
         var options = new DbContextOptionsBuilder<AdminDbContext>()
             .UseNpgsql(
-                connectionString,
+                systemDatabaseConnectionString,
                 npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"))
             .Options;
 

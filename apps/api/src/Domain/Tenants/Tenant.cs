@@ -6,7 +6,7 @@ public sealed class Tenant
 
     public TenantAlias Alias { get; private set; }
 
-    public string SchemaName => Id.ToString("N");
+    public string DatabaseName => $"tenant_{Id:N}";
 
     private Tenant(Guid id, TenantAlias alias)
     {

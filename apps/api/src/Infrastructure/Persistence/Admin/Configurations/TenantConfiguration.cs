@@ -17,6 +17,6 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasConversion(alias => alias.Value, value => TenantAlias.Create(value))
             .IsRequired();
         builder.HasIndex(x => x.Alias).IsUnique();
-        builder.Ignore(x => x.SchemaName);
+        builder.Ignore(x => x.DatabaseName);
     }
 }

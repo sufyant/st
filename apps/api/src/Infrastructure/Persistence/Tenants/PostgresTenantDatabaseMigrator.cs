@@ -3,22 +3,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence.Tenants;
 
-public sealed class PostgresTenantSchemaMigrator(
+public sealed class PostgresTenantDatabaseMigrator(
     AdminDbContext adminDbContext,
-    PostgresTenantSchemaProvisioner schemaProvisioner,
+    PostgresTenantDatabaseProvisioner databaseProvisioner,
     TenantDbContextFactory tenantDbContextFactory)
 {
     public async Task MigrateAsync(CancellationToken cancellationToken)
     {
-        var tenantIds = await adminDbContext.Tenants
+        var tenants = await adminDbContext.Tenants
             .AsNoTracking()
-            .Select(tenant => tenant.Id)
             .ToListAsync(cancellationToken);
 
-        foreach (var tenantId in tenantIds)
+        foreach (var tenant in tenants)
         {
-            await schemaProvisioner.CreateAsync(tenantId, cancellationToken);
-            await using var tenantDbContext = tenantDbContextFactory.Create(tenantId);
+            await databaseProvisioner.CreateAsync(tenant, cancellationToken);
+            await using var tenantDbContext = tenantDbContextFactory.Create(tenant);
             await tenantDbContext.Database.MigrateAsync(cancellationToken);
         }
     }

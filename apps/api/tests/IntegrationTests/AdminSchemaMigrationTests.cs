@@ -9,20 +9,31 @@ namespace IntegrationTests;
 public sealed class AdminSchemaMigrationTests
 {
     [Fact]
-    public async Task Migrate_CreatesControlPlaneTablesInAdminSchema()
+    public async Task Migrate_CreatesSystemDatabaseTablesInAdminSchema()
     {
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var connectionString = postgres.GetConnectionString();
+        await using (var bootstrapConnection = new NpgsqlConnection(connectionString))
+        {
+            await bootstrapConnection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var bootstrapCommand = new NpgsqlCommand("CREATE DATABASE systemdb", bootstrapConnection);
+            await bootstrapCommand.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+        var systemDatabaseConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Database = "systemdb"
+        }.ConnectionString;
         var options = new DbContextOptionsBuilder<AdminDbContext>()
-            .UseNpgsql(postgres.GetConnectionString(), npgsql =>
+            .UseNpgsql(systemDatabaseConnectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "admin"))
             .Options;
         await using var context = new AdminDbContext(options);
 
         // Act
         await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
-        await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
+        await using var connection = new NpgsqlConnection(systemDatabaseConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = new NpgsqlCommand("SELECT to_regclass('admin.tenants')::text", connection);
         var result = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
