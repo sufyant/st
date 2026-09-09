@@ -11,27 +11,24 @@ public sealed class MembershipTests
         // Arrange
         var membershipId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
-        var userId = IdentityUserId.Create("user_2abc123");
-        var roleId = Guid.NewGuid();
+        var externalUserId = ExternalUserId.Create("user_2abc123");
 
         // Act
-        var membership = Membership.Create(membershipId, tenantId, userId, roleId);
+        var membership = Membership.Create(membershipId, tenantId, externalUserId);
 
         // Assert
         Assert.Equal(membershipId, membership.Id);
         Assert.Equal(tenantId, membership.TenantId);
-        Assert.Equal(IdentityUserId.Create("user_2abc123"), membership.UserId);
-        Assert.Equal(roleId, membership.RoleId);
-        Assert.Equal(MembershipStatus.Active, membership.Status);
+        Assert.Equal(ExternalUserId.Create("user_2abc123"), membership.ExternalUserId);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_WithBlankIdentityUserId_ThrowsArgumentException(string value)
+    public void Create_WithBlankExternalUserId_ThrowsArgumentException(string value)
     {
         // Arrange
-        var action = () => IdentityUserId.Create(value);
+        var action = () => ExternalUserId.Create(value);
 
         // Act
         var exception = Record.Exception(action);
@@ -41,17 +38,15 @@ public sealed class MembershipTests
     }
 
     [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, true)]
-    public void Create_WithEmptyRequiredId_ThrowsArgumentException(bool emptyMembershipId, bool emptyTenantId, bool emptyRoleId)
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Create_WithEmptyRequiredId_ThrowsArgumentException(bool emptyMembershipId, bool emptyTenantId)
     {
         // Arrange
         var membershipId = emptyMembershipId ? Guid.Empty : Guid.NewGuid();
         var tenantId = emptyTenantId ? Guid.Empty : Guid.NewGuid();
-        var roleId = emptyRoleId ? Guid.Empty : Guid.NewGuid();
-        var userId = IdentityUserId.Create("user_2abc123");
-        var action = () => Membership.Create(membershipId, tenantId, userId, roleId);
+        var externalUserId = ExternalUserId.Create("user_2abc123");
+        var action = () => Membership.Create(membershipId, tenantId, externalUserId);
 
         // Act
         var exception = Record.Exception(action);

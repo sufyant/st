@@ -42,22 +42,14 @@ public sealed class AdminDbContext(DbContextOptions<AdminDbContext> options) : D
             membership.Property(x => x.TenantId)
                 .HasColumnName("tenant_id")
                 .IsRequired();
-            membership.Property(x => x.UserId)
-                .HasColumnName("user_id")
+            membership.Property(x => x.ExternalUserId)
+                .HasColumnName("external_user_id")
                 .HasMaxLength(255)
                 .HasConversion(
                     userId => userId.Value,
-                    value => IdentityUserId.Create(value))
+                    value => ExternalUserId.Create(value))
                 .IsRequired();
-            membership.Property(x => x.RoleId)
-                .HasColumnName("role_id")
-                .IsRequired();
-            membership.Property(x => x.Status)
-                .HasColumnName("status")
-                .HasConversion<string>()
-                .HasMaxLength(32)
-                .IsRequired();
-            membership.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+            membership.HasIndex(x => new { x.TenantId, x.ExternalUserId }).IsUnique();
             membership.HasOne<Tenant>()
                 .WithMany()
                 .HasForeignKey(x => x.TenantId)

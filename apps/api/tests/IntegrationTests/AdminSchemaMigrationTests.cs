@@ -30,9 +30,20 @@ public sealed class AdminSchemaMigrationTests
         await using var membershipCommand = new NpgsqlCommand("SELECT to_regclass('admin.memberships')::text", connection);
         var membershipResult = await membershipCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken);
         var membershipTableName = membershipResult is DBNull ? null : (string)membershipResult!;
+        await using var columnsCommand = new NpgsqlCommand(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'admin' AND table_name = 'memberships'",
+            connection);
+        await using var reader = await columnsCommand.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        var membershipColumns = new List<string>();
+
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            membershipColumns.Add(reader.GetString(0));
+        }
 
         // Assert
         Assert.Equal("admin.tenants", tableName);
         Assert.Equal("admin.memberships", membershipTableName);
+        Assert.Contains("external_user_id", membershipColumns);
     }
 }
