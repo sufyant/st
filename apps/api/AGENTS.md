@@ -27,6 +27,9 @@
 
 Run from `apps/api`:
 
+- Start PostgreSQL: `docker compose up -d`
+- Stop PostgreSQL: `docker compose down`
+- Reset PostgreSQL (drops all local data): `docker compose down -v && docker compose up -d`
 - Build: `dotnet build Api.slnx`
 - Test: `dotnet test --solution Api.slnx`
 - Start API: `dotnet run --project src/Api --urls http://localhost:5000`
