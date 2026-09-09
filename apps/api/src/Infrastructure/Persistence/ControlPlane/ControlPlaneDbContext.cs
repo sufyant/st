@@ -1,4 +1,5 @@
 using Domain.Access;
+using Infrastructure.Messaging;
 using Domain.Tenants;
 using Infrastructure.Persistence.ControlPlane.Configurations;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
