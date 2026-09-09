@@ -202,6 +202,15 @@ olması ve ileride ayrı bir deployable'a çıkarmanın mekanik bir işe dönü�
 | `migrate tenants` | `control.tenants` içindeki uygun tenant'ların **var olan** veritabanlarına tenant migration'larını uygular. |
 | `migrate tenants --tenant <alias>` | Aynısını tek tenant için yapar. |
 
+Bu komutun var olma sebebi: yeni bir tenant, provisioning sırasında zaten en güncel şemayla
+doğar; daha önce oluşturulmuş tenant'lar ise bulundukları sürümde kalır. Şema her
+değiştiğinde var olan tenant veritabanlarının yetiştirilmesi gerekir. İlk deploy'da tenant
+listesi boş olduğu için komut hiçbir şey yapmaz — asıl işlevi ikinci ve sonraki deploy'lardadır.
+
+Tek paylaşılan veritabanında bu sorun yoktur: bir migration çalışır ve iş biter.
+Database-per-tenant'ta her şema değişikliği N veritabanına uygulanmak zorundadır; bu komut o
+bedelin karşılığıdır.
+
 Tenant seçimi status'e göredir:
 
 | Status | Davranış |
@@ -229,10 +238,28 @@ Gerekçe: "migration'lar yeniden yazılmaz" kuralı, gerçek bir ortamda çalı�
 için geçerlidir. Bu migration'lar hiçbir kalıcı ortamda çalışmadı ve terk edilmiş bir tasarıma
 (schema-per-tenant, `admin` şeması) referans veriyorlar.
 
-**Bu, son geriye dönük düzenlemedir.** Bundan sonra her değişiklik — yeniden adlandırma ve
-yazım hatası dahil — yeni bir migration ile ileriye doğru yapılır. Bu hak, bir migration
-düşürülemeyecek herhangi bir yerde (staging, prod, paylaşılan dev veritabanı, başka bir
-geliştiricinin makinesi) çalıştığı anda sona erer.
+**Bu dönem henüz bitmedi ve squash onun tek örneği değil.** Bir migration, düşürülemeyecek
+herhangi bir yerde (staging, prod, paylaşılan dev veritabanı, başka bir geliştiricinin
+makinesi) çalışana kadar, var olan bir migration'ı düzenleyip lokal veritabanını yeniden
+kurmak doğru ve en ucuz yoldur. Bu dönemde bir yeniden adlandırma için ayrı migration yazmak
+gereksiz törendir.
+
+O eşik aşıldığı anda **iki kural birlikte** yürürlüğe girer:
+
+1. **İleriye doğru migration:** var olan migration'lar bir daha düzenlenmez; yeniden
+   adlandırma ve yazım hatası dahil her değişiklik yeni bir migration ile yapılır.
+2. **Expand/contract:** bir migration, o an yayında olan kodu kırmamalıdır. Tablo veya
+   nullable kolon eklemek güvenlidir; silmek, yeniden adlandırmak ve tip değiştirmek bir
+   sonraki sürüme bırakılır — önce yeni kolon eklenir, bir süre ikisine birden yazılır, eskisi
+   sonra silinir.
+
+İkisi aynı anda başlar çünkü sebepleri aynıdır: artık sizin kontrolünüzde olmayan bir yerde
+çalışmış bir şema vardır.
+
+Eşik aşıldığında `apps/api/AGENTS.md`'ye eklenecek satır: "Migrations must not break the
+currently deployed code: add before removing, and defer destructive changes to a later
+release." Bu satır o güne kadar eklenmez, çünkü erken eklenirse her şema değişikliğini
+gereksiz yere iki sürüme yayar.
 
 ### 11. Provisioning ile migration sınırı
 
@@ -277,7 +304,7 @@ CI kurulduğunda aynı sıra otomatikleşir, K8s'te migrator bir Job'a dönüş�
 
 Migration'lar API'den önce çalıştığı için kısa bir süre eski API kodu yeni şemaya karşı çalışır.
 Bu nedenle **expand/contract** disiplini uygulanır: additive değişiklik önce, kod sonra, yıkıcı
-değişiklik bir sonraki sürümde. Tek ortam varken zorunluluk değil, alışkanlıktır.
+değişiklik bir sonraki sürümde. Bu kuralın ne zaman yürürlüğe girdiği Karar 10'da tanımlıdır.
 
 ## Bilinçli olarak yapmadıklarımız
 
@@ -302,6 +329,7 @@ xUnit + Testcontainers (gerçek PostgreSQL), AAA yapısı.
 | Platform admin policy | IntegrationTests | Tenant owner'ın platform yetkisi yok; platform admin geçiyor |
 | Credential sınırı | TenantIsolationTests | `st_tenant` ile control plane'e yazma ve DDL başarısız oluyor |
 | Migrator status filtresi | IntegrationTests | `Provisioning` atlanıyor, `Active` + eksik veritabanı hata veriyor |
+| Şema yakınsaması | IntegrationTests | Sıfırdan kurulan veritabanı ile eski sürümden yükseltilen veritabanının `__EFMigrationsHistory` içeriği aynı |
 | Tenant veri izolasyonu | TenantIsolationTests | Bir tenant'ın verisi diğerinden okunamıyor (mevcut test taşınır) |
 
 `TenantIsolationTests`, `AGENTS.md`'nin gerektirdiği gibi ayrı ve adlandırılmış bir proje olarak
