@@ -7,42 +7,25 @@ using Api.Tests.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Api.Tests.Integration;
 
+// IMediator is resolved from the real host (CustomWebApplicationFactory, the same composition
+// root Program.cs builds) rather than a hand-built ServiceCollection, so these tests exercise the
+// actual registered pipeline behavior order (Logging -> Permission -> Validation -> SaveChanges),
+// not a test-local reimplementation that could silently drift from production.
 [Collection(nameof(PostgresCollection))]
-public class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture)
+public sealed class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture) : IDisposable
 {
-    private (IMediator Mediator, AdminDbContext DbContext) BuildMediator(ClaimsPrincipal? user)
+    private readonly CustomWebApplicationFactory _factory = new(fixture.ConnectionString);
+
+    public void Dispose() => _factory.Dispose();
+
+    private AdminDbContext CreateDbContext()
     {
-        var services = new ServiceCollection();
-
-        services.AddDbContext<AdminDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
-        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
-        services.AddLogging();
-
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = user is null ? null : new DefaultHttpContext { User = user },
-        };
-        services.AddSingleton<IHttpContextAccessor>(httpContextAccessor);
-
-        services.AddScoped<IMediator, Mediator>();
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PermissionBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(SaveChangesUnitOfWorkBehavior<,>));
-
-        services.AddScoped<ITenantRepository, TenantRepository>();
-        services.AddScoped<IRequestHandler<RenameTenantCommand, Result>, RenameTenantCommandHandler>();
-        services.AddScoped<FluentValidation.IValidator<RenameTenantCommand>, RenameTenantCommandValidator>();
-
-        var provider = services.BuildServiceProvider();
-        var scope = provider.CreateScope();
-        return (scope.ServiceProvider.GetRequiredService<IMediator>(), scope.ServiceProvider.GetRequiredService<AdminDbContext>());
+        var options = new DbContextOptionsBuilder<AdminDbContext>().UseNpgsql(fixture.ConnectionString).Options;
+        return new AdminDbContext(options);
     }
 
     private static ClaimsPrincipal AuthenticatedUserWithPermission(string permission, Guid tenantId)
@@ -57,14 +40,27 @@ public class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture)
         return new ClaimsPrincipal(identity);
     }
 
+    private IMediator ResolveMediatorAs(ClaimsPrincipal user, out IServiceScope scope)
+    {
+        var httpContextAccessor = _factory.Services.GetRequiredService<IHttpContextAccessor>();
+        httpContextAccessor.HttpContext = new DefaultHttpContext { User = user };
+
+        scope = _factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IMediator>();
+    }
+
     [Fact]
     public async Task Send_ValidCommandWithPermission_RenamesTenantInDatabase()
     {
         // Arrange
         var tenant = Tenant.Create(TenantSlug.Create($"e2e-{Guid.NewGuid():N}"[..15]), "Original Name");
-        var (mediator, setupContext) = BuildMediator(AuthenticatedUserWithPermission("tenant.rename", tenant.Id));
+        await using var setupContext = CreateDbContext();
         setupContext.Tenants.Add(tenant);
         await setupContext.SaveChangesAsync();
+
+        var mediator = ResolveMediatorAs(
+            AuthenticatedUserWithPermission("tenant.rename", tenant.Id), out var scope);
+        using var _ = scope;
 
         // Act
         var result = await mediator.Send(new RenameTenantCommand(tenant.Id, "Renamed"));
@@ -89,9 +85,13 @@ public class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture)
     {
         // Arrange
         var tenant = Tenant.Create(TenantSlug.Create($"e2e-{Guid.NewGuid():N}"[..15]), "Original Name");
-        var (mediator, setupContext) = BuildMediator(AuthenticatedUserWithPermission("tenant.rename", tenant.Id));
+        await using var setupContext = CreateDbContext();
         setupContext.Tenants.Add(tenant);
         await setupContext.SaveChangesAsync();
+
+        var mediator = ResolveMediatorAs(
+            AuthenticatedUserWithPermission("tenant.rename", tenant.Id), out var scope);
+        using var _ = scope;
 
         // Act
         var result = await mediator.Send(new RenameTenantCommand(tenant.Id, ""));
@@ -111,9 +111,13 @@ public class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture)
     {
         // Arrange
         var tenant = Tenant.Create(TenantSlug.Create($"e2e-{Guid.NewGuid():N}"[..15]), "Original Name");
-        var (mediator, setupContext) = BuildMediator(AuthenticatedUserWithPermission("some.other.permission", tenant.Id));
+        await using var setupContext = CreateDbContext();
         setupContext.Tenants.Add(tenant);
         await setupContext.SaveChangesAsync();
+
+        var mediator = ResolveMediatorAs(
+            AuthenticatedUserWithPermission("some.other.permission", tenant.Id), out var scope);
+        using var _ = scope;
 
         // Act
         var result = await mediator.Send(new RenameTenantCommand(tenant.Id, "Should Not Apply"));
@@ -134,9 +138,13 @@ public class RenameTenantCommandEndToEndTests(PostgresContainerFixture fixture)
         // Arrange — caller is authenticated for Tenant A but targets Tenant B.
         var tenantA = Tenant.Create(TenantSlug.Create($"e2e-{Guid.NewGuid():N}"[..15]), "Tenant A");
         var tenantB = Tenant.Create(TenantSlug.Create($"e2e-{Guid.NewGuid():N}"[..15]), "Tenant B Original");
-        var (mediator, setupContext) = BuildMediator(AuthenticatedUserWithPermission("tenant.rename", tenantA.Id));
+        await using var setupContext = CreateDbContext();
         setupContext.Tenants.AddRange(tenantA, tenantB);
         await setupContext.SaveChangesAsync();
+
+        var mediator = ResolveMediatorAs(
+            AuthenticatedUserWithPermission("tenant.rename", tenantA.Id), out var scope);
+        using var _ = scope;
 
         // Act
         var result = await mediator.Send(new RenameTenantCommand(tenantB.Id, "Hijacked Name"));

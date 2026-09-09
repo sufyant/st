@@ -76,4 +76,41 @@ public sealed class JwtClaimInjectionTests(PostgresContainerFixture fixture) : I
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(tenantA.Id.ToString(), body.GetProperty("tenantId").GetString());
     }
+
+    [Fact]
+    public async Task ForgedPermissionClaimInJwt_CannotGrantAccessBeyondRealRole()
+    {
+        // Arrange: the caller has real membership in tenantA as "member" — a role that is
+        // NOT granted "tenant.rename". Their JWT carries a forged "permission" claim for
+        // "tenant.rename" anyway. If TenantResolutionMiddleware failed to strip pre-existing
+        // "permission" claims before deriving its own from the DB-backed role, the forged claim
+        // would flow straight into PermissionBehavior's HasClaim("permission", ...) check and
+        // grant an escalated capability the user's real role does not confer.
+        await using var dbContext = CreateDbContext();
+        var provisioningService = new TenantProvisioningService(dbContext);
+        var tenantA = await provisioningService.ProvisionAsync(
+            TenantSlug.Create($"iso-jwt-p-{Guid.NewGuid():N}"[..15]), "Tenant A");
+
+        var clerkUserId = $"clerk_iso_jwt_perm_{Guid.NewGuid():N}";
+        var user = User.Create(clerkUserId, Email.Create($"{Guid.NewGuid():N}@example.com"));
+        dbContext.Users.Add(user);
+        dbContext.Memberships.Add(Membership.Create(user.Id, tenantA.Id, "member"));
+        await dbContext.SaveChangesAsync();
+
+        // "member" is only granted tenant.whoami, never tenant.rename — that's the whole point
+        // of the forged claim below.
+        await EnsureRolePermissionAsync("member", "tenant.whoami");
+
+        var client = _factory.CreateClient();
+        var token = TestJwtTokenFactory.CreateToken(
+            clerkUserId, extraClaims: [new Claim("permission", "tenant.rename")]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.PutAsJsonAsync(
+            $"/{tenantA.Slug.Value}/api/v1/tenant", new { NewName = "Hijacked Name" });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

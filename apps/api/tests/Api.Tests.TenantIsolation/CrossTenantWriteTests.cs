@@ -7,8 +7,6 @@ using Api.Tests.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Api.Tests.TenantIsolation;
@@ -26,36 +24,22 @@ namespace Api.Tests.TenantIsolation;
 // PermissionBehavior's ITenantScopedRequest check in the MediatR pipeline (the "Tenant.Mismatch"
 // rejection), so this test dispatches RenameTenantCommand directly via IMediator with a
 // mismatched TenantId to exercise that check the way RenameTenantCommandEndToEndTests does.
+//
+// Unlike a hand-built ServiceCollection, IMediator is resolved from the real host
+// (CustomWebApplicationFactory, same composition root Program.cs builds) so this test exercises
+// the actual registered pipeline behavior order (Logging -> Permission -> Validation ->
+// SaveChanges), not a test-local reimplementation that could silently drift from production.
 [Collection(nameof(PostgresCollection))]
-public sealed class CrossTenantWriteTests(PostgresContainerFixture fixture)
+public sealed class CrossTenantWriteTests(PostgresContainerFixture fixture) : IDisposable
 {
-    private (IMediator Mediator, AdminDbContext DbContext) BuildMediator(ClaimsPrincipal user)
+    private readonly CustomWebApplicationFactory _factory = new(fixture.ConnectionString);
+
+    public void Dispose() => _factory.Dispose();
+
+    private AdminDbContext CreateDbContext()
     {
-        var services = new ServiceCollection();
-
-        services.AddDbContext<AdminDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
-        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
-        services.AddLogging();
-
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = new DefaultHttpContext { User = user },
-        };
-        services.AddSingleton<IHttpContextAccessor>(httpContextAccessor);
-
-        services.AddScoped<IMediator, Mediator>();
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PermissionBehavior<,>));
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(SaveChangesUnitOfWorkBehavior<,>));
-
-        services.AddScoped<ITenantRepository, TenantRepository>();
-        services.AddScoped<IRequestHandler<RenameTenantCommand, Result>, RenameTenantCommandHandler>();
-        services.AddScoped<FluentValidation.IValidator<RenameTenantCommand>, RenameTenantCommandValidator>();
-
-        var provider = services.BuildServiceProvider();
-        var scope = provider.CreateScope();
-        return (scope.ServiceProvider.GetRequiredService<IMediator>(), scope.ServiceProvider.GetRequiredService<AdminDbContext>());
+        var options = new DbContextOptionsBuilder<AdminDbContext>().UseNpgsql(fixture.ConnectionString).Options;
+        return new AdminDbContext(options);
     }
 
     private static ClaimsPrincipal AuthenticatedUserWithPermission(string permission, Guid tenantId)
@@ -77,9 +61,21 @@ public sealed class CrossTenantWriteTests(PostgresContainerFixture fixture)
         // command targets Tenant B, a tenant they hold no membership in whatsoever.
         var tenantA = Tenant.Create(TenantSlug.Create($"iso-wr-a-{Guid.NewGuid():N}"[..15]), "Tenant A");
         var tenantB = Tenant.Create(TenantSlug.Create($"iso-wr-b-{Guid.NewGuid():N}"[..15]), "Tenant B Original");
-        var (mediator, setupContext) = BuildMediator(AuthenticatedUserWithPermission("tenant.rename", tenantA.Id));
+        await using var setupContext = CreateDbContext();
         setupContext.Tenants.AddRange(tenantA, tenantB);
         await setupContext.SaveChangesAsync();
+
+        // There's no real HTTP request in a direct-mediator-dispatch test, so
+        // PermissionBehavior's read of IHttpContextAccessor.HttpContext.User needs a stand-in —
+        // seed the real host's singleton IHttpContextAccessor with a forged HttpContext.
+        var httpContextAccessor = _factory.Services.GetRequiredService<IHttpContextAccessor>();
+        httpContextAccessor.HttpContext = new DefaultHttpContext
+        {
+            User = AuthenticatedUserWithPermission("tenant.rename", tenantA.Id),
+        };
+
+        using var scope = _factory.Services.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         // Act
         var result = await mediator.Send(new RenameTenantCommand(tenantB.Id, "Hijacked Name"));

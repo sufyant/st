@@ -63,15 +63,24 @@ public sealed class CustomWebApplicationFactory(string connectionString, ILogEve
     // ConfigureWebHost only exposes IWebHostBuilder, which Serilog.AspNetCore doesn't add a
     // UseSerilog overload for (only IHostBuilder gets one). CreateHost hands us the underlying
     // IHostBuilder before it's built, so a second UseSerilog call can be appended here.
+    //
+    // This override always runs (not just when testLogSink is supplied) so that no test host
+    // ever falls through to appsettings.json's real WriteTo.Seq(http://localhost:5341) — every
+    // other test in this and other test projects would otherwise ship real log traffic into a
+    // developer's local Seq instance, and spin up a background HTTP sink per test host.
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        if (testLogSink is not null)
+        builder.UseSerilog((context, services, configuration) =>
         {
-            builder.UseSerilog((context, services, configuration) => configuration
+            configuration
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .WriteTo.Sink(testLogSink));
-        }
+                .WriteTo.Console();
+
+            if (testLogSink is not null)
+            {
+                configuration.WriteTo.Sink(testLogSink);
+            }
+        });
 
         return base.CreateHost(builder);
     }

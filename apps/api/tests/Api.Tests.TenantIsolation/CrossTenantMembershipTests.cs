@@ -61,6 +61,14 @@ public sealed class CrossTenantMembershipTests(PostgresContainerFixture fixture)
         var token = TestJwtTokenFactory.CreateToken(clerkUserId);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+        // Positive control: the same authenticated client succeeds against their own, real
+        // tenant. Without this, a 403 on tenant B below can't be distinguished from claims/auth
+        // being broken entirely (PermissionAuthorizationHandler also yields 403 when the
+        // "permission" claim is simply absent for any reason) — this proves auth genuinely works
+        // for this user, so the subsequent 403 is attributable to the membership check.
+        var ownTenantResponse = await client.GetAsync($"/{tenantA.Slug.Value}/api/v1/whoami");
+        Assert.Equal(HttpStatusCode.OK, ownTenantResponse.StatusCode);
+
         // Act
         var response = await client.GetAsync($"/{tenantB.Slug.Value}/api/v1/whoami");
 
