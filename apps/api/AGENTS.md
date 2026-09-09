@@ -12,6 +12,7 @@
 - Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
 - Create database roles with the bootstrap script, never in EF migrations; the API runtime role never holds DDL privileges.
+- Run migrations as a deploy step through `src/Migrator`, never at application startup. The migrator updates existing tenant databases and fails when one is missing; creating tenant databases belongs to provisioning.
 - Serve tenant requests through the read-only control plane credential; writes to the control plane belong to `/admin` endpoints.
 - Tenant-scoped endpoints use `/{tenant-alias}/api/v{version}/...`.
 - Resolve tenants from trusted control-plane data; fail closed on missing context.
@@ -38,7 +39,10 @@ Run from `apps/api`:
 - Test: `dotnet test --solution Api.slnx`
 - Start API: `dotnet run --project src/Api --urls http://localhost:5000`
 - Restore EF tool: `dotnet tool restore`
-- Add admin migration: `dotnet tool run dotnet-ef migrations add <Name> --project src/Infrastructure --startup-project src/Api --context AdminDbContext --output-dir Persistence/Admin/Migrations`
+- Add control plane migration: `dotnet tool run dotnet-ef migrations add <Name> --project src/Infrastructure --startup-project src/Api --context ControlPlaneDbContext --output-dir Persistence/ControlPlane/Migrations`
+- Add tenant migration: `dotnet tool run dotnet-ef migrations add <Name> --project src/Infrastructure --startup-project src/Api --context TenantDbContext --output-dir Persistence/Tenants/Migrations`
+- Migrate control plane: `dotnet run --project src/Migrator -- migrate control-plane`
+- Migrate existing tenants: `dotnet run --project src/Migrator -- migrate tenants`
 
 - `/health` checks application liveness only.
-- `/health/ready` checks PostgreSQL readiness and requires `ConnectionStrings__Postgres`.
+- `/health/ready` checks PostgreSQL readiness and requires `ConnectionStrings__ControlPlane`.

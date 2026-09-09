@@ -21,6 +21,19 @@ public sealed class TenantDbContextFactory(string connectionString)
 
         return new TenantDbContext(options);
     }
+
+    public async Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken cancellationToken)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString) { Database = "postgres" };
+        await using var connection = new NpgsqlConnection(builder.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = @name)",
+            connection);
+        command.Parameters.AddWithValue("name", databaseName);
+
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
 }
 
 public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFactory<TenantDbContext>

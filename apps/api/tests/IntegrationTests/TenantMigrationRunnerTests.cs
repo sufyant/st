@@ -1,0 +1,83 @@
+using Domain.Tenants;
+using Infrastructure.Persistence.ControlPlane;
+using Infrastructure.Persistence.Tenants;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit;
+
+namespace IntegrationTests;
+
+public sealed class TenantMigrationRunnerTests
+{
+    [Fact]
+    public async Task RunAsync_MigratesActiveTenantsAndSkipsTheRest()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var connectionString = postgres.GetConnectionString();
+        await using var controlPlaneContext = await CreateControlPlaneAsync(connectionString);
+        var active = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
+        active.ChangeStatus(TenantStatus.Active, DateTimeOffset.UtcNow);
+        var provisioning = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("globex"), DateTimeOffset.UtcNow);
+        controlPlaneContext.Tenants.AddRange(active, provisioning);
+        await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await TenantSchemaMigratorTests.ExecuteAsync(
+            connectionString,
+            $"CREATE DATABASE {active.DatabaseName.Value}");
+        var runner = new TenantMigrationRunner(
+            controlPlaneContext,
+            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString)));
+
+        // Act
+        var outcomes = await runner.RunAsync(null, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(TenantMigrationRunner.Migrated, Assert.Single(outcomes, x => x.Alias == "acme").Result);
+        Assert.Equal(TenantMigrationRunner.Skipped, Assert.Single(outcomes, x => x.Alias == "globex").Result);
+        Assert.False(await TenantSchemaMigratorTests.DatabaseExistsAsync(
+            connectionString,
+            provisioning.DatabaseName.Value));
+    }
+
+    [Fact]
+    public async Task RunAsync_ForAnActiveTenantWithoutADatabase_ReportsFailure()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var connectionString = postgres.GetConnectionString();
+        await using var controlPlaneContext = await CreateControlPlaneAsync(connectionString);
+        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
+        tenant.ChangeStatus(TenantStatus.Active, DateTimeOffset.UtcNow);
+        controlPlaneContext.Tenants.Add(tenant);
+        await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var runner = new TenantMigrationRunner(
+            controlPlaneContext,
+            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString)));
+
+        // Act
+        var outcomes = await runner.RunAsync(null, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(TenantMigrationRunner.Failed, Assert.Single(outcomes).Result);
+        Assert.False(await TenantSchemaMigratorTests.DatabaseExistsAsync(
+            connectionString,
+            tenant.DatabaseName.Value));
+    }
+
+    private static async Task<ControlPlaneDbContext> CreateControlPlaneAsync(string connectionString)
+    {
+        await TenantSchemaMigratorTests.ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
+        var builder = new NpgsqlConnectionStringBuilder(connectionString) { Database = "control_plane" };
+        var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
+            .UseNpgsql(builder.ConnectionString, npgsql =>
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+            .Options;
+        var context = new ControlPlaneDbContext(options);
+        await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
+
+        return context;
+    }
+}
