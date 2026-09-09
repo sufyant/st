@@ -293,13 +293,18 @@ olan tüm tenant veritabanlarına taşır; ayrı bir backfill mekanizması gerek
 ### 13. Deploy sırası
 
 ```
-1. scripts/bootstrap-roles.sql       (ortam kurulurken bir kez, elle, superuser)
+1. scripts/bootstrap-roles.sql        (ortam kurulurken bir kez, elle, superuser)
 2. migrator: migrate control-plane
-3. migrator: migrate tenants
-4. API deploy
+3. scripts/grant-control-plane.sql    (ortam kurulurken bir kez, 2'den sonra)
+4. migrator: migrate tenants
+5. API deploy
 ```
 
-2 ve 3 başarılı olmadan 4 çalışmaz. Şimdilik `apps/api/AGENTS.md`'de belgelenmiş komutlardır;
+Grant'lar ayrı bir script ve ayrı bir adımdır çünkü `control_plane` veritabanı ile `control`
+şeması ancak 2. adımda var olur; bootstrap script'i çalışırken henüz ortada değillerdir.
+1 ve 3 ortam kurulumuna, 2 ve 4 her deploy'a aittir.
+
+2 ve 4 başarılı olmadan 5 çalışmaz. Şimdilik `apps/api/AGENTS.md`'de belgelenmiş komutlardır;
 CI kurulduğunda aynı sıra otomatikleşir, K8s'te migrator bir Job'a dönüşür.
 
 Migration'lar API'den önce çalıştığı için kısa bir süre eski API kodu yeni şemaya karşı çalışır.
