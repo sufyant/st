@@ -62,6 +62,7 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
             builder.UseSetting("ConnectionStrings:ControlPlane", controlPlane);
             builder.UseSetting("ConnectionStrings:ControlPlaneRead", controlPlane);
             builder.UseSetting("ConnectionStrings:TenantData", connectionString);
+            builder.UseSetting("ConnectionStrings:Provisioner", connectionString);
             builder.ConfigureTestServices(services =>
                 services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(

@@ -7,3 +7,7 @@ CREATE ROLE st_migrator LOGIN PASSWORD :'migrator_password' CREATEDB;
 CREATE ROLE st_provisioner LOGIN PASSWORD :'provisioner_password' CREATEDB;
 CREATE ROLE st_control LOGIN PASSWORD :'control_password';
 CREATE ROLE st_tenant LOGIN PASSWORD :'tenant_password';
+
+-- Provisioning owns the tenant tables it creates, and the deploy-time migrator alters them,
+-- so the migrator must be able to act as their owner.
+GRANT st_provisioner TO st_migrator;

@@ -198,6 +198,7 @@ public sealed class TenantAccessEndpointTests
             builder.UseSetting("ConnectionStrings:ControlPlane", controlPlane);
             builder.UseSetting("ConnectionStrings:ControlPlaneRead", controlPlane);
             builder.UseSetting("ConnectionStrings:TenantData", connectionString);
+            builder.UseSetting("ConnectionStrings:Provisioner", connectionString);
             builder.ConfigureTestServices(services =>
             {
                 services.AddAuthentication(TestAuthenticationHandler.SchemeName)

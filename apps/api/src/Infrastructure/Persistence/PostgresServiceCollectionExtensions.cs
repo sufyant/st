@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
+using Infrastructure.Provisioning;
 
 namespace Infrastructure.Persistence;
 
@@ -21,6 +22,9 @@ public static class PostgresServiceCollectionExtensions
 
         services.AddScoped(_ => new TenantDbContextFactory(
             RequiredConnectionString(configuration, "TenantData")));
+
+        services.AddSingleton(new TenantProvisioner(
+            RequiredConnectionString(configuration, "Provisioner")));
 
         services.AddKeyedSingleton<NpgsqlDataSource>("control-plane-read", (_, _) =>
             NpgsqlDataSource.Create(RequiredConnectionString(configuration, "ControlPlaneRead")));
