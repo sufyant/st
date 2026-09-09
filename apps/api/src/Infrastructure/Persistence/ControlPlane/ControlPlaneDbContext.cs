@@ -11,6 +11,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
 
     public DbSet<Membership> Memberships => Set<Membership>();
 
+    public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("control");

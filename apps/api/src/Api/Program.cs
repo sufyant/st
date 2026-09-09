@@ -1,6 +1,7 @@
 using Api.Tenants;
 using System.Security.Claims;
 using Infrastructure.Persistence;
+using ControlPlane;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -19,7 +20,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.Authority = builder.Configuration["Clerk:Issuer"];
         options.Audience = builder.Configuration["Clerk:Audience"];
     });
-builder.Services.AddAuthorization();
+builder.Services.AddControlPlane();
 
 var app = builder.Build();
 
@@ -27,6 +28,7 @@ app.UseAuthentication();
 app.UseMiddleware<TenantAccessMiddleware>();
 app.UseAuthorization();
 app.MapOpenApi();
+app.MapControlPlane();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false

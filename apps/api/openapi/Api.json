@@ -16,6 +16,18 @@
           }
         }
       }
+    },
+    "/admin/api/v1/tenants": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "tags": [
