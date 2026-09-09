@@ -7,13 +7,14 @@
 - Separate commands and queries; keep endpoints thin.
 - Use EF Core by default; introduce Dapper for justified query needs.
 - Avoid generic repositories and speculative abstractions.
-- Store tenant business data in separate schemas; keep shared tenant, membership, invitation, and access-control records in the `admin` schema.
+- Store tenant business data, users, roles, and permissions in separate schemas. Keep only shared tenant, membership, and invitation records in the `admin` schema.
 - Treat tenant aliases as mutable path identifiers. Use each tenant's immutable GUID in `N` format as its schema name and always quote it as a PostgreSQL identifier; never derive a schema name from an alias.
 - Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
 - Tenant-scoped endpoints use `/{tenant-alias}/api/v{version}/...`.
 - Resolve tenants from trusted control-plane data; fail closed on missing context.
-- Enforce membership and permissions before executing tenant operations.
+- A membership record only grants entry to a tenant; remove it to revoke access. Check the tenant-schema user status after membership and reject disabled users before permission checks.
+- Enforce permissions before executing tenant operations.
 - Persist business changes and outbox messages atomically. Delivery may repeat; make outbox processing idempotent.
 - Write a failing behavior test before implementing business logic or fixing bugs.
 - Use xUnit with explicit `// Arrange`, `// Act`, and `// Assert` sections.
