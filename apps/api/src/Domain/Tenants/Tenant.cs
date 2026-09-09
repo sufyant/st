@@ -14,6 +14,10 @@ public sealed class Tenant
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public TenantProvisioningStep? ProvisioningStep { get; private set; }
+
+    public string? ProvisioningError { get; private set; }
+
     private Tenant()
     {
     }
@@ -33,6 +37,7 @@ public sealed class Tenant
             Alias = alias,
             DatabaseName = TenantDatabaseName.ForTenant(id),
             Status = TenantStatus.Provisioning,
+            ProvisioningStep = TenantProvisioningStep.CreatingDatabase,
             CreatedAt = createdAt,
             UpdatedAt = createdAt
         };
@@ -49,6 +54,30 @@ public sealed class Tenant
     public void ChangeStatus(TenantStatus status, DateTimeOffset updatedAt)
     {
         Status = status;
+        UpdatedAt = updatedAt;
+    }
+
+    public void RecordProvisioningProgress(TenantProvisioningStep step, DateTimeOffset updatedAt)
+    {
+        ProvisioningStep = step;
+        ProvisioningError = null;
+        UpdatedAt = updatedAt;
+    }
+
+    public void RecordProvisioningFailure(TenantProvisioningStep step, string error, DateTimeOffset updatedAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(error);
+
+        ProvisioningStep = step;
+        ProvisioningError = error;
+        UpdatedAt = updatedAt;
+    }
+
+    public void CompleteProvisioning(DateTimeOffset updatedAt)
+    {
+        Status = TenantStatus.Active;
+        ProvisioningStep = null;
+        ProvisioningError = null;
         UpdatedAt = updatedAt;
     }
 }

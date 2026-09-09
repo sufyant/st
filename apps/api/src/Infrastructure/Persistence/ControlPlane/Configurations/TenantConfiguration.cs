@@ -28,6 +28,11 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(x => x.ProvisioningStep)
+            .HasColumnName("provisioning_step")
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        builder.Property(x => x.ProvisioningError).HasColumnName("provisioning_error");
         builder.HasIndex(x => x.Alias).IsUnique();
         builder.HasIndex(x => x.DatabaseName).IsUnique();
     }
