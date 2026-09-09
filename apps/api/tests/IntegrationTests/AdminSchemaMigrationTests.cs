@@ -9,7 +9,7 @@ namespace IntegrationTests;
 public sealed class AdminSchemaMigrationTests
 {
     [Fact]
-    public async Task Migrate_CreatesTenantsTableInAdminSchema()
+    public async Task Migrate_CreatesControlPlaneTablesInAdminSchema()
     {
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
@@ -27,8 +27,12 @@ public sealed class AdminSchemaMigrationTests
         await using var command = new NpgsqlCommand("SELECT to_regclass('admin.tenants')::text", connection);
         var result = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
         var tableName = result is DBNull ? null : (string)result!;
+        await using var membershipCommand = new NpgsqlCommand("SELECT to_regclass('admin.memberships')::text", connection);
+        var membershipResult = await membershipCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+        var membershipTableName = membershipResult is DBNull ? null : (string)membershipResult!;
 
         // Assert
         Assert.Equal("admin.tenants", tableName);
+        Assert.Equal("admin.memberships", membershipTableName);
     }
 }
