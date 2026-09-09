@@ -6,6 +6,13 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
+    "api#build": {
+      "outputs": ["openapi/Api.json"]
+    },
+    "@st/api-client#build": {
+      "dependsOn": ["api#build"],
+      "outputs": ["src/schema.d.ts"]
+    },
     "check-types": {
       "dependsOn": ["^build"]
     },

@@ -7,6 +7,20 @@ namespace IntegrationTests;
 public sealed class HealthEndpointTests
 {
     [Fact]
+    public async Task GetOpenApiDocument_ReturnsOk()
+    {
+        // Arrange
+        await using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+
+        // Act
+        using var response = await client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetHealth_ReturnsOk()
     {
         // Arrange

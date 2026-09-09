@@ -1,0 +1,10 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "dotnet build src/Api/Api.csproj --no-restore",
+    "test": "dotnet test --solution Api.slnx",
+    "dev": "dotnet run --project src/Api --urls http://localhost:5000"
+  }
+}

@@ -21,6 +21,7 @@ public sealed class TenantAliasTests
 
     [Theory]
     [InlineData("")]
+    [InlineData("a")]
     [InlineData("ab")]
     [InlineData("Acme")]
     [InlineData("acme_")]
@@ -35,6 +36,7 @@ public sealed class TenantAliasTests
     [InlineData("swagger")]
     [InlineData("docs")]
     [InlineData("system")]
+    [InlineData("acme\n")]
     public void Create_WithInvalidPathAlias_ThrowsArgumentException(string value)
     {
         // Arrange

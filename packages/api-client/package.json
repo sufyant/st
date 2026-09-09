@@ -6,7 +6,7 @@
   "main": "./src/client.ts",
   "types": "./src/client.ts",
   "scripts": {
-    "build:openapi": "openapi-typescript ../../apps/api/openapi/Api.Host.json -o src/schema.d.ts",
+    "build:openapi": "openapi-typescript ../../apps/api/openapi/Api.json -o src/schema.d.ts",
     "build": "pnpm run build:openapi && tsc --noEmit",
     "check-types": "tsc --noEmit"
   },

@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPostgresReadiness(builder.Configuration);
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+app.MapOpenApi();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false

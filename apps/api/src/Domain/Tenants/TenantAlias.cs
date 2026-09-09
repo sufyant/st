@@ -18,7 +18,7 @@ public sealed record TenantAlias
     };
 
     private static readonly Regex PathSegmentPattern = new(
-        "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$",
+        "\\A[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])\\z",
         RegexOptions.CultureInvariant);
 
     public string Value { get; }
