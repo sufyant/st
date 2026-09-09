@@ -2,19 +2,23 @@ namespace Domain.Tenants;
 
 public sealed class Tenant
 {
-    public Guid Id { get; }
+    public Guid Id { get; private set; }
 
-    public TenantAlias Alias { get; private set; }
+    public TenantAlias Alias { get; private set; } = null!;
 
-    public string DatabaseName => $"tenant_{Id:N}";
+    public TenantDatabaseName DatabaseName { get; private set; } = null!;
 
-    private Tenant(Guid id, TenantAlias alias)
+    public TenantStatus Status { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    private Tenant()
     {
-        Id = id;
-        Alias = alias;
     }
 
-    public static Tenant Create(Guid id, TenantAlias alias)
+    public static Tenant Create(Guid id, TenantAlias alias, DateTimeOffset createdAt)
     {
         if (id == Guid.Empty)
         {
@@ -23,13 +27,28 @@ public sealed class Tenant
 
         ArgumentNullException.ThrowIfNull(alias);
 
-        return new Tenant(id, alias);
+        return new Tenant
+        {
+            Id = id,
+            Alias = alias,
+            DatabaseName = TenantDatabaseName.ForTenant(id),
+            Status = TenantStatus.Provisioning,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
     }
 
-    public void RenameAlias(TenantAlias alias)
+    public void RenameAlias(TenantAlias alias, DateTimeOffset updatedAt)
     {
         ArgumentNullException.ThrowIfNull(alias);
 
         Alias = alias;
+        UpdatedAt = updatedAt;
+    }
+
+    public void ChangeStatus(TenantStatus status, DateTimeOffset updatedAt)
+    {
+        Status = status;
+        UpdatedAt = updatedAt;
     }
 }

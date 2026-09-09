@@ -247,7 +247,7 @@ public sealed class TenantDatabaseNameTests
 
 - [ ] **Step 2: Testlerin derlenmediğini doğrula**
 
-Run: `dotnet test apps/api/tests/UnitTests/UnitTests.csproj`
+Run: `dotnet test --project apps/api/tests/UnitTests/UnitTests.csproj`
 Expected: Derleme hatası — `TenantDatabaseName` tipi bulunamıyor.
 
 - [ ] **Step 3: `TenantDatabaseName` value object'ini yaz**
@@ -312,7 +312,7 @@ public sealed record TenantDatabaseName
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/UnitTests/UnitTests.csproj`
+Run: `dotnet test --project apps/api/tests/UnitTests/UnitTests.csproj`
 Expected: `TenantDatabaseNameTests` içindeki tüm testler PASS.
 
 - [ ] **Step 5: `Tenant` için başarısız testleri yaz**
@@ -401,7 +401,7 @@ public sealed class TenantTests
 
 - [ ] **Step 6: Testlerin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/UnitTests/UnitTests.csproj`
+Run: `dotnet test --project apps/api/tests/UnitTests/UnitTests.csproj`
 Expected: Derleme hatası — `Tenant.Create` üç parametre almıyor, `TenantStatus` bulunamıyor.
 
 - [ ] **Step 7: `TenantStatus` enum'unu yaz**
@@ -484,7 +484,7 @@ public sealed class Tenant
 
 - [ ] **Step 9: Birim testlerinin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/UnitTests/UnitTests.csproj`
+Run: `dotnet test --project apps/api/tests/UnitTests/UnitTests.csproj`
 Expected: Tüm testler PASS. (Çözümün tamamı bu noktada henüz derlenmez; `Tenant.Create` çağıran diğer projeler Görev 3'te düzeltilir.)
 
 - [ ] **Step 10: Commit**
@@ -802,7 +802,7 @@ public sealed class ConnectionConfigurationTests
 
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: `AddTenantPersistence_RegistersTheControlPlaneReadDataSource` FAIL — anahtarlı servis kayıtlı değil.
 
 - [ ] **Step 3: Okuma veri kaynağını kaydet**
@@ -816,7 +816,7 @@ services.AddKeyedSingleton<NpgsqlDataSource>("control-plane-read", (_, _) =>
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Her iki test de PASS.
 
 - [ ] **Step 5: Commit**
@@ -927,7 +927,7 @@ builder.UseSetting("ConnectionStrings:TenantData", connectionString);
 
 - [ ] **Step 3: Testlerin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Üç yeni test FAIL — middleware status'e bakmıyor, hepsi 200 veya 403 dönüyor.
 
 - [ ] **Step 4: `TenantResolver`'ı yaz**
@@ -1274,7 +1274,7 @@ public sealed class TenantResolverTests
 
 - [ ] **Step 10: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Status ve cache testleri dahil tüm testler PASS.
 
 - [ ] **Step 11: Commit**
@@ -1341,7 +1341,7 @@ public sealed class PlatformAdminTests
 
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/UnitTests/UnitTests.csproj`
+Run: `dotnet test --project apps/api/tests/UnitTests/UnitTests.csproj`
 Expected: Derleme hatası — `PlatformAdmin` bulunamıyor.
 
 - [ ] **Step 3: `PlatformAdmin` entity'sini yaz**
@@ -1630,7 +1630,7 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
 - [ ] **Step 3: Testin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Derleme hatası veya 404 — endpoint henüz yok.
 
 - [ ] **Step 4: Yetkilendirme gereksinimini ve handler'ını yaz**
@@ -1744,7 +1744,7 @@ public static class ControlPlaneEndpoints
 
 - [ ] **Step 7: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Her iki yetkilendirme testi de PASS.
 
 - [ ] **Step 8: Commit**
@@ -1854,7 +1854,7 @@ public sealed class TenantSchemaMigratorTests
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Derleme hatası — `TenantSchemaMigrator` bulunamıyor.
 
 - [ ] **Step 3: `TenantSchemaMigrator`'ı yaz**
@@ -1900,7 +1900,7 @@ rm tests/IntegrationTests/TenantDatabaseProvisionerTests.cs
 
 - [ ] **Step 5: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: `TenantSchemaMigratorTests` PASS.
 
 - [ ] **Step 6: Status filtresi için başarısız testi yaz**
@@ -2009,7 +2009,7 @@ public sealed class TenantMigrationRunnerTests
 
 - [ ] **Step 7: Testin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: Derleme hatası — `TenantMigrationRunner` bulunamıyor.
 
 - [ ] **Step 8: `TenantMigrationRunner`'ı yaz**
@@ -2070,7 +2070,7 @@ public sealed class TenantMigrationRunner(
 
 - [ ] **Step 9: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: `TenantMigrationRunnerTests` içindeki her iki test de PASS.
 
 - [ ] **Step 10: Migrator konsol projesini oluştur**
@@ -2258,7 +2258,7 @@ Dosyanın başına `using Domain.Access;` ekle.
 
 - [ ] **Step 2: Testin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: FAIL — sayılar sıfır.
 
 - [ ] **Step 3: `HasData` yapılandırmalarını katalogdan besle**
@@ -2307,7 +2307,7 @@ dotnet tool run dotnet-ef migrations add SeedSystemAccessCatalog \
 
 - [ ] **Step 5: Testlerin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: `MigrateAsync_SeedsTheSystemAccessCatalog` PASS.
 
 - [ ] **Step 6: Şema yakınsaması testini ekle**
@@ -2375,7 +2375,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 - [ ] **Step 7: Yakınsama testinin geçtiğini doğrula**
 
-Run: `dotnet test apps/api/tests/IntegrationTests/IntegrationTests.csproj`
+Run: `dotnet test --project apps/api/tests/IntegrationTests/IntegrationTests.csproj`
 Expected: `MigrateAsync_ConvergesRegardlessOfTheStartingVersion` PASS — iki veritabanının uygulanmış migration listesi aynı.
 
 - [ ] **Step 8: Commit**
@@ -2546,7 +2546,7 @@ public sealed class CredentialBoundaryTests
 
 - [ ] **Step 3: Testlerin başarısız olduğunu doğrula**
 
-Run: `dotnet test apps/api/tests/TenantIsolationTests/TenantIsolationTests.csproj`
+Run: `dotnet test --project apps/api/tests/TenantIsolationTests/TenantIsolationTests.csproj`
 Expected: Üçü de PASS. Bu testler yeni kod değil, Görev 4'teki script'lerin kurduğu sınırı kanıtlar; herhangi biri FAIL ederse `scripts/grant-control-plane.sql` yanlış demektir — `st_tenant`'a yalnızca `GRANT SELECT ON control.tenants, control.memberships` verildiğini doğrula.
 
 - [ ] **Step 4: Veri izolasyonu testini yaz**
