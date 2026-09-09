@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Api.Host;
 using Api.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
@@ -68,11 +69,18 @@ public sealed class CustomWebApplicationFactory(string connectionString, ILogEve
     // ever falls through to appsettings.json's real WriteTo.Seq(http://localhost:5341) — every
     // other test in this and other test projects would otherwise ship real log traffic into a
     // developer's local Seq instance, and spin up a background HTTP sink per test host.
+    //
+    // Because this call replaces Program.cs's UseSerilog outright (see the last-call-wins note
+    // above), it must also re-apply Program.cs's minimum-level policy — most importantly the
+    // Microsoft.AspNetCore override that keeps request URLs (which can carry a JWT via SignalR's
+    // ?access_token= query string) out of Information-level logs. ApplyStandardMinimumLevel is
+    // the single place that policy lives, shared with Program.cs, so the two can't drift apart.
     protected override IHost CreateHost(IHostBuilder builder)
     {
         builder.UseSerilog((context, services, configuration) =>
         {
             configuration
+                .ApplyStandardMinimumLevel()
                 .Enrich.FromLogContext()
                 .WriteTo.Console();
 
