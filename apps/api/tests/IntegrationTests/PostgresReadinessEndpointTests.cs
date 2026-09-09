@@ -12,7 +12,7 @@ public sealed class PostgresReadinessEndpointTests
     public async Task GetReadiness_ReturnsOkWhenPostgresAcceptsConnections()
     {
         // Arrange
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         await using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.UseSetting(

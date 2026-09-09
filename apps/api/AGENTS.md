@@ -29,6 +29,8 @@ Run from `apps/api`:
 - Build: `dotnet build Api.slnx`
 - Test: `dotnet test --solution Api.slnx`
 - Start API: `dotnet run --project src/Api --urls http://localhost:5000`
+- Restore EF tool: `dotnet tool restore`
+- Add admin migration: `dotnet tool run dotnet-ef migrations add <Name> --project src/Infrastructure --startup-project src/Api --context AdminDbContext --output-dir Persistence/Admin/Migrations`
 
 - `/health` checks application liveness only.
 - `/health/ready` checks PostgreSQL readiness and requires `ConnectionStrings__Postgres`.

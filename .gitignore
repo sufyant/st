@@ -51,3 +51,6 @@ agent/
 
 # Superpowers subagent-driven-development scratch
 .superpowers/
+# Local application settings
+appsettings.Development.json
+appsettings.*.local.json
