@@ -9,9 +9,14 @@ public sealed class TenantDbContextFactory(string connectionString)
 {
     public TenantDbContext Create(string schemaName)
     {
+        if (!Guid.TryParseExact(schemaName, "N", out var tenantId) || tenantId == Guid.Empty)
+        {
+            throw new ArgumentException("Tenant schema name must be a non-empty GUID in N format.", nameof(schemaName));
+        }
+
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
         {
-            SearchPath = $"\"{schemaName}\""
+            SearchPath = $"\"{tenantId:N}\""
         };
         var options = new DbContextOptionsBuilder<TenantDbContext>()
             .UseNpgsql(builder.ConnectionString)
@@ -35,6 +40,6 @@ public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFacto
         var connectionString = configuration.GetConnectionString("Postgres")
             ?? throw new InvalidOperationException("PostgreSQL connection string is not configured.");
 
-        return new TenantDbContextFactory(connectionString).Create("public");
+        return new TenantDbContextFactory(connectionString).Create(Guid.Parse("11111111-1111-1111-1111-111111111111").ToString("N"));
     }
 }
