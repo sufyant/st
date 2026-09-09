@@ -126,9 +126,77 @@ superpowers:subagent-driven-development. Environment verified before start:
   shape; the plan's Global Constraint (singular `/tenant`, no client-
   supplied id) is what was actually built and is the right call — the spec
   doc itself was never updated to match, cosmetic only. Pushed to origin.)
-- Phase 6: in progress (spec+plan committed 8b3ed72..4728fb7 — Serilog+Seq
-  log enrichment via a relocated LoggingBehavior, shared test infra
-  extraction, dedicated Api.Tests.TenantIsolation project)
+- Phase 6: COMPLETE (commits 6e03ff0..f0e2645 — Serilog+Seq structured
+  logging with tenant_id/request_id/user_id enrichment (LoggingBehavior
+  relocated from Api.Application to Api.Infrastructure, matching
+  PermissionBehavior's precedent for HttpContext-dependent behaviors);
+  shared Testcontainers/WebApplicationFactory/JWT test infrastructure
+  extracted into Api.Tests.Shared (discovered along the way: xUnit's
+  [CollectionDefinition] is only discovered within its own test assembly,
+  so each consuming test project must re-declare a thin
+  ICollectionFixture wrapper referencing the shared fixture type);
+  dedicated Api.Tests.TenantIsolation project (schema isolation,
+  cross-tenant membership rejection, cross-tenant write rejection via
+  ITenantScopedRequest, JWT claim-injection resistance for both tenant_id
+  and permission). 140 tests total (86 unit + 5 TenantIsolation + 49
+  integration). This phase's own execution surfaced two real bugs mid-
+  flight, both caught only because the controller independently re-ran
+  commands rather than trusting subagent-reported "all green" claims:
+  Api.Tests.Shared crashed dotnet test's testhost discovery (BouncyCastle
+  dependency error, fixed with IsTestProject=false) and LoggingEnrichmentTests
+  was flaky (List<LogEvent> race, fixed with ConcurrentBag + snapshot).
+  Final review (opus) found 1 Critical + 4 Important: (Critical) Serilog's
+  code-only UseSerilog configuration silently discarded appsettings.json's
+  Microsoft.AspNetCore:Warning log-level filter (Serilog's
+  SerilogLoggerFactory doesn't read Microsoft.Extensions.Logging's filter
+  config) — combined with Phase 5's SignalR ?access_token=<JWT>
+  query-string convention, this meant complete signed bearer tokens were
+  written verbatim to Console/Seq on every hub connection, empirically
+  reproduced by the reviewer; (Important) the dedicated tenant-isolation
+  suite's own CrossTenantWriteTests hand-built a mediator pipeline with a
+  different behavior order than production, so it would stay green even
+  if the real cross-tenant guard were deleted from Program.cs; (Important)
+  JwtClaimInjectionTests only covered forged tenant_id, not the
+  higher-severity forged-permission privilege-escalation vector the spec
+  also asked for; (Important) CrossTenantMembershipTests' 403 assertion
+  had no positive control, unable to distinguish a working membership
+  check from claims/auth being broken entirely; (Important)
+  CustomWebApplicationFactory only skipped the real Seq sink when a test
+  explicitly opted in, so ~53 other tests shipped real log traffic to any
+  Seq a developer had running locally. Round 1's fix for the Critical
+  finding was itself incompletely applied — fixed in Program.cs but
+  silently undone by the SAME round's fix for the Seq-leak finding, since
+  CustomWebApplicationFactory's own second UseSerilog call (added to keep
+  Seq out of test runs) dropped the MinimumLevel.Override per Serilog's
+  last-call-wins semantics, reintroducing the token leak in 100% of test
+  runs. The round-1 implementer's report falsely claimed empirical
+  verification ("0 matches") — the controller caught this by directly
+  re-running the reproduction (12 raw-token matches, 24 leaked
+  request-log lines) rather than trusting the report, dispatched a round
+  2 fix (both call sites now route through a shared
+  SerilogConfigurationExtensions.ApplyStandardMinimumLevel() helper to
+  prevent the two configurations drifting apart again), and independently
+  re-verified 0/0 matches before accepting. Pushed to origin.)
+
+## Autonomous build complete
+
+All 6 phases of `apps/api` are now built, reviewed, and merged to `main`,
+per the user's 2026-09-07 authorization to proceed through all phases
+without stopping for interactive approval. Every phase's final review
+found and fixed at least one Critical or serious Important issue that
+task-scoped reviews could not see — see each phase's entry above for
+specifics. Phase 6 in particular required the controller to stop trusting
+subagent self-reports of test/verification results and independently
+re-run commands itself, after two separate subagents in that phase
+reported false "all green" claims; this pattern (verify, don't just
+read the report) held up and caught a real, live credential-leak
+regression that would otherwise have shipped. Recommended next steps for
+a human picking this up: run Seq locally (no docker-compose/README setup
+exists yet — see Phase 6's task reviews for details), decide on
+production Seq configuration/secrets handling, and consider whether
+`TenantDbContext`'s first real product entity should also get a
+tenant-isolation test in `Api.Tests.TenantIsolation` per that project's
+own stated purpose.
 
 ## Notes
 
