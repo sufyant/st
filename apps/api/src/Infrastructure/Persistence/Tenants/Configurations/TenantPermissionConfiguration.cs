@@ -1,3 +1,4 @@
+using Domain.Access;
 using Domain.Access.Permissions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -15,5 +16,12 @@ public sealed class TenantPermissionConfiguration : IEntityTypeConfiguration<Ten
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(100);
         builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
         builder.HasIndex(x => x.Code).IsUnique();
+        builder.HasData(SystemAccessCatalog.Permissions.Select(permission => new
+        {
+            permission.Id,
+            permission.Code,
+            permission.Name,
+            permission.Description
+        }));
     }
 }

@@ -7,7 +7,7 @@
 - Separate commands and queries; keep endpoints thin.
 - Use EF Core by default; introduce Dapper for justified query needs.
 - Avoid generic repositories and speculative abstractions.
-- Store tenant business data, users, roles, and permissions in a separate PostgreSQL database for each tenant. Keep shared tenant, membership, and invitation records in the `admin` schema of `systemdb`.
+- Store tenant business data, users, roles, and permissions in a separate PostgreSQL database for each tenant. Keep shared tenant, membership, and platform admin records in the `control` schema of `control_plane`.
 - Treat tenant aliases as mutable path identifiers. Use each tenant's immutable GUID in `N` format in its database name, `tenant_<guid-N>`; never derive a database name from an alias.
 - Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
@@ -22,6 +22,7 @@
 - Write a failing behavior test before implementing business logic or fixing bugs.
 - Use xUnit with explicit `// Arrange`, `// Act`, and `// Assert` sections.
 - Test persistence and tenant isolation against real PostgreSQL with Testcontainers.
+- Keep tenant isolation and credential boundary tests in the `TenantIsolationTests` project.
 - Keep API contracts versioned and generate shared client types from OpenAPI.
 - Do not add comments that repeat the code; prefer clear names. Only explain non-obvious constraints or rationale, apart from required AAA labels in tests.
 - Run affected checks and report results.

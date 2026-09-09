@@ -1,3 +1,4 @@
+using Domain.Access;
 using Domain.Access.Permissions;
 using Domain.Access.Roles;
 using Microsoft.EntityFrameworkCore;
@@ -15,5 +16,7 @@ public sealed class TenantRolePermissionConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.PermissionId).HasColumnName("permission_id");
         builder.HasOne<TenantRole>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<TenantPermission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasData(SystemAccessCatalog.Roles.SelectMany(role =>
+            role.PermissionIds.Select(permissionId => new { RoleId = role.Id, PermissionId = permissionId })));
     }
 }
