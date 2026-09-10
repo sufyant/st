@@ -1534,23 +1534,8 @@ public sealed class OutboxDrainer(
 
     public async Task<int> DrainAsync(CancellationToken cancellationToken)
     {
-        var processed = 0;
-
-        foreach (var id in await ClaimAsync(cancellationToken))
-        {
-            if (await ProcessAsync(id, cancellationToken))
-            {
-                processed++;
-            }
-        }
-
-        return processed;
-    }
-
-    public ValueTask DisposeAsync() => dbContext.DisposeAsync();
-
-    private async Task<IReadOnlyList<Guid>> ClaimAsync(CancellationToken cancellationToken)
-    {
+        // The row lock is held for the whole batch so a second worker skips these messages, and so
+        // that a crashed process rolls back and releases them without any bookkeeping of its own.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var messages = await dbContext.OutboxMessages
             .FromSql($"""
@@ -1563,47 +1548,32 @@ public sealed class OutboxDrainer(
                 FOR UPDATE SKIP LOCKED
                 """)
             .ToListAsync(cancellationToken);
-        var ids = messages.Select(message => message.Id).ToList();
+        var processed = 0;
 
-        // Claiming marks nothing; the lock is released here so a slow handler does not hold it.
+        foreach (var message in messages)
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<TenantProvisioningRequested>(message.Payload)
+                              ?? throw new InvalidOperationException(
+                                  $"Outbox message '{message.Id}' has an empty payload.");
+                await handle(payload);
+                message.MarkProcessed(timeProvider.GetUtcNow());
+                processed++;
+            }
+            catch (Exception exception)
+            {
+                message.RecordFailure(exception.Message, timeProvider.GetUtcNow());
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return ids;
+        return processed;
     }
 
-    private async Task<bool> ProcessAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var message = await dbContext.OutboxMessages.SingleAsync(
-            candidate => candidate.Id == id,
-            cancellationToken);
-
-        if (message.ProcessedAt is not null)
-        {
-            return false;
-        }
-
-        try
-        {
-            var payload = JsonSerializer.Deserialize<TenantProvisioningRequested>(message.Payload)
-                          ?? throw new InvalidOperationException($"Outbox message '{id}' has an empty payload.");
-            await handle(payload);
-            message.MarkProcessed(timeProvider.GetUtcNow());
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            return true;
-        }
-        catch (Exception exception)
-        {
-            dbContext.ChangeTracker.Clear();
-            var failed = await dbContext.OutboxMessages.SingleAsync(
-                candidate => candidate.Id == id,
-                cancellationToken);
-            failed.RecordFailure(exception.Message, timeProvider.GetUtcNow());
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            return false;
-        }
-    }
+    public ValueTask DisposeAsync() => dbContext.DisposeAsync();
 }
 ```
 

@@ -2,6 +2,7 @@ using Api.Tenants;
 using System.Security.Claims;
 using Infrastructure.Persistence;
 using ControlPlane;
+using Infrastructure.Messaging;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -13,6 +14,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<TenantResolver>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHostedService<OutboxProcessor>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
