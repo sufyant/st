@@ -11,7 +11,8 @@ public static class MemberEndpoints
 {
     public static IEndpointRouteBuilder MapTenantMembers(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/{tenantAlias}/api/v1/members");
+        var group = endpoints.MapGroup("/{tenantAlias}/api/v1/members")
+            .WithTags("MemberEndpoints");
 
         group.MapGet("/", async (IMediator mediator, CancellationToken cancellationToken) =>
                 (await mediator.SendAsync(new ListMembersQuery(), cancellationToken)).ToOk())

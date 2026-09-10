@@ -8,7 +8,7 @@
     "/{tenantAlias}/api/v1/roles": {
       "get": {
         "tags": [
-          "Api"
+          "RoleEndpoints"
         ],
         "responses": {
           "200": {
@@ -111,17 +111,7 @@
     "/{tenantAlias}/api/v1/invitations": {
       "post": {
         "tags": [
-          "Api"
-        ],
-        "parameters": [
-          {
-            "name": "tenantAlias",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
+          "InvitationEndpoints"
         ],
         "requestBody": {
           "content": {
@@ -141,7 +131,7 @@
       },
       "get": {
         "tags": [
-          "Api"
+          "InvitationEndpoints"
         ],
         "responses": {
           "200": {
@@ -153,7 +143,7 @@
     "/{tenantAlias}/api/v1/invitations/{id}": {
       "delete": {
         "tags": [
-          "Api"
+          "InvitationEndpoints"
         ],
         "parameters": [
           {
@@ -176,7 +166,7 @@
     "/api/v1/memberships": {
       "get": {
         "tags": [
-          "Api"
+          "MeEndpoints"
         ],
         "responses": {
           "200": {
@@ -188,7 +178,7 @@
     "/api/v1/invitations": {
       "get": {
         "tags": [
-          "Api"
+          "MeEndpoints"
         ],
         "responses": {
           "200": {
@@ -200,7 +190,7 @@
     "/api/v1/invitations/accept": {
       "post": {
         "tags": [
-          "Api"
+          "MeEndpoints"
         ],
         "requestBody": {
           "content": {
@@ -222,7 +212,7 @@
     "/{tenantAlias}/api/v1/members": {
       "get": {
         "tags": [
-          "Api"
+          "MemberEndpoints"
         ],
         "responses": {
           "200": {
@@ -234,7 +224,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/roles": {
       "put": {
         "tags": [
-          "Api"
+          "MemberEndpoints"
         ],
         "parameters": [
           {
@@ -266,7 +256,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}": {
       "delete": {
         "tags": [
-          "Api"
+          "MemberEndpoints"
         ],
         "parameters": [
           {
@@ -288,7 +278,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/disable": {
       "post": {
         "tags": [
-          "Api"
+          "MemberEndpoints"
         ],
         "parameters": [
           {
@@ -310,7 +300,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/enable": {
       "post": {
         "tags": [
-          "Api"
+          "MemberEndpoints"
         ],
         "parameters": [
           {
@@ -387,10 +377,22 @@
   },
   "tags": [
     {
+      "name": "RoleEndpoints"
+    },
+    {
       "name": "Api"
     },
     {
       "name": "TenantEndpoints"
+    },
+    {
+      "name": "InvitationEndpoints"
+    },
+    {
+      "name": "MeEndpoints"
+    },
+    {
+      "name": "MemberEndpoints"
     }
   ]
 }

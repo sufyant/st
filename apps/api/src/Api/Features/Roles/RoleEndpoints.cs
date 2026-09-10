@@ -13,7 +13,8 @@ public static class RoleEndpoints
                     IMediator mediator,
                     CancellationToken cancellationToken) =>
                 (await mediator.SendAsync(new ListRolesQuery(), cancellationToken)).ToOk())
-            .RequirePermission(TenantPermissions.RolesRead);
+            .RequirePermission(TenantPermissions.RolesRead)
+            .WithTags("RoleEndpoints");
 
         return endpoints;
     }

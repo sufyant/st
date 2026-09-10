@@ -10,7 +10,9 @@ public static class MeEndpoints
 {
     public static IEndpointRouteBuilder MapMe(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1").RequireAuthorization();
+        var group = endpoints.MapGroup("/api/v1")
+            .RequireAuthorization()
+            .WithTags("MeEndpoints");
 
         group.MapGet("/memberships", async (IMediator mediator, CancellationToken cancellationToken) =>
             (await mediator.SendAsync(new ListMyMembershipsQuery(), cancellationToken)).ToOk());
