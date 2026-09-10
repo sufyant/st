@@ -30,4 +30,8 @@ public sealed class TenantUser
             Status = status
         };
     }
+
+    public void Enable() => Status = TenantUserStatus.Active;
+
+    public void Disable() => Status = TenantUserStatus.Disabled;
 }

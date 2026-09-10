@@ -13,7 +13,10 @@
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
 - Create database roles with the bootstrap script, never in EF migrations; the API runtime role never holds DDL privileges.
 - Run migrations as a deploy step through `src/Migrator`, never at application startup. The migrator updates existing tenant databases and fails when one is missing; creating tenant databases belongs to provisioning.
-- Serve tenant requests through the read-only control plane credential; writes to the control plane belong to `/admin` endpoints.
+- Resolve tenants and check membership through the read-only control plane credential. Tenant-surface endpoints that write control plane rows must scope every row to the resolved tenant, never to an identifier taken from the request.
+- Require an `email` claim on the access token for invitation acceptance; possession of an invitation token alone must not grant entry. The Clerk JWT template must include `email`.
+- Store only the hash of an invitation token; return the plaintext once, at creation.
+- Refuse to remove, disable or demote the last owner of a tenant.
 - Tenant-scoped endpoints use `/{tenant-alias}/api/v{version}/...`.
 - Resolve tenants from trusted control-plane data; fail closed on missing context.
 - A membership record only grants entry to a tenant; remove it to revoke access. Check the tenant-database user status after membership and reject disabled users before permission checks.
