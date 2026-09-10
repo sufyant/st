@@ -26,7 +26,6 @@ public static class PostgresServiceCollectionExtensions
         services.AddSingleton(new TenantProvisioner(
             RequiredConnectionString(configuration, "Provisioner")));
 
-        services.AddScoped<TenantProvisioningHandler>();
 
         services.AddKeyedSingleton<NpgsqlDataSource>("control-plane-read", (_, _) =>
             NpgsqlDataSource.Create(RequiredConnectionString(configuration, "ControlPlaneRead")));

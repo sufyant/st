@@ -1,18 +1,26 @@
+using System.Text.Json;
 using Domain.Access;
 using Domain.Access.Users;
 using Domain.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
+using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
 
-namespace Infrastructure.Provisioning;
+namespace Application.Features.Provisioning;
 
 public sealed class TenantProvisioningHandler(
     ControlPlaneDbContext controlPlaneDbContext,
     TenantProvisioner provisioner,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider) : IOutboxMessageHandler
 {
-    public const string MessageType = "TenantProvisioningRequested";
+    public string MessageType => TenantProvisioningRequested.MessageType;
+
+    public Task HandleAsync(string payload, CancellationToken cancellationToken) =>
+        HandleAsync(
+            JsonSerializer.Deserialize<TenantProvisioningRequested>(payload)
+            ?? throw new InvalidOperationException("The outbox payload is empty."),
+            cancellationToken);
 
     public async Task HandleAsync(TenantProvisioningRequested message, CancellationToken cancellationToken)
     {

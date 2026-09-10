@@ -3,7 +3,6 @@ using System.Text.Json;
 using Domain.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
-using Infrastructure.Provisioning;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -109,7 +108,7 @@ public static class TenantEndpoints
         DateTimeOffset now) =>
         dbContext.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
-            TenantProvisioningHandler.MessageType,
+            TenantProvisioningRequested.MessageType,
             JsonSerializer.Serialize(new TenantProvisioningRequested(
                 tenantId,
                 user.FindFirstValue("sub")!)),

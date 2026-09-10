@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,7 +5,7 @@ namespace Infrastructure.Messaging;
 
 public sealed class OutboxDrainer(
     ControlPlaneDbContext dbContext,
-    Func<TenantProvisioningRequested, Task> handle,
+    IEnumerable<IOutboxMessageHandler> handlers,
     TimeProvider timeProvider) : IAsyncDisposable
 {
     private const int BatchSize = 10;
@@ -33,10 +32,10 @@ public sealed class OutboxDrainer(
         {
             try
             {
-                var payload = JsonSerializer.Deserialize<TenantProvisioningRequested>(message.Payload)
+                var handler = handlers.SingleOrDefault(candidate => candidate.MessageType == message.Type)
                               ?? throw new InvalidOperationException(
-                                  $"Outbox message '{message.Id}' has an empty payload.");
-                await handle(payload);
+                                  $"No handler is registered for outbox message type '{message.Type}'.");
+                await handler.HandleAsync(message.Payload, cancellationToken);
                 message.MarkProcessed(timeProvider.GetUtcNow());
                 processed++;
             }

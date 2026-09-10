@@ -1,6 +1,6 @@
 using Domain.Tenants;
 using Infrastructure.Messaging;
-using Infrastructure.Provisioning;
+using Application.Features.Provisioning;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -122,13 +122,45 @@ public sealed class OutboxDrainerTests
         Assert.Equal(1, results.Sum());
     }
 
+    [Fact]
+    public async Task DrainAsync_ForAnUnknownMessageType_RecordsTheFailureAndKeepsTheMessage()
+    {
+        // Arrange
+        await using var fixture = await ProvisioningFixture.StartAsync();
+
+        await using (var context = fixture.CreateControlPlane())
+        {
+            context.OutboxMessages.Add(OutboxMessage.Create(
+                Guid.CreateVersion7(),
+                "SomethingNobodyHandles",
+                "{}",
+                DateTimeOffset.UtcNow));
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var drainer = CreateDrainer(fixture);
+
+        // Act
+        var processed = await drainer.DrainAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0, processed);
+        await using var assertions = fixture.CreateControlPlane();
+        var message = await assertions.OutboxMessages.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Null(message.ProcessedAt);
+        Assert.Equal(1, message.AttemptCount);
+        Assert.Contains("SomethingNobodyHandles", message.LastError);
+    }
+
     private static OutboxDrainer CreateDrainer(ProvisioningFixture fixture) =>
         new(
             fixture.CreateControlPlane(),
-            message => new TenantProvisioningHandler(
-                fixture.CreateControlPlane(),
-                fixture.Provisioner,
-                TimeProvider.System).HandleAsync(message, CancellationToken.None),
+            [
+                new TenantProvisioningHandler(
+                    fixture.CreateControlPlane(),
+                    fixture.Provisioner,
+                    TimeProvider.System)
+            ],
             TimeProvider.System);
 
     private static async Task EnqueueAsync(ProvisioningFixture fixture, Guid tenantId)
@@ -136,7 +168,7 @@ public sealed class OutboxDrainerTests
         await using var context = fixture.CreateControlPlane();
         context.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
-            TenantProvisioningHandler.MessageType,
+            TenantProvisioningRequested.MessageType,
             $$"""{"TenantId":"{{tenantId}}","OwnerExternalUserId":"{{ProvisioningFixture.OwnerExternalUserId}}"}""",
             DateTimeOffset.UtcNow));
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);

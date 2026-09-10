@@ -1,5 +1,4 @@
 using Infrastructure.Persistence.ControlPlane;
-using Infrastructure.Provisioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,8 +22,7 @@ public sealed class OutboxProcessor(
                 var provider = scope.ServiceProvider;
                 var drainer = new OutboxDrainer(
                     provider.GetRequiredService<ControlPlaneDbContext>(),
-                    message => provider.GetRequiredService<TenantProvisioningHandler>()
-                        .HandleAsync(message, stoppingToken),
+                    provider.GetServices<IOutboxMessageHandler>(),
                     timeProvider);
                 await drainer.DrainAsync(stoppingToken);
             }

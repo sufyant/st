@@ -1,6 +1,8 @@
 using Application.Abstractions;
 using Application.Behaviors;
+using Application.Features.Provisioning;
 using Application.Mediation;
+using Infrastructure.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application;
@@ -18,6 +20,10 @@ public static class DependencyInjection
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
+
+        services.AddScoped<TenantProvisioningHandler>();
+        services.AddScoped<IOutboxMessageHandler>(provider =>
+            provider.GetRequiredService<TenantProvisioningHandler>());
 
         return services;
     }
