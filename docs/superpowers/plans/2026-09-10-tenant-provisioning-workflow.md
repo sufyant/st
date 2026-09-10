@@ -2050,7 +2050,25 @@ git commit -m "feat(api): create tenants through the control plane"
 
 ## Tamamlanma Kontrolü
 
-- [ ] `dotnet test --solution apps/api/Api.slnx` — dört proje de yeşil
-- [ ] Temiz ortamda uçtan uca akış: `docker compose down -v && docker compose up -d`, bootstrap rolleri, `migrate control-plane`, grant script'i, API'yi başlat, `POST /admin/api/v1/tenants` ile bir tenant oluştur, on saniye içinde `GET /admin/api/v1/tenants/{id}` `Active` dönüyor
-- [ ] Oluşan tenant'ın veritabanı var, şeması migrate edilmiş, `users` ve `user_roles` birer satır içeriyor
-- [ ] `apps/api/AGENTS.md` outbox kuralını içeriyor
+2026-09-10 tarihinde temiz bir ortamda doğrulandı:
+
+- [x] `dotnet test --solution apps/api/Api.slnx` — dört proje, 108 test yeşil
+- [x] `docker compose down -v` sonrası sıra çalışıyor: bootstrap rolleri → `migrate control-plane` →
+      grant script'i → API başlıyor
+- [x] Kuyruğa bırakılan bir provisioning mesajı worker tarafından işlendi: tenant
+      `Provisioning` → `Active`, `provisioning_step` temizlendi, hata yok, mesaj `processed_at`
+      damgası aldı
+- [x] Oluşan tenant veritabanında şema migrate edilmiş ve sistem kataloğu seed edilmiş:
+      `users=1`, `user_roles=1`, `roles=1`, `permissions=5`, `role_permissions=5`;
+      owner kullanıcısı `owner` rolüne sahip
+- [x] `st_tenant` kendi tenant veritabanını okuyabiliyor, `control.tenants`'a yazmaya
+      çalıştığında `permission denied` alıyor — sınır gerçek credential'larla da tutuyor
+- [x] `migrate tenants`, `st_provisioner`'ın sahip olduğu tabloları `st_migrator` ile migrate
+      edebiliyor (`GRANT st_provisioner TO st_migrator` sayesinde)
+- [x] `apps/api/AGENTS.md` outbox kuralını içeriyor
+
+HTTP seviyesindeki uçtan uca akış (`POST /admin/api/v1/tenants` → poll → `Active`) elle
+çalıştırılmadı, çünkü control plane endpoint'leri Clerk token'ı gerektiriyor ve `Clerk:Issuer`
+lokalde yapılandırılmamış durumda. Endpoint'lerin kendisi entegrasyon testlerinde test
+kimlik doğrulama şemasıyla kanıtlanıyor; yukarıdaki doğrulama aynı zinciri outbox mesajından
+başlatarak gerçek uygulama process'i ve gerçek credential'larla yürütüyor.
