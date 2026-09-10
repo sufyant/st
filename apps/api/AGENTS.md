@@ -19,6 +19,7 @@
 - A membership record only grants entry to a tenant; remove it to revoke access. Check the tenant-database user status after membership and reject disabled users before permission checks.
 - Enforce permissions before executing tenant operations.
 - Persist business changes and outbox messages atomically. Delivery may repeat; make outbox processing idempotent.
+- Queue provisioning work through the control plane outbox in the same transaction as the business change; every provisioning step must be safe to run again.
 - Write a failing behavior test before implementing business logic or fixing bugs.
 - Use xUnit with explicit `// Arrange`, `// Act`, and `// Assert` sections.
 - Test persistence and tenant isolation against real PostgreSQL with Testcontainers.

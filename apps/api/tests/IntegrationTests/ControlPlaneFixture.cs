@@ -22,11 +22,16 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
     private readonly PostgreSqlContainer postgres;
     private readonly WebApplicationFactory<Program> factory;
+    private readonly string controlPlaneConnectionString;
 
-    private ControlPlaneFixture(PostgreSqlContainer postgres, WebApplicationFactory<Program> factory)
+    private ControlPlaneFixture(
+        PostgreSqlContainer postgres,
+        WebApplicationFactory<Program> factory,
+        string controlPlaneConnectionString)
     {
         this.postgres = postgres;
         this.factory = factory;
+        this.controlPlaneConnectionString = controlPlaneConnectionString;
         Client = factory.CreateClient();
     }
 
@@ -70,7 +75,16 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
                         _ => { }));
         });
 
-        return new ControlPlaneFixture(postgres, factory);
+        return new ControlPlaneFixture(postgres, factory, controlPlane);
+    }
+
+    public async Task<long> CountControlPlaneRowsAsync(string qualifiedTable)
+    {
+        await using var connection = new NpgsqlConnection(controlPlaneConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand($"SELECT count(*) FROM {qualifiedTable}", connection);
+
+        return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
 
     public async ValueTask DisposeAsync()

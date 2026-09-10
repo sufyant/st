@@ -41,6 +41,8 @@ public static class ControlPlaneEndpoints
             return Results.Ok(tenants);
         });
 
+        group.MapTenants();
+
         return endpoints;
     }
 }
