@@ -2550,10 +2550,23 @@ git commit -m "feat(api): manage tenant members and their roles"
 
 ## Tamamlanma Kontrolü
 
-- [ ] `dotnet test --solution apps/api/Api.slnx` — dört proje de yeşil
-- [ ] Temiz ortamda uçtan uca: bir tenant provision edilir, sahibi ikinci bir kişiyi davet
-      eder, davet kabul edilir, kabul eden kişi tenant endpoint'ini çağırabilir, rolü owner'a
-      yükseltilince davet oluşturabilir, üyeliği geri alınınca 403 alır
-- [ ] `grep -rn "systemdb\|AdminDbContext" apps/api --include='*.cs'` boş döner
-- [ ] `apps/api/AGENTS.md` üç yeni kuralı içerir
-- [ ] `packages/api-client/src/schema.d.ts` yeni endpoint'leri içerir
+2026-09-10 tarihinde doğrulandı:
+
+- [x] `dotnet test --solution apps/api/Api.slnx` — dört proje, 151 test yeşil
+- [x] Davet zincirinin tamamı entegrasyon testleriyle kanıtlandı: sahip davet eder, davet
+      edilen kişi kabul eder ve tenant endpoint'ini çağırabilir; rolü `owner`'a yükseltilince
+      davet oluşturabilir; üyeliği geri alınınca 403 alır
+- [x] Güvenlik davranışları kanıtlandı: bilinmeyen token 404, süresi geçmiş token 410,
+      e-posta uyuşmazlığı 403, `email` claim'i olmayan istek 403, ikinci kabul 404
+- [x] Son owner koruması üç yolda da çalışıyor: silme, devre dışı bırakma ve rol düşürme 409
+- [x] Temiz ortamda migration'lar uygulanıyor; `control` şeması `invitations` tablosunu
+      içeriyor ve yeni tenant veritabanları `member` ile `owner` rollerinin ikisiyle de doğuyor
+- [x] Uygulama Development ortamında ayağa kalkıyor, `/health/ready` 200 dönüyor, her iki yeni
+      yüzey de kimlik doğrulaması istiyor
+- [x] `grep -rn "systemdb\|AdminDbContext" apps/api --include='*.cs'` boş dönüyor
+- [x] `apps/api/AGENTS.md` dört yeni kuralı içeriyor
+- [x] `packages/api-client/src/schema.d.ts` on dört endpoint'i içeriyor
+
+HTTP seviyesinde elle uçtan uca akış çalıştırılmadı çünkü tüm yüzeyler Clerk token'ı
+gerektiriyor ve `Clerk:Issuer` lokalde yapılandırılmamış durumda. Aynı zincir entegrasyon
+testlerinde test kimlik doğrulama şemasıyla uçtan uca yürütülüyor.
