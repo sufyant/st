@@ -43,12 +43,14 @@ HTTP'yi bir isteğe çevir, `Result`'ı bir status koduna çevir.
 - ProblemDetails tabanlı tek hata sözleşmesi
 - Mevcut Members, Invitations, Roles ve Me endpoint'lerinin taşınması
 - Son owner korumasının domain kuralına dönüşmesi
+- Outbox işleyici portu ve `TenantProvisioningHandler`'ın `Application`'a taşınması
 
 ### Bu spec'te değil
 
 - **Domain event'ler ve base class'lar.** Karar 16'nın tetikleyicisi hâlâ dolmadı.
-- **Provisioning'in mediator'a taşınması.** `TenantProvisioningHandler` outbox tarafından
-  çağrılıyor, HTTP isteği değil. Pipeline'ın hiçbir behavior'ı ona uymuyor.
+- **Provisioning'in mediator'a taşınması.** Handler `Application`'a taşınıyor ama outbox
+  tarafından çağrılmaya devam ediyor. Outbox mesajı HTTP isteği değil; permission,
+  validation ve unit of work behavior'larının hiçbiri ona uymuyor.
 - **Concurrency kontrolü (karar 14) ve dual ID (karar 15).** Tetikleyicileri dolmadı.
 - **Seq kurulumu.** Serilog konsola yazar; Seq sink'i bir sonraki adım.
 
@@ -80,11 +82,69 @@ Domain     ← Infrastructure ← Application ← Api
               ControlPlane ──────────────────┘
 ```
 
-**Bedeli, kayda geçiyor:** `Infrastructure` artık `Application`'ı göremez. Outbox
-işleyicilerinin bir gün command handler olması istenirse, dispatch `Api` tarafına ya da
-yeni bir kompozisyon projesine çıkar. Bugün böyle bir ihtiyaç yok.
+`Infrastructure` artık `Application`'ı tip olarak göremez. Bunun tek gerçek sonucu
+outbox işleyicileridir ve çözümü bir sonraki kararda; derleme zamanı referansı yerine
+DI ile ters çevirme.
 
-### 2. `Result<T>`: beklenen iş hataları exception değildir
+### 2. Outbox işleyicileri `Application`'a taşınır, port `Infrastructure`'da kalır
+
+Bugün `OutboxProcessor` doğrudan `TenantProvisioningHandler`'ı çözüyor ve `OutboxDrainer`
+`message.Type` alanına hiç bakmadan her payload'ı `TenantProvisioningRequested` olarak
+deserialize ediyor. Tek mesaj tipi varsayımı koda gömülü; ikinci bir mesaj tipi sessizce
+yanlış çalışırdı.
+
+Port `Infrastructure/Messaging` içinde tanımlanır:
+
+```csharp
+public interface IOutboxMessageHandler
+{
+    string MessageType { get; }
+
+    Task HandleAsync(string payload, CancellationToken cancellationToken);
+}
+```
+
+`OutboxDrainer` artık `IEnumerable<IOutboxMessageHandler>` alır ve mesajı `Type` alanına
+göre eşleştirir. Eşleşme yoksa mesaj işlenmiş sayılmaz, `RecordFailure` ile kayda geçer;
+kuyruktan sessizce düşmez.
+
+`TenantProvisioningHandler` `Application/Features/Provisioning/` altına taşınır ve bu
+arayüzü uygular. Payload deserializasyonu handler'ın kendi işidir, çünkü mesaj tipini
+bilen tek yer odur.
+
+Bu, bağımlılık yönü sorusunun cevabıdır ve iddia değil, derleyicinin kanıtladığı bir
+şeydir: `Application` `Infrastructure`'a referans verdiği için arayüzü uygulayabilir,
+`Infrastructure` ise implementasyonu hiç görmeden DI üzerinden çalıştırır. `IHostedService`
+ile aynı şekil.
+
+Handler'ın **mediator'a** taşınması hâlâ bu spec'te değil. Outbox mesajı bir HTTP isteği
+değil; permission, validation ve unit of work behavior'larının hiçbiri ona uymuyor.
+Taşınan şey handler'ın yeri, çağrılma biçimi değil.
+
+### 3. Vertical slice iki projeye yayılır, dilim bölünmez
+
+Karar 30 vertical slice'ı `src/Api/Features/<Feature>/` olarak yazmıştı. Handler'lar
+`Application`'a çıktığı için tanım genişler: bir özellik, aynı adı taşıyan **iki** klasör.
+
+```
+src/Application/Features/Members/
+    ListMembers.cs              (query + handler + response)
+    DisableMember.cs            (command + handler + validator)
+    ...
+src/Api/Features/Members/
+    MemberEndpoints.cs          (route + Result eşlemesi)
+```
+
+Dosya başına bir dilim parçası: istek, varsa validator, handler ve yanıt tipi aynı
+dosyada durur. Ayrı `Commands/`, `Handlers/`, `Validators/` klasörleri açılmaz; o
+bölünme katman-önce klasörlemedir ve vertical slice'ın tam tersidir.
+
+Bir özelliği okumak için iki dosya açılır: dilimin kendisi ve onu HTTP'ye bağlayan
+endpoint. Bir özelliği silmek iki klasörü silmektir.
+
+Karar 30'un metni `AGENTS.md` içinde buna göre güncellenir.
+
+### 4. `Result<T>`: beklenen iş hataları exception değildir
 
 ```csharp
 public readonly record struct Unit;
@@ -114,7 +174,7 @@ doğurur; listeye ancak gerçek bir handler ihtiyaç duyduğunda eklenir.
 `Unit`, hiçbir şey döndürmeyen komutlar için. Ayrı bir generic olmayan `Result` tipi
 yazılmaz; iki tip iki kod yolu demektir.
 
-### 3. HTTP eşlemesi tek yerde, ProblemDetails ile
+### 5. HTTP eşlemesi tek yerde, ProblemDetails ile
 
 | `ErrorKind` | Status | Gövde |
 |---|---|---|
@@ -131,9 +191,9 @@ bir exception artık gövdesiz 500 değil, `traceId` taşıyan bir ProblemDetail
 
 Spec 3'ün ürettiği status kodları **korunur**. Davet akışındaki 410 Gone, `ErrorKind`'a
 yeni bir değer eklemek yerine ilgili endpoint'te açıkça eşlenir; tek kullanımlık bir
-durum için genel bir kategori açmak karar 2'nin kısalığını bozardı.
+durum için genel bir kategori açmak karar 4'ün kısalığını bozardı.
 
-### 4. Mediator: elle yazılır, çağrı yeri sade kalır
+### 6. Mediator: elle yazılır, çağrı yeri sade kalır
 
 MediatR 2025'te ticari lisansa geçti (karar 18). Yerine yazılan yapı:
 
@@ -174,7 +234,7 @@ Handler'lar DI'a assembly taramasıyla değil, `Application/DependencyInjection.
 içinde **elle** kaydedilir. Otuz handler'a kadar elle liste okunabilir kalır ve neyin
 kayıtlı olduğu görünür olur.
 
-### 5. Pipeline behavior'ları ve sırası
+### 7. Pipeline behavior'ları ve sırası
 
 ```csharp
 public delegate Task<Result<TResponse>> RequestHandlerDelegate<TResponse>();
@@ -206,7 +266,7 @@ Caching doğrulamadan **sonra** gelir, böylece anahtar doğrulanmış girdiden 
 Behavior'lar açık generic olarak (`typeof(LoggingBehavior<,>)`) kaydedilir ve kayıt
 sırası zincir sırasını belirler.
 
-### 6. Permission zorlaması endpoint policy'sinden behavior'a taşınır
+### 8. Permission zorlaması endpoint policy'sinden behavior'a taşınır
 
 Karar 18 bunu öngörmüştü. İstek kaydının üstünde:
 
@@ -242,7 +302,7 @@ olmaktan kazanır.
 `TenantContext` `Api/Tenants/`'dan `Application/Abstractions/`'a taşınır; handler'lar
 tenant kimliğini oradan alır. Middleware onu doldurmaya devam eder.
 
-### 7. `ICachedQuery` bugün yazılır, üretimde implementor'ı yoktur
+### 9. `ICachedQuery` bugün yazılır, üretimde implementor'ı yoktur
 
 ```csharp
 public interface ICachedQuery
@@ -271,7 +331,7 @@ gösterir.
 
 `ICachedQuery` istisnası dışında, karar 23'ün genel cache katmanı reddi yürürlükte kalır.
 
-### 8. Unit of work: iki veritabanı, iki kayıt, dürüst sınır
+### 10. Unit of work: iki veritabanı, iki kayıt, dürüst sınır
 
 `UnitOfWorkBehavior` komut tamamlandıktan sonra, sonuç başarılıysa, **kirli olan** her
 context'i ayrı ayrı kaydeder. Hata sonucunda hiçbir şey kaydedilmez.
@@ -290,7 +350,7 @@ seçilmiştir.
 
 **Bilinçli olarak yapılmıyor:** iki yazma arası atomiklik. Tetikleyicisi tabloda.
 
-### 9. Son owner koruması domain kuralına dönüşür
+### 11. Son owner koruması domain kuralına dönüşür
 
 Bugün `MemberEndpoints` içindeki `IsLastOwnerAsync`, karar 37'nin invariant'ını üç
 handler'da tekrar ediyor ve yalnızca HTTP üzerinden test edilebiliyor.
@@ -302,7 +362,7 @@ sorgusu handler'da kalır, karar handler'da alınmaz.
 Bu, projedeki ilk gerçek domain kuralıdır ve kendi birim testini kazanır. Feathers'ın
 tanımıyla, o kural bugüne kadar legacy koddu.
 
-### 10. Serilog ve istek zenginleştirmesi
+### 12. Serilog ve istek zenginleştirmesi
 
 Karar 21 uygulanır, Seq hariç. `LoggingBehavior` her istek için `RequestName`,
 `Elapsed` ve sonucu yazar. `tenant_id`, `request_id` ve `user_id` bir middleware
