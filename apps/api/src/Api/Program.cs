@@ -2,6 +2,7 @@ using Api.Tenants;
 using System.Security.Claims;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Tenants;
+using Api.Features.Invitations;
 using ControlPlane;
 using Infrastructure.Messaging;
 using Infrastructure.Tenants;
@@ -40,6 +41,7 @@ app.UseMiddleware<TenantAccessMiddleware>();
 app.UseAuthorization();
 app.MapOpenApi();
 app.MapControlPlane();
+app.MapTenantInvitations();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false

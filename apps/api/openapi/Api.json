@@ -95,10 +95,80 @@
           }
         }
       }
+    },
+    "/{tenantAlias}/api/v1/invitations": {
+      "post": {
+        "tags": [
+          "InvitationEndpoints"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "InvitationEndpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/{tenantAlias}/api/v1/invitations/{id}": {
+      "delete": {
+        "tags": [
+          "InvitationEndpoints"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CreateInvitationRequest": {
+        "required": [
+          "email",
+          "roleCode"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "roleCode": {
+            "type": "string"
+          }
+        }
+      },
       "CreateTenantRequest": {
         "required": [
           "alias"
@@ -118,6 +188,9 @@
     },
     {
       "name": "TenantEndpoints"
+    },
+    {
+      "name": "InvitationEndpoints"
     }
   ]
 }
