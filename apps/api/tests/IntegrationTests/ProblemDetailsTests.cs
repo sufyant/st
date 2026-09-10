@@ -43,4 +43,24 @@ public sealed class ProblemDetailsTests
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Post_WithAnInvalidEmail_ReturnsFieldLevelValidationErrors()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+
+        // Act
+        var response = await fixture.Client.PostAsJsonAsync(
+            $"/{TenantSurfaceFixture.Alias}/api/v1/invitations",
+            new { email = "not-an-email", roleCode = "member" },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var errors = document.RootElement.GetProperty("errors");
+        Assert.True(errors.TryGetProperty("Email", out _));
+    }
 }

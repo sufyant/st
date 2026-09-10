@@ -8,7 +8,7 @@
     "/{tenantAlias}/api/v1/roles": {
       "get": {
         "tags": [
-          "RoleEndpoints"
+          "Api"
         ],
         "responses": {
           "200": {
@@ -176,7 +176,7 @@
     "/api/v1/memberships": {
       "get": {
         "tags": [
-          "MeEndpoints"
+          "Api"
         ],
         "responses": {
           "200": {
@@ -188,7 +188,7 @@
     "/api/v1/invitations": {
       "get": {
         "tags": [
-          "MeEndpoints"
+          "Api"
         ],
         "responses": {
           "200": {
@@ -200,7 +200,7 @@
     "/api/v1/invitations/accept": {
       "post": {
         "tags": [
-          "MeEndpoints"
+          "Api"
         ],
         "requestBody": {
           "content": {
@@ -387,16 +387,10 @@
   },
   "tags": [
     {
-      "name": "RoleEndpoints"
-    },
-    {
       "name": "Api"
     },
     {
       "name": "TenantEndpoints"
-    },
-    {
-      "name": "MeEndpoints"
     }
   ]
 }

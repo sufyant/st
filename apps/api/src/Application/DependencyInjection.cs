@@ -2,7 +2,9 @@ using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
 using Application.Features.Invitations;
+using Application.Features.Me;
 using Application.Features.Members;
+using Application.Features.Roles;
 using FluentValidation;
 using Application.Features.Provisioning;
 using Application.Mediation;
@@ -37,6 +39,18 @@ public static class DependencyInjection
             IRequestHandler<ListPendingInvitationsQuery, IReadOnlyList<PendingInvitation>>,
             ListPendingInvitationsHandler>();
         services.AddScoped<IRequestHandler<RevokeInvitationCommand, Unit>, RevokeInvitationHandler>();
+
+        services.AddScoped<
+            IRequestHandler<ListRolesQuery, IReadOnlyList<TenantRoleDetail>>,
+            ListRolesHandler>();
+
+        services.AddScoped<
+            IRequestHandler<ListMyMembershipsQuery, IReadOnlyList<MyMembership>>,
+            ListMyMembershipsHandler>();
+        services.AddScoped<
+            IRequestHandler<ListMyInvitationsQuery, IReadOnlyList<MyInvitation>>,
+            ListMyInvitationsHandler>();
+        services.AddScoped<IRequestHandler<AcceptInvitationCommand, MyMembership>, AcceptInvitationHandler>();
 
         services.AddScoped<TenantProvisioningHandler>();
         services.AddScoped<IOutboxMessageHandler>(provider =>
