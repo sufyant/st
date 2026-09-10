@@ -4,7 +4,36 @@
 - Target .NET 10 and PostgreSQL with EF Core code-first migrations.
 - Keep the domain independent of ASP.NET Core, EF Core, and external services.
 - Model business invariants in aggregates and value objects.
-- Separate commands and queries; keep endpoints thin.
+- Separate commands and queries; keep endpoints thin. An endpoint maps HTTP to a request and a
+  result to a status code, nothing else.
+- Keep a vertical slice in two folders of the same name: `src/Application/Features/<Feature>/`
+  holds the request, its validator, its handler and its response, one slice per file;
+  `src/Api/Features/<Feature>/` holds the routes. Never split a slice into `Commands/`,
+  `Handlers/` or `Validators/` folders.
+- References run `Domain <- Infrastructure <- Application <- Api`. Only `Domain` referencing
+  nothing is a hard rule; the application layer works against the EF contexts directly because
+  there is no repository wrapper to hide them.
+- Return expected business failures as `Result<T>`; reserve exceptions for the unexpected. Every
+  failure answers as a problem document. Never hand-write an error body.
+- Keep `ErrorKind` short. A one-off status, such as Gone on invitation acceptance, is refined at
+  the endpoint rather than widening the shared classification.
+- Send requests through the mediator. Behaviors run logging, permission, validation, caching and
+  unit of work, outside in; permission comes before validation so an unauthorised caller never
+  learns the shape of a request it may not send.
+- Declare permissions on the request with `[RequiresPermission]` and keep `RequirePermission` on
+  the route. The route gate rejects before the body is read and shows up in OpenAPI; the behavior
+  defends inside. A test holds both against the system catalog.
+- The caching behavior prefixes every cache key with the tenant id; a query never supplies that
+  prefix itself.
+- The unit of work behavior saves each dirty context after a successful command, control plane
+  first. Two databases are two units of work, not one atomic write: order them so that a crash in
+  between closes access rather than leaving it half open.
+- Register handlers by hand in `AddApplication`; do not scan assemblies.
+- Handle outbox messages through `IOutboxMessageHandler`, matched by message type. The port lives
+  in `Infrastructure` and the handlers in `Application`; DI does the inversion.
+- Domain events do not exist yet. When they arrive, an aggregate records them and something else
+  publishes them, and dispatch happens before `SaveChanges` so an event handler's outbox row joins
+  the business transaction.
 - Use EF Core by default; introduce Dapper for justified query needs.
 - Avoid generic repositories and speculative abstractions.
 - Store tenant business data, users, roles, and permissions in a separate PostgreSQL database for each tenant. Keep shared tenant, membership, and platform admin records in the `control` schema of `control_plane`.
@@ -30,6 +59,8 @@
 - Keep tenant isolation and credential boundary tests in the `TenantIsolationTests` project.
 - Keep API contracts versioned and generate shared client types from OpenAPI.
 - Do not add comments that repeat the code; prefer clear names. Only explain non-obvious constraints or rationale, apart from required AAA labels in tests.
+- Log through Serilog; `tenant_id`, `request_id` and `user_id` are pushed to the log context by
+  middleware. Never log a request object: it can carry an invitation token or an email address.
 - Run affected checks and report results.
 
 ## Commands
