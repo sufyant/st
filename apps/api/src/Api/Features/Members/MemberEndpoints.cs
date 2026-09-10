@@ -1,10 +1,10 @@
 using Api.Authorization;
-using Api.Tenants;
 using Domain.Access;
 using Domain.Access.Users;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
+using Application.Abstractions;
 
 namespace Api.Features.Members;
 

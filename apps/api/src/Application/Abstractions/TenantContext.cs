@@ -1,4 +1,4 @@
-namespace Api.Tenants;
+namespace Application.Abstractions;
 
 public sealed class TenantContext
 {
@@ -12,7 +12,7 @@ public sealed class TenantContext
 
     public string DatabaseName => databaseName ?? throw NotResolved();
 
-    internal void Set(Guid resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
+    public void Set(Guid resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
     {
         tenantId = resolvedTenantId;
         alias = resolvedAlias;

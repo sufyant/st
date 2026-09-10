@@ -1,11 +1,11 @@
 using System.Security.Claims;
 using Api.Authorization;
-using Api.Tenants;
 using Domain.Access;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
+using Application.Abstractions;
 
 namespace Api.Features.Invitations;
 

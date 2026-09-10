@@ -6,7 +6,6 @@
     <UserSecretsId>6d336430-76c2-42a4-a50f-b2ea2af970a2</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Application/Application.csproj" />
     <ProjectReference Include="../Domain/Domain.csproj" />
   </ItemGroup>
   <ItemGroup>

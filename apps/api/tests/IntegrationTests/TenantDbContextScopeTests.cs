@@ -1,4 +1,4 @@
-using Api.Tenants;
+using Application.Abstractions;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

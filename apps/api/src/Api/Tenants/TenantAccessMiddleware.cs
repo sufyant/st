@@ -7,6 +7,7 @@ using Infrastructure.Persistence.Tenants;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Application.Abstractions;
 
 namespace Api.Tenants;
 

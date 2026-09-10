@@ -11,6 +11,7 @@ using Infrastructure.Messaging;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Application.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddPostgresReadiness(builder.Configuration);
