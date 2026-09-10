@@ -1,7 +1,9 @@
 using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
+using Application.Features.Invitations;
 using Application.Features.Members;
+using FluentValidation;
 using Application.Features.Provisioning;
 using Application.Mediation;
 using Infrastructure.Messaging;
@@ -28,6 +30,13 @@ public static class DependencyInjection
         services.AddScoped<IRequestHandler<RevokeMemberCommand, Unit>, RevokeMemberHandler>();
         services.AddScoped<IRequestHandler<DisableMemberCommand, Unit>, DisableMemberHandler>();
         services.AddScoped<IRequestHandler<EnableMemberCommand, Unit>, EnableMemberHandler>();
+
+        services.AddScoped<IRequestHandler<CreateInvitationCommand, CreatedInvitation>, CreateInvitationHandler>();
+        services.AddScoped<IValidator<CreateInvitationCommand>, CreateInvitationValidator>();
+        services.AddScoped<
+            IRequestHandler<ListPendingInvitationsQuery, IReadOnlyList<PendingInvitation>>,
+            ListPendingInvitationsHandler>();
+        services.AddScoped<IRequestHandler<RevokeInvitationCommand, Unit>, RevokeInvitationHandler>();
 
         services.AddScoped<TenantProvisioningHandler>();
         services.AddScoped<IOutboxMessageHandler>(provider =>

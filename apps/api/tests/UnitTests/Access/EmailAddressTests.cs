@@ -41,4 +41,31 @@ public sealed class EmailAddressTests
         // Assert
         Assert.Equal(first, second);
     }
+
+    [Fact]
+    public void TryCreate_ForAnInvalidAddress_ReportsFailureWithoutThrowing()
+    {
+        // Arrange
+        const string value = "not-an-email";
+
+        // Act
+        var created = EmailAddress.TryCreate(value, out _);
+
+        // Assert
+        Assert.False(created);
+    }
+
+    [Fact]
+    public void TryCreate_ForAValidAddress_NormalisesIt()
+    {
+        // Arrange
+        const string value = "  Someone@Example.COM ";
+
+        // Act
+        var created = EmailAddress.TryCreate(value, out var email);
+
+        // Assert
+        Assert.True(created);
+        Assert.Equal("someone@example.com", email.Value);
+    }
 }

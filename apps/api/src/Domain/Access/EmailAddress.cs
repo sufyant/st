@@ -11,7 +11,12 @@ public sealed record EmailAddress
         Value = value;
     }
 
-    public static EmailAddress Create(string value)
+    public static EmailAddress Create(string value) =>
+        TryCreate(value, out var email)
+            ? email
+            : throw new ArgumentException("Email address is not valid.", nameof(value));
+
+    public static bool TryCreate(string? value, out EmailAddress email)
     {
         var normalised = value?.Trim().ToLowerInvariant();
         var atIndex = normalised?.IndexOf('@') ?? -1;
@@ -22,9 +27,13 @@ public sealed record EmailAddress
             atIndex == normalised.Length - 1 ||
             normalised.LastIndexOf('@') != atIndex)
         {
-            throw new ArgumentException("Email address is not valid.", nameof(value));
+            email = null!;
+
+            return false;
         }
 
-        return new EmailAddress(normalised);
+        email = new EmailAddress(normalised);
+
+        return true;
     }
 }
