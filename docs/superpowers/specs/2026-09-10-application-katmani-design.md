@@ -350,6 +350,17 @@ seçilmiştir.
 
 **Bilinçli olarak yapılmıyor:** iki yazma arası atomiklik. Tetikleyicisi tabloda.
 
+Domain event kancası bugün takılmıyor ama yeri burasıdır ve şartı şimdiden yazılıyor:
+event'ler `SaveChanges`'ten **önce** dispatch edilir. Sonra dispatch etmek, event
+handler'ının eklediği outbox satırını iş değişikliğinden ayrı bir transaction'a düşürür
+ve karar 24'ün tek şartını bozar. Önce dispatch edildiğinde handler'ın eklediği satır
+aynı change tracker'a girer ve aynı commit'le gider.
+
+Sınır ayrıca kayda geçiyor: aggregate event'i **kaydeder**, yayınlamaz. Yayınlamak bir
+dispatcher tanımak, dispatcher tanımak da `Domain`'in altyapıyı görmesi demektir. Domain
+event hiçbir zaman kalıcı değildir; saklanan tek şey outbox mesajıdır ve o
+`Infrastructure`'a aittir, çünkü bir teslimat mekanizmasıdır, domain kavramı değil.
+
 ### 11. Son owner koruması domain kuralına dönüşür
 
 Bugün `MemberEndpoints` içindeki `IsLastOwnerAsync`, karar 37'nin invariant'ını üç
@@ -457,7 +468,7 @@ Eklenenler:
 | Handler'ların assembly taramasıyla kaydı | Elle liste okunabilir ve görünür | Kayıt listesinin otuz handler'ı geçmesi |
 | Kaynak üreteçli dispatch | Reflection ilk çağrıda bir kez, sonra önbellekli | Native AOT yayım hedefi |
 | Genel cache katmanı | Karar 23 yürürlükte | `ICachedQuery`'nin ikinci gerçek implementor'ı |
-| Domain event'ler ve base class'lar | Karar 16, tek aggregate | İlk domain event ihtiyacı |
+| Domain event'ler ve base class'lar | Karar 16 yürürlükte; bugün üretilecek hiçbir event'in tüketicisi yok | Davet e-postası. `InvitationCreated` ilk gerçek integration event olur. |
 | Seq | Konsol logu bugün yetiyor | Lokal olmayan ilk ortam |
 | Provisioning'in mediator'a taşınması | HTTP isteği değil, hiçbir behavior uymuyor | Provisioning'in istek yolundan senkron tetiklenmesi |
 | `ControlPlane` endpoint'lerinin taşınması | Ayrı deployable adayı, outbox'a bağlı | Kendi adımı |
