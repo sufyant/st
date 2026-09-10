@@ -12,6 +12,7 @@
 - Reserve system and platform aliases so tenants cannot claim protected routes or identities.
 - Use Clerk only for authentication; manage authorization in the backend. Keep platform privileges separate from tenant roles.
 - Create database roles with the bootstrap script, never in EF migrations; the API runtime role never holds DDL privileges.
+- Keep `src/Api/appsettings.Development.example.json` in step with every configuration key the API requires. The real `appsettings.Development.json` is gitignored, so the example is the only record of the expected shape; adding or renaming a connection string means updating it in the same change.
 - Run migrations as a deploy step through `src/Migrator`, never at application startup. The migrator updates existing tenant databases and fails when one is missing; creating tenant databases belongs to provisioning.
 - Resolve tenants and check membership through the read-only control plane credential. Tenant-surface endpoints that write control plane rows must scope every row to the resolved tenant, never to an identifier taken from the request.
 - Require an `email` claim on the access token for invitation acceptance; possession of an invitation token alone must not grant entry. The Clerk JWT template must include `email`.
@@ -35,6 +36,7 @@
 
 Run from `apps/api`:
 
+- Create local settings (first checkout): `cp src/Api/appsettings.Development.example.json src/Api/appsettings.Development.json`
 - Start PostgreSQL: `docker compose up -d`
 - Stop PostgreSQL: `docker compose down`
 - Reset PostgreSQL (drops all local data): `docker compose down -v && docker compose up -d`
