@@ -1,4 +1,6 @@
+using Api.Http;
 using Api.Tenants;
+using Application;
 using System.Security.Claims;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Tenants;
@@ -11,13 +13,23 @@ using Infrastructure.Messaging;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Serilog;
 using Application.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog((context, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
 builder.Services.AddPostgresReadiness(builder.Configuration);
 builder.Services.AddTenantPersistence(builder.Configuration);
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
+builder.Services.AddApplication();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<TenantResolver>();
 builder.Services.AddScoped(provider =>
@@ -40,8 +52,11 @@ builder.Services.AddControlPlane();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseMiddleware<TenantAccessMiddleware>();
+// Placed after tenant resolution so the enriched fields include the tenant the request reached.
+app.UseMiddleware<RequestEnrichmentMiddleware>();
 app.UseAuthorization();
 app.MapOpenApi();
 app.MapControlPlane();
