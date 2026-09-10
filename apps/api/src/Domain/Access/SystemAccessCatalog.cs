@@ -27,6 +27,15 @@ public static class SystemAccessCatalog
             "owner",
             "Owner",
             "Full access to this tenant.",
-            Permissions.Select(permission => permission.Id).ToHashSet())
+            Permissions.Select(permission => permission.Id).ToHashSet()),
+        new(
+            Guid.Parse("5b2c1a44-9d3e-4f81-b0a7-6c8e2f95d310"),
+            "member",
+            "Member",
+            "Read-only access to this tenant.",
+            Permissions
+                .Where(permission => permission.Code is "members.read" or "roles.read")
+                .Select(permission => permission.Id)
+                .ToHashSet())
     ];
 }
