@@ -5,6 +5,18 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/{tenantAlias}/api/v1/roles": {
+      "get": {
+        "tags": [
+          "RoleEndpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/{tenantAlias}/api/v1/whoami": {
       "get": {
         "tags": [
@@ -364,6 +376,9 @@
     }
   },
   "tags": [
+    {
+      "name": "RoleEndpoints"
+    },
     {
       "name": "Api"
     },

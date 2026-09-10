@@ -2548,24 +2548,44 @@ git commit -m "feat(api): manage tenant members and their roles"
 
 ---
 
+### Görev 8: Rol listeleme
+
+**Files:**
+- Create: `apps/api/src/Api/Features/Roles/RoleEndpoints.cs`
+- Modify: `apps/api/src/Api/Program.cs`
+- Test: `apps/api/tests/IntegrationTests/RoleEndpointTests.cs`
+
+Bu görev plan ilk yazıldığında atlanmıştı: spec'in kapsam maddesi "Üye **ve rol** listeleme"
+diyor ve `roles.read` permission'ı katalogda tanımlıydı, ancak hiçbir endpoint onu
+tüketmiyordu. Kapsam denetimi sırasında fark edildi ve kapatıldı.
+
+- [x] `GET /{tenant-alias}/api/v1/roles`, `roles.read` gerektiriyor; rolleri permission
+      kodlarıyla listeliyor
+- [x] Projeksiyon materyalizasyondan sonra yapılıyor — Görev 6'da öğrenilen EF kısıtı
+- [x] Testler: sistem rolleri ve permission'ları doğru listeleniyor; `member` rolündeki
+      kullanıcı erişebiliyor; tüm rolleri kaldırılan kullanıcı 403 alıyor
+
+---
+
 ## Tamamlanma Kontrolü
 
 2026-09-10 tarihinde doğrulandı:
 
-- [x] `dotnet test --solution apps/api/Api.slnx` — dört proje, 151 test yeşil
+- [x] `dotnet test --solution apps/api/Api.slnx` — dört proje, 154 test yeşil
 - [x] Davet zincirinin tamamı entegrasyon testleriyle kanıtlandı: sahip davet eder, davet
       edilen kişi kabul eder ve tenant endpoint'ini çağırabilir; rolü `owner`'a yükseltilince
       davet oluşturabilir; üyeliği geri alınınca 403 alır
 - [x] Güvenlik davranışları kanıtlandı: bilinmeyen token 404, süresi geçmiş token 410,
       e-posta uyuşmazlığı 403, `email` claim'i olmayan istek 403, ikinci kabul 404
 - [x] Son owner koruması üç yolda da çalışıyor: silme, devre dışı bırakma ve rol düşürme 409
+- [x] Rol listeleme `roles.read` ile korunuyor; rolleri kaldırılan kullanıcı 403 alıyor
 - [x] Temiz ortamda migration'lar uygulanıyor; `control` şeması `invitations` tablosunu
       içeriyor ve yeni tenant veritabanları `member` ile `owner` rollerinin ikisiyle de doğuyor
 - [x] Uygulama Development ortamında ayağa kalkıyor, `/health/ready` 200 dönüyor, her iki yeni
       yüzey de kimlik doğrulaması istiyor
 - [x] `grep -rn "systemdb\|AdminDbContext" apps/api --include='*.cs'` boş dönüyor
 - [x] `apps/api/AGENTS.md` dört yeni kuralı içeriyor
-- [x] `packages/api-client/src/schema.d.ts` on dört endpoint'i içeriyor
+- [x] `packages/api-client/src/schema.d.ts` on beş endpoint'i içeriyor
 
 HTTP seviyesinde elle uçtan uca akış çalıştırılmadı çünkü tüm yüzeyler Clerk token'ı
 gerektiriyor ve `Clerk:Issuer` lokalde yapılandırılmamış durumda. Aynı zincir entegrasyon

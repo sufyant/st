@@ -5,6 +5,7 @@ using Infrastructure.Persistence.Tenants;
 using Api.Features.Invitations;
 using Api.Features.Me;
 using Api.Features.Members;
+using Api.Features.Roles;
 using ControlPlane;
 using Infrastructure.Messaging;
 using Infrastructure.Tenants;
@@ -46,6 +47,7 @@ app.MapControlPlane();
 app.MapTenantInvitations();
 app.MapMe();
 app.MapTenantMembers();
+app.MapTenantRoles();
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false
