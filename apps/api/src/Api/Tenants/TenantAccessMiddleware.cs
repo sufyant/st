@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Api.Authorization;
 using Domain.Access;
 using Domain.Access.Users;
 using Domain.Tenants;
@@ -92,7 +93,29 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        context.User.AddIdentity(new ClaimsIdentity([new Claim("tenant_id", tenant.Id.ToString("N"))], "Tenant"));
+        var permissions = await tenantDbContext.UserRoles
+            .Where(assignment => assignment.UserId == tenantUser.Id)
+            .Join(
+                tenantDbContext.RolePermissions,
+                assignment => assignment.RoleId,
+                rolePermission => rolePermission.RoleId,
+                (_, rolePermission) => rolePermission.PermissionId)
+            .Join(
+                tenantDbContext.Permissions,
+                permissionId => permissionId,
+                permission => permission.Id,
+                (_, permission) => permission.Code)
+            .Distinct()
+            .ToListAsync(context.RequestAborted);
+        var identity = new ClaimsIdentity("Tenant");
+        identity.AddClaim(new Claim(TenantClaims.TenantId, tenant.Id.ToString("N")));
+
+        foreach (var permission in permissions)
+        {
+            identity.AddClaim(new Claim(TenantClaims.Permission, permission));
+        }
+
+        context.User.AddIdentity(identity);
 
         await next(context);
     }
