@@ -6,6 +6,8 @@ public sealed class TenantContext
     private string? alias;
     private string? databaseName;
 
+    public bool IsResolved => tenantId is not null;
+
     public Guid TenantId => tenantId ?? throw NotResolved();
 
     public string Alias => alias ?? throw NotResolved();
