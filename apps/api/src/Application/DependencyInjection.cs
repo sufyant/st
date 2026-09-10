@@ -1,5 +1,7 @@
 using Application.Abstractions;
 using Application.Behaviors;
+using Application.Results;
+using Application.Features.Members;
 using Application.Features.Provisioning;
 using Application.Mediation;
 using Infrastructure.Messaging;
@@ -20,6 +22,12 @@ public static class DependencyInjection
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
+
+        services.AddScoped<IRequestHandler<ListMembersQuery, IReadOnlyList<TenantMember>>, ListMembersHandler>();
+        services.AddScoped<IRequestHandler<ReplaceMemberRolesCommand, Unit>, ReplaceMemberRolesHandler>();
+        services.AddScoped<IRequestHandler<RevokeMemberCommand, Unit>, RevokeMemberHandler>();
+        services.AddScoped<IRequestHandler<DisableMemberCommand, Unit>, DisableMemberHandler>();
+        services.AddScoped<IRequestHandler<EnableMemberCommand, Unit>, EnableMemberHandler>();
 
         services.AddScoped<TenantProvisioningHandler>();
         services.AddScoped<IOutboxMessageHandler>(provider =>

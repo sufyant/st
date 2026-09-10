@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Api.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;

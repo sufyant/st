@@ -212,7 +212,7 @@
     "/{tenantAlias}/api/v1/members": {
       "get": {
         "tags": [
-          "MemberEndpoints"
+          "Api"
         ],
         "responses": {
           "200": {
@@ -224,7 +224,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/roles": {
       "put": {
         "tags": [
-          "MemberEndpoints"
+          "Api"
         ],
         "parameters": [
           {
@@ -256,7 +256,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}": {
       "delete": {
         "tags": [
-          "MemberEndpoints"
+          "Api"
         ],
         "parameters": [
           {
@@ -278,7 +278,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/disable": {
       "post": {
         "tags": [
-          "MemberEndpoints"
+          "Api"
         ],
         "parameters": [
           {
@@ -300,7 +300,7 @@
     "/{tenantAlias}/api/v1/members/{externalUserId}/enable": {
       "post": {
         "tags": [
-          "MemberEndpoints"
+          "Api"
         ],
         "parameters": [
           {
@@ -390,9 +390,6 @@
     },
     {
       "name": "MeEndpoints"
-    },
-    {
-      "name": "MemberEndpoints"
     }
   ]
 }
