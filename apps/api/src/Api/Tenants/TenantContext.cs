@@ -4,14 +4,21 @@ public sealed class TenantContext
 {
     private Guid? tenantId;
     private string? alias;
+    private string? databaseName;
 
-    public Guid TenantId => tenantId ?? throw new InvalidOperationException("Tenant context has not been resolved.");
+    public Guid TenantId => tenantId ?? throw NotResolved();
 
-    public string Alias => alias ?? throw new InvalidOperationException("Tenant context has not been resolved.");
+    public string Alias => alias ?? throw NotResolved();
 
-    internal void Set(Guid resolvedTenantId, string resolvedAlias)
+    public string DatabaseName => databaseName ?? throw NotResolved();
+
+    internal void Set(Guid resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
     {
         tenantId = resolvedTenantId;
         alias = resolvedAlias;
+        databaseName = resolvedDatabaseName;
     }
+
+    private static InvalidOperationException NotResolved() =>
+        new("Tenant context has not been resolved.");
 }

@@ -1,6 +1,7 @@
 using Api.Tenants;
 using System.Security.Claims;
 using Infrastructure.Persistence;
+using Infrastructure.Persistence.Tenants;
 using ControlPlane;
 using Infrastructure.Messaging;
 using Infrastructure.Tenants;
@@ -14,6 +15,13 @@ builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<TenantResolver>();
+builder.Services.AddScoped(provider =>
+{
+    var tenantContext = provider.GetRequiredService<TenantContext>();
+    var factory = provider.GetRequiredService<TenantDbContextFactory>();
+
+    return factory.Create(tenantContext.DatabaseName);
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<OutboxProcessor>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

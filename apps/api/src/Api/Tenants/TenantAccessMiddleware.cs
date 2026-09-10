@@ -78,9 +78,10 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
+        tenantContext.Set(tenant.Id, tenant.Alias, tenant.DatabaseName);
+
         var userId = ExternalUserId.Create(externalUserId);
-        var tenantDbContextFactory = services.GetRequiredService<TenantDbContextFactory>();
-        await using var tenantDbContext = tenantDbContextFactory.Create(tenant.DatabaseName);
+        var tenantDbContext = services.GetRequiredService<TenantDbContext>();
         var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
             user => user.ExternalUserId == userId,
             context.RequestAborted);
@@ -91,7 +92,6 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        tenantContext.Set(tenant.Id, tenant.Alias);
         context.User.AddIdentity(new ClaimsIdentity([new Claim("tenant_id", tenant.Id.ToString("N"))], "Tenant"));
 
         await next(context);
