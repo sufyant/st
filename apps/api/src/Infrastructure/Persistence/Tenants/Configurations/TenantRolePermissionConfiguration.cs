@@ -1,6 +1,5 @@
 using Domain.Shared;
 using Domain.Authorization;
-using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

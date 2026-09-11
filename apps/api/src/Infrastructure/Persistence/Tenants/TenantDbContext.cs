@@ -1,6 +1,4 @@
 using Domain.Authorization;
-using Domain.Authorization;
-using Domain.Authorization;
 using Infrastructure.Persistence.Tenants.Configurations;
 using Microsoft.EntityFrameworkCore;
 
