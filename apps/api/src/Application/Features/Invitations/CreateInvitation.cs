@@ -75,7 +75,8 @@ public sealed class CreateInvitationHandler(
             request.RoleCode,
             InvitationTokens.Hash(token),
             currentUser.Id,
-            timeProvider.GetUtcNow() + Lifetime);
+            timeProvider.GetUtcNow(),
+            Lifetime);
         controlPlaneDbContext.Invitations.Add(invitation);
 
         // The plain token is returned once and never stored; only its digest is persisted.

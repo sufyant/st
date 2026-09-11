@@ -95,5 +95,6 @@ public sealed class InvitationTests
         "member",
         "token-hash",
         ExternalUserId.Create("user_owner"),
-        Now.AddDays(7));
+        Now,
+        TimeSpan.FromDays(7));
 }

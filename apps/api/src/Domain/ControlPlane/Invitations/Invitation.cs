@@ -48,12 +48,18 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
         string roleCode,
         string tokenHash,
         ExternalUserId invitedBy,
-        DateTimeOffset expiresAt)
+        DateTimeOffset now,
+        TimeSpan lifetime)
     {
         ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(invitedBy);
         ArgumentException.ThrowIfNullOrWhiteSpace(roleCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
+
+        if (lifetime <= TimeSpan.Zero)
+        {
+            throw new ArgumentException("Invitation lifetime must be positive.", nameof(lifetime));
+        }
 
         return new Invitation
         {
@@ -64,7 +70,7 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
             TokenHash = tokenHash,
             Status = InvitationStatus.Pending,
             InvitedByExternalUserId = invitedBy,
-            ExpiresAt = expiresAt
+            ExpiresAt = now + lifetime
         };
     }
 
