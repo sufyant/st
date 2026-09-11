@@ -11,14 +11,12 @@ public sealed class PlatformAdminTests
     {
         // Arrange
         var externalUserId = ExternalUserId.Create("user_2abc123");
-        var createdAt = DateTimeOffset.UtcNow;
 
         // Act
-        var admin = PlatformAdmin.Create(externalUserId, createdAt);
+        var admin = PlatformAdmin.Create(externalUserId);
 
         // Assert
         Assert.NotEqual(Guid.Empty, admin.Id.Value);
         Assert.Equal(externalUserId, admin.ExternalUserId);
-        Assert.Equal(createdAt, admin.CreatedAt);
     }
 }

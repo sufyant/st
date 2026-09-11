@@ -19,6 +19,8 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
             .HasConversion(email => email.Value, value => EmailAddress.Create(value))
             .IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(x => x.ExternalUserId).IsUnique();
         builder.HasMany(x => x.Roles)
             .WithMany()

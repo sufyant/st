@@ -10,7 +10,7 @@ public sealed class InvitationTests
     private static readonly DateTimeOffset Now = new(2026, 9, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Create_StartsPendingAndExpiresAfterTheLifetime()
+    public void Create_StartsPendingWithTheGivenExpiry()
     {
         // Arrange & Act
         var invitation = CreateInvitation();
@@ -95,6 +95,5 @@ public sealed class InvitationTests
         "member",
         "token-hash",
         ExternalUserId.Create("user_owner"),
-        Now,
-        TimeSpan.FromDays(7));
+        Now.AddDays(7));
 }

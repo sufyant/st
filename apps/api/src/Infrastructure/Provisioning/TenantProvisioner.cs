@@ -1,10 +1,11 @@
 using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.Tenants;
 using Npgsql;
 
 namespace Infrastructure.Provisioning;
 
-public sealed class TenantProvisioner(string connectionString)
+public sealed class TenantProvisioner(string connectionString, AuditInterceptor auditInterceptor)
 {
     private const string TenantRole = "st_tenant";
 
@@ -34,7 +35,7 @@ public sealed class TenantProvisioner(string connectionString)
     {
         ArgumentNullException.ThrowIfNull(databaseName);
 
-        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString));
+        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor));
 
         return migrator.MigrateAsync(databaseName.Value, cancellationToken);
     }
@@ -67,7 +68,7 @@ public sealed class TenantProvisioner(string connectionString)
     {
         ArgumentNullException.ThrowIfNull(databaseName);
 
-        return new TenantDbContextFactory(connectionString).Create(databaseName.Value);
+        return new TenantDbContextFactory(connectionString, auditInterceptor).Create(databaseName.Value);
     }
 
     private string MaintenanceConnectionString() =>

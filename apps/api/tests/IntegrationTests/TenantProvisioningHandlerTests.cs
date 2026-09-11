@@ -2,6 +2,7 @@ using Application.Features.Provisioning;
 using Domain.Shared;
 using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
+using Infrastructure.Persistence;
 using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -19,7 +20,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         await handler.HandleAsync(
@@ -41,7 +42,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         await handler.HandleAsync(
@@ -63,7 +64,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
         var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
@@ -86,7 +87,7 @@ public sealed class TenantProvisioningHandlerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         var act = async () => await handler.HandleAsync(
@@ -106,8 +107,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var context = fixture.CreateControlPlane();
         var handler = new TenantProvisioningHandler(
             context,
-            new TenantProvisioner(Unreachable),
-            TimeProvider.System);
+            new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
 
         // Act
         var act = async () => await handler.HandleAsync(
@@ -134,15 +134,14 @@ public sealed class TenantProvisioningHandlerTests
         {
             var failingHandler = new TenantProvisioningHandler(
                 failingContext,
-                new TenantProvisioner(Unreachable),
-                TimeProvider.System);
+                new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
             await Assert.ThrowsAnyAsync<Exception>(async () =>
                 await failingHandler.HandleAsync(message, TestContext.Current.CancellationToken));
         }
 
         // Act
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
         // Assert

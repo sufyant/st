@@ -1,4 +1,5 @@
 using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
     {
         this.postgres = postgres;
         ControlPlaneConnectionString = controlPlaneConnectionString;
-        Provisioner = new TenantProvisioner(postgres.GetConnectionString());
+        Provisioner = new TenantProvisioner(postgres.GetConnectionString(), new AuditInterceptor(TimeProvider.System));
     }
 
     public string ControlPlaneConnectionString { get; }
@@ -49,7 +50,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
 
     public async Task<Tenant> AddProvisioningTenantAsync(string alias)
     {
-        var tenant = Tenant.Create(TenantAlias.Create(alias), DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(alias));
         await using var context = CreateControlPlane();
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);

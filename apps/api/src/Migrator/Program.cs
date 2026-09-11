@@ -1,3 +1,4 @@
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +41,7 @@ async Task<int> MigrateTenantsAsync(string? alias)
     await using var context = new ControlPlaneDbContext(options);
     var runner = new TenantMigrationRunner(
         context,
-        new TenantSchemaMigrator(new TenantDbContextFactory(Required("TenantData"))));
+        new TenantSchemaMigrator(new TenantDbContextFactory(Required("TenantData"), new AuditInterceptor(TimeProvider.System))));
     var outcomes = await runner.RunAsync(alias, CancellationToken.None);
 
     foreach (var outcome in outcomes)

@@ -19,6 +19,8 @@ public sealed class MembershipConfiguration : IEntityTypeConfiguration<Membershi
             .HasMaxLength(255)
             .HasConversion(userId => userId.Value, value => ExternalUserId.Create(value))
             .IsRequired();
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(x => new { x.TenantId, x.ExternalUserId }).IsUnique();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
     }

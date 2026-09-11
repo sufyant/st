@@ -4,6 +4,7 @@ using Domain.Shared;
 using Domain.Authorization;
 using Domain.ControlPlane.Memberships;
 using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -25,6 +26,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
     public const string Alias = "acme";
     public const string OwnerUserId = "user_owner";
     public const string OwnerEmail = "owner@example.com";
+
+    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
 
     private readonly PostgreSqlContainer postgres;
     private readonly WebApplicationFactory<Program> factory;
@@ -66,8 +69,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlane = WithDatabase(connectionString, "control_plane");
-        var tenant = Tenant.Create(TenantAlias.Create(Alias), DateTimeOffset.UtcNow);
-        tenant.CompleteProvisioning(DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(Alias));
+        tenant.CompleteProvisioning();
 
         await using (var context = CreateControlPlaneDbContext(controlPlane))
         {
@@ -82,7 +85,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         await ExecuteAsync(connectionString, $"CREATE DATABASE {tenant.DatabaseName.Value}");
 
         await using (var tenantDbContext =
-                     new TenantDbContextFactory(connectionString).Create(tenant.DatabaseName.Value))
+                     new TenantDbContextFactory(connectionString, auditInterceptor).Create(tenant.DatabaseName.Value))
         {
             await tenantDbContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
 
@@ -124,7 +127,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         CreateControlPlaneDbContext(ControlPlaneConnectionString);
 
     public TenantDbContext CreateTenantDbContext() =>
-        new TenantDbContextFactory(ServerConnectionString).Create(Tenant.DatabaseName.Value);
+        new TenantDbContextFactory(ServerConnectionString, auditInterceptor).Create(Tenant.DatabaseName.Value);
 
     public async ValueTask DisposeAsync()
     {

@@ -23,7 +23,35 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Access.Invitation", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Administration.PlatformAdmin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("external_user_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalUserId")
+                        .IsUnique();
+
+                    b.ToTable("platform_admins", "control");
+                });
+
+            modelBuilder.Entity("Domain.ControlPlane.Invitations.Invitation", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -80,6 +108,10 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("token_hash");
 
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TokenHash")
@@ -92,31 +124,7 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.ToTable("invitations", "control");
                 });
 
-            modelBuilder.Entity("Domain.Access.Membership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ExternalUserId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("external_user_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "ExternalUserId")
-                        .IsUnique();
-
-                    b.ToTable("memberships", "control");
-                });
-
-            modelBuilder.Entity("Domain.Access.PlatformAdmin", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Memberships.Membership", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -132,15 +140,23 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("external_user_id");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalUserId")
+                    b.HasIndex("TenantId", "ExternalUserId")
                         .IsUnique();
 
-                    b.ToTable("platform_admins", "control");
+                    b.ToTable("memberships", "control");
                 });
 
-            modelBuilder.Entity("Domain.Tenants.Tenant", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -236,18 +252,18 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.ToTable("outbox_messages", "control");
                 });
 
-            modelBuilder.Entity("Domain.Access.Invitation", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Invitations.Invitation", b =>
                 {
-                    b.HasOne("Domain.Tenants.Tenant", null)
+                    b.HasOne("Domain.ControlPlane.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Access.Membership", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Memberships.Membership", b =>
                 {
-                    b.HasOne("Domain.Tenants.Tenant", null)
+                    b.HasOne("Domain.ControlPlane.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)

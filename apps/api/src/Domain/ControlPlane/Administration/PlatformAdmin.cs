@@ -11,25 +11,26 @@ public readonly record struct PlatformAdminId(Guid Value)
         : new PlatformAdminId(value);
 }
 
-public sealed class PlatformAdmin : Entity<PlatformAdminId>
+public sealed class PlatformAdmin : Entity<PlatformAdminId>, IAuditable
 {
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    public DateTimeOffset UpdatedAt { get; private set; }
+
     private PlatformAdmin()
     {
     }
 
-    public static PlatformAdmin Create(ExternalUserId externalUserId, DateTimeOffset createdAt)
+    public static PlatformAdmin Create(ExternalUserId externalUserId)
     {
         ArgumentNullException.ThrowIfNull(externalUserId);
 
         return new PlatformAdmin
         {
             Id = PlatformAdminId.New(),
-            ExternalUserId = externalUserId,
-            CreatedAt = createdAt
+            ExternalUserId = externalUserId
         };
     }
 }

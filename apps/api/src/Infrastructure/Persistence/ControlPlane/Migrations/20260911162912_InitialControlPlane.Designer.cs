@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.ControlPlane.Migrations
 {
     [DbContext(typeof(ControlPlaneDbContext))]
-    [Migration("20260909232232_AddTenantProvisioningProgress")]
-    partial class AddTenantProvisioningProgress
+    [Migration("20260911162912_InitialControlPlane")]
+    partial class InitialControlPlane
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -26,31 +26,7 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Access.Membership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ExternalUserId")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("external_user_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "ExternalUserId")
-                        .IsUnique();
-
-                    b.ToTable("memberships", "control");
-                });
-
-            modelBuilder.Entity("Domain.Access.PlatformAdmin", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Administration.PlatformAdmin", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -66,6 +42,10 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("external_user_id");
 
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExternalUserId")
@@ -74,7 +54,112 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.ToTable("platform_admins", "control");
                 });
 
-            modelBuilder.Entity("Domain.Tenants.Tenant", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Invitations.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<string>("AcceptedByExternalUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("accepted_by_external_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("InvitedByExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("invited_by_external_user_id");
+
+                    b.Property<string>("RoleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("role_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique()
+                        .HasFilter("status = 'Pending'");
+
+                    b.ToTable("invitations", "control");
+                });
+
+            modelBuilder.Entity("Domain.ControlPlane.Memberships.Membership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("external_user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ExternalUserId")
+                        .IsUnique();
+
+                    b.ToTable("memberships", "control");
+                });
+
+            modelBuilder.Entity("Domain.ControlPlane.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -170,9 +255,18 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.ToTable("outbox_messages", "control");
                 });
 
-            modelBuilder.Entity("Domain.Access.Membership", b =>
+            modelBuilder.Entity("Domain.ControlPlane.Invitations.Invitation", b =>
                 {
-                    b.HasOne("Domain.Tenants.Tenant", null)
+                    b.HasOne("Domain.ControlPlane.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.ControlPlane.Memberships.Membership", b =>
+                {
+                    b.HasOne("Domain.ControlPlane.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)

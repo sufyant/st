@@ -12,8 +12,7 @@ namespace Application.Features.Provisioning;
 
 public sealed class TenantProvisioningHandler(
     ControlPlaneDbContext controlPlaneDbContext,
-    TenantProvisioner provisioner,
-    TimeProvider timeProvider) : IOutboxMessageHandler
+    TenantProvisioner provisioner) : IOutboxMessageHandler
 {
     public string MessageType => TenantProvisioningRequested.MessageType;
 
@@ -55,12 +54,12 @@ public sealed class TenantProvisioningHandler(
             await RecordAsync(tenant, step, cancellationToken);
             await SeedOwnerAsync(tenant, message.OwnerExternalUserId, message.OwnerEmail, cancellationToken);
 
-            tenant.CompleteProvisioning(timeProvider.GetUtcNow());
+            tenant.CompleteProvisioning();
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception exception)
         {
-            tenant.RecordProvisioningFailure(step, exception.Message, timeProvider.GetUtcNow());
+            tenant.RecordProvisioningFailure(step, exception.Message);
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
 
             throw;
@@ -69,7 +68,7 @@ public sealed class TenantProvisioningHandler(
 
     private async Task RecordAsync(Tenant tenant, TenantProvisioningStep step, CancellationToken cancellationToken)
     {
-        tenant.RecordProvisioningProgress(step, timeProvider.GetUtcNow());
+        tenant.RecordProvisioningProgress(step);
         await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
     }
 

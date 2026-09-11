@@ -12,7 +12,7 @@ public readonly record struct MembershipId(Guid Value)
         : new MembershipId(value);
 }
 
-public sealed class Membership : Entity<MembershipId>
+public sealed class Membership : Entity<MembershipId>, IAuditable
 {
     private Membership()
     {
@@ -21,6 +21,10 @@ public sealed class Membership : Entity<MembershipId>
     public TenantId TenantId { get; private set; }
 
     public ExternalUserId ExternalUserId { get; private set; } = null!;
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
 
     public static Membership Create(TenantId tenantId, ExternalUserId externalUserId)
     {

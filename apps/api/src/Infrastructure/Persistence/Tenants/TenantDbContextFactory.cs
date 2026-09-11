@@ -1,3 +1,4 @@
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -5,7 +6,7 @@ using Npgsql;
 
 namespace Infrastructure.Persistence.Tenants;
 
-public sealed class TenantDbContextFactory(string connectionString)
+public sealed class TenantDbContextFactory(string connectionString, AuditInterceptor auditInterceptor)
 {
     public TenantDbContext Create(string databaseName)
     {
@@ -17,6 +18,7 @@ public sealed class TenantDbContextFactory(string connectionString)
         };
         var options = new DbContextOptionsBuilder<TenantDbContext>()
             .UseNpgsql(builder.ConnectionString)
+            .AddInterceptors(auditInterceptor)
             .Options;
 
         return new TenantDbContext(options);
@@ -50,6 +52,6 @@ public sealed class TenantDesignTimeDbContextFactory : IDesignTimeDbContextFacto
         var connectionString = configuration.GetConnectionString("TenantData")
             ?? throw new InvalidOperationException("Connection string 'TenantData' is not configured.");
 
-        return new TenantDbContextFactory(connectionString).Create("design_time");
+        return new TenantDbContextFactory(connectionString, new AuditInterceptor(TimeProvider.System)).Create("design_time");
     }
 }

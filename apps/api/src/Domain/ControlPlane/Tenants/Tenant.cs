@@ -11,7 +11,7 @@ public readonly record struct TenantId(Guid Value)
         : new TenantId(value);
 }
 
-public sealed class Tenant : Entity<TenantId>
+public sealed class Tenant : Entity<TenantId>, IAuditable
 {
     public TenantAlias Alias { get; private set; } = null!;
 
@@ -31,7 +31,7 @@ public sealed class Tenant : Entity<TenantId>
     {
     }
 
-    public static Tenant Create(TenantAlias alias, DateTimeOffset createdAt)
+    public static Tenant Create(TenantAlias alias)
     {
         ArgumentNullException.ThrowIfNull(alias);
 
@@ -43,65 +43,58 @@ public sealed class Tenant : Entity<TenantId>
             Alias = alias,
             DatabaseName = TenantDatabaseName.ForTenant(id),
             Status = TenantStatus.Provisioning,
-            ProvisioningStep = TenantProvisioningStep.CreatingDatabase,
-            CreatedAt = createdAt,
-            UpdatedAt = createdAt
+            ProvisioningStep = TenantProvisioningStep.CreatingDatabase
         };
     }
 
-    public void RenameAlias(TenantAlias alias, DateTimeOffset updatedAt)
+    public void RenameAlias(TenantAlias alias)
     {
         ArgumentNullException.ThrowIfNull(alias);
 
         Alias = alias;
-        UpdatedAt = updatedAt;
     }
 
-    public void RecordProvisioningProgress(TenantProvisioningStep step, DateTimeOffset updatedAt)
+    public void RecordProvisioningProgress(TenantProvisioningStep step)
     {
         ProvisioningStep = step;
         ProvisioningError = null;
-        UpdatedAt = updatedAt;
     }
 
-    public void RecordProvisioningFailure(TenantProvisioningStep step, string error, DateTimeOffset updatedAt)
+    public void RecordProvisioningFailure(TenantProvisioningStep step, string error)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(error);
 
         ProvisioningStep = step;
         ProvisioningError = error;
-        UpdatedAt = updatedAt;
     }
 
-    public void CompleteProvisioning(DateTimeOffset updatedAt)
+    public void CompleteProvisioning()
     {
-        RequireStatus(updatedAt, TenantStatus.Active, TenantStatus.Provisioning);
+        RequireStatus(TenantStatus.Active, TenantStatus.Provisioning);
 
         ProvisioningStep = null;
         ProvisioningError = null;
     }
 
-    public void Suspend(DateTimeOffset updatedAt) =>
-        RequireStatus(updatedAt, TenantStatus.Suspended, TenantStatus.Active);
+    public void Suspend() =>
+        RequireStatus(TenantStatus.Suspended, TenantStatus.Active);
 
-    public void Resume(DateTimeOffset updatedAt) =>
-        RequireStatus(updatedAt, TenantStatus.Active, TenantStatus.Suspended);
+    public void Resume() =>
+        RequireStatus(TenantStatus.Active, TenantStatus.Suspended);
 
-    public void BeginDeprovisioning(DateTimeOffset updatedAt) =>
-        RequireStatus(updatedAt, TenantStatus.Deprovisioning, TenantStatus.Active, TenantStatus.Suspended);
+    public void BeginDeprovisioning() =>
+        RequireStatus(TenantStatus.Deprovisioning, TenantStatus.Active, TenantStatus.Suspended);
 
-    public void MarkDeleted(DateTimeOffset updatedAt) =>
-        RequireStatus(updatedAt, TenantStatus.Deleted, TenantStatus.Deprovisioning);
+    public void MarkDeleted() =>
+        RequireStatus(TenantStatus.Deleted, TenantStatus.Deprovisioning);
 
-    private void RequireStatus(DateTimeOffset updatedAt, TenantStatus target, params TenantStatus[] allowed)
+    private void RequireStatus(TenantStatus target, params TenantStatus[] allowed)
     {
         if (!allowed.Contains(Status))
         {
-            throw new InvalidOperationException(
-                $"A tenant cannot move from {Status} to {target}.");
+            throw new InvalidOperationException($"A tenant cannot move from {Status} to {target}.");
         }
 
         Status = target;
-        UpdatedAt = updatedAt;
     }
 }

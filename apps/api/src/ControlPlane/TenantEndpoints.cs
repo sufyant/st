@@ -63,7 +63,7 @@ public static class TenantEndpoints
         }
 
         var now = timeProvider.GetUtcNow();
-        var tenant = Tenant.Create(alias, now);
+        var tenant = Tenant.Create(alias);
         dbContext.Tenants.Add(tenant);
         Enqueue(dbContext, tenant.Id, user, now);
         await dbContext.SaveChangesAsync(cancellationToken);

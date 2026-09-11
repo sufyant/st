@@ -18,6 +18,7 @@ public sealed class PlatformAdminConfiguration : IEntityTypeConfiguration<Platfo
             .HasConversion(userId => userId.Value, value => ExternalUserId.Create(value))
             .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(x => x.ExternalUserId).IsUnique();
     }
 }

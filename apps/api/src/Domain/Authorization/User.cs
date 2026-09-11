@@ -13,7 +13,7 @@ public readonly record struct UserId(Guid Value)
         : new UserId(value);
 }
 
-public sealed class User : Entity<UserId>
+public sealed class User : Entity<UserId>, IAuditable
 {
     private readonly List<Role> roles = [];
 
@@ -22,6 +22,10 @@ public sealed class User : Entity<UserId>
     public EmailAddress Email { get; private set; } = null!;
 
     public UserStatus Status { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
 
     public IReadOnlyCollection<Role> Roles => roles;
 

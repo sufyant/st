@@ -158,8 +158,7 @@ public sealed class OutboxDrainerTests
             [
                 new TenantProvisioningHandler(
                     fixture.CreateControlPlane(),
-                    fixture.Provisioner,
-                    TimeProvider.System)
+                    fixture.Provisioner)
             ],
             TimeProvider.System);
 

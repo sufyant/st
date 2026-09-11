@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Domain.ControlPlane.Administration;
 using Domain.Shared;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -11,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -39,6 +41,8 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
     public HttpClient Client { get; }
 
+    public FakeTimeProvider Clock { get; } = new();
+
     public static Task<ControlPlaneFixture> StartAsync(bool isPlatformAdmin) =>
         StartAsync(isPlatformAdmin, TestEmail);
 
@@ -59,9 +63,7 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
             if (isPlatformAdmin)
             {
-                context.PlatformAdmins.Add(PlatformAdmin.Create(
-                    ExternalUserId.Create(TestUserId),
-                    DateTimeOffset.UtcNow));
+                context.PlatformAdmins.Add(PlatformAdmin.Create(ExternalUserId.Create(TestUserId)));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }
@@ -81,6 +83,18 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
         });
 
         return new ControlPlaneFixture(postgres, factory, controlPlane);
+    }
+
+    public ControlPlaneDbContext CreateControlPlaneDbContext()
+    {
+        var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
+            .UseNpgsql(
+                controlPlaneConnectionString,
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+            .AddInterceptors(new AuditInterceptor(Clock))
+            .Options;
+
+        return new ControlPlaneDbContext(options);
     }
 
     public async Task<long> CountControlPlaneRowsAsync(string qualifiedTable)

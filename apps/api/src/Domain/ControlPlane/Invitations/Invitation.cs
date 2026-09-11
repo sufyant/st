@@ -14,7 +14,7 @@ public readonly record struct InvitationId(Guid Value)
         : new InvitationId(value);
 }
 
-public sealed class Invitation : Entity<InvitationId>
+public sealed class Invitation : Entity<InvitationId>, IAuditable
 {
     public TenantId TenantId { get; private set; }
 
@@ -29,6 +29,8 @@ public sealed class Invitation : Entity<InvitationId>
     public ExternalUserId InvitedByExternalUserId { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
+
+    public DateTimeOffset UpdatedAt { get; private set; }
 
     public DateTimeOffset ExpiresAt { get; private set; }
 
@@ -46,18 +48,12 @@ public sealed class Invitation : Entity<InvitationId>
         string roleCode,
         string tokenHash,
         ExternalUserId invitedBy,
-        DateTimeOffset createdAt,
-        TimeSpan lifetime)
+        DateTimeOffset expiresAt)
     {
         ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(invitedBy);
         ArgumentException.ThrowIfNullOrWhiteSpace(roleCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
-
-        if (lifetime <= TimeSpan.Zero)
-        {
-            throw new ArgumentException("Invitation lifetime must be positive.", nameof(lifetime));
-        }
 
         return new Invitation
         {
@@ -68,8 +64,7 @@ public sealed class Invitation : Entity<InvitationId>
             TokenHash = tokenHash,
             Status = InvitationStatus.Pending,
             InvitedByExternalUserId = invitedBy,
-            CreatedAt = createdAt,
-            ExpiresAt = createdAt + lifetime
+            ExpiresAt = expiresAt
         };
     }
 
