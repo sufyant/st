@@ -580,15 +580,52 @@ tenant endpoint'ini çağırmasına kadar bütün zinciri kanıtlar.
 | Üye listesinde sayfalama | Liste tek ekrana sığmadığında |
 | IdP soyutlaması (arayüz) | Yok. Koruma tek çağrı yerinden gelir, soyutlamadan değil |
 
-## Uygulamadan önce doğrulanacaklar
+## Clerk tarafının doğrulanmış davranışı
 
-- Clerk JWT'sinde e-postanın doğrulanmışlığını hangi claim taşıyor. Karar 3 yalnızca
-  `email` claim'ini zorunlu tutuyor; doğrulanmışlık bilgisi eksik olabilir ve karar 10
-  buna bağlı.
-- Clerk davet API'sinin var olan bir kullanıcıyı davet etmeye çalışınca ne döndürdüğü,
-  ve davetin iptal yolu.
+Karar 10 ile 11 Clerk'ün somut davranışına dayanıyor; bu bölüm o davranışı kayda geçirir.
+
+**Oturum token'ı varsayılan olarak e-posta taşımaz.** Claim'ler elle eklenmelidir. Kısa
+kodlar `{{user.primary_email_address}}` ve `{{user.email_verified}}`; ikincisi boolean
+üretir. Bunlar isimli bir JWT şablonu yerine **varsayılan oturum token'ına** eklenir
+(Dashboard içindeki oturum claim editörü). Böylece ön yüzün `getToken({ template })`
+çağırması gerekmez ve bütün istemciler aynı token'ı kullanır. Özel claim'ler için
+yaklaşık 1.2KB'lık bir sınır var; iki claim bunun çok altında kalır.
+
+Bu, karar 3'ün "Clerk JWT şablonu `email` claim'ini içermek zorunda" cümlesini genişletir:
+artık `email_verified` de zorunludur.
+
+**İki uygulama notu.** ASP.NET Core tarafında boolean bir claim `ClaimsPrincipal` içine
+`"true"` / `"false"` metni olarak düşer, yani karşılaştırma buna göre yapılır. Claim
+eksikse doğrulanmamış sayılır; kapalı tarafa düşülür.
+
+**Claim'ler 60 saniyede bir tazelenir**, yani token'daki veri bir dakikaya kadar bayat
+olabilir. Bu, karar 23'ün "yetki ve üyelik cache'lenmez, her istekte sunucuda hesaplanır"
+duruşunu doğrudan destekler. E-posta doğrulanmışlığı için bayatlık zararsızdır, çünkü o
+değer yalnızca yanlıştan doğruya gider.
+
+**Clerk daveti bir ay sonra sona erer**, bizimki yedi gün (karar 10). Uyumsuzluk bilinçli
+kabul edilir: bizim davetimiz düştükten sonra Clerk daveti hâlâ hesap açmaya yeter, ama
+hesap açmak tek başına hiçbir tenant'a erişim vermez. Clerk davetini süresi dolduğunda
+temizlemek için ayrı bir süpürme işi yazılmaz.
+
+**Davet `redirectUrl` ve `publicMetadata` taşıyabilir.** `redirectUrl` kullanılır, kişi
+kabul sonrası doğru sayfaya iner ve bunun için gizli bir değer gerekmez. `publicMetadata`
+kullanılmaz; davet aramamız e-postaya dayanır ve Clerk'e ikinci bir bağ eklemenin
+karşılığı yoktur.
+
+**Davetin iptali Backend API üzerinden yapılır** ve yalnızca iptal edilmemiş davetler
+iptal edilebilir; zaten iptal edilmiş bir davete tekrar denemek hata verir. Outbox
+handler'ı bu hatayı başarı sayar, çünkü hedef durum zaten sağlanmıştır.
+
+### Uygulama sırasında doğrulanacak iki nokta
+
+- Restricted modun kapıyı tam olarak neyle açtığı: davetin kendisi mi, yoksa allow-list
+  kaydı mı. İkisi de aynı outbox handler'ından tek bir çağrı olur, ama hangisi olduğu
+  ilk gerçek çağrıda netleşmeli.
+- Var olan bir kullanıcının e-postasına davet oluşturmaya çalışınca dönen hata. Handler
+  bunu başarı sayıp adımı atlamalı (karar 11).
 - `appsettings.Development.example.json` Clerk yönetim anahtarı için yeni bir
-  konfigürasyon anahtarı gerektiriyor; aynı değişiklikte güncellenmeli.
+  konfigürasyon anahtarı gerektirir; aynı değişiklikte güncellenmelidir.
 
 ## Sonraki adım
 
