@@ -76,7 +76,7 @@ public sealed class TenantProvisioningHandler(
     private async Task SeedOwnerAsync(Tenant tenant, string ownerExternalUserId, CancellationToken cancellationToken)
     {
         var externalUserId = ExternalUserId.Create(ownerExternalUserId);
-        var ownerRole = AccessCatalog.Roles.Single(role => role.Code == "owner");
+        var ownerRole = AccessCatalog.OwnerRole;
 
         await using var tenantDbContext = provisioner.CreateTenantDbContext(tenant.DatabaseName);
         var user = await tenantDbContext.Users.SingleOrDefaultAsync(

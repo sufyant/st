@@ -44,4 +44,39 @@ public sealed class AccessCatalogTests
         // Assert
         Assert.Equal(AccessCatalog.Permissions.Count, owner.PermissionIds.Count);
     }
+
+    [Fact]
+    public void OwnerRoleIsNamedAndHoldsEveryPermission()
+    {
+        // Arrange
+        var permissionIds = AccessCatalog.Permissions.Select(permission => permission.Id).ToHashSet();
+
+        // Act
+        var owner = AccessCatalog.OwnerRole;
+
+        // Assert
+        Assert.Equal("owner", owner.Code);
+        Assert.Equal(permissionIds, owner.PermissionIds);
+    }
+
+    [Fact]
+    public void MemberRoleIsNamedAndReadsOnly()
+    {
+        // Arrange & Act
+        var member = AccessCatalog.MemberRole;
+
+        // Assert
+        Assert.Equal("member", member.Code);
+        Assert.Equal(2, member.PermissionIds.Count);
+    }
+
+    [Fact]
+    public void EveryRoleCarriesACode()
+    {
+        // Arrange & Act
+        var codes = AccessCatalog.Roles.Select(role => role.Code).ToList();
+
+        // Assert
+        Assert.All(codes, code => Assert.False(string.IsNullOrWhiteSpace(code)));
+    }
 }

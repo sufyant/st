@@ -7,8 +7,6 @@ namespace Application.Features.Members;
 
 internal static class TenantUsers
 {
-    public const string OwnerRoleCode = "owner";
-
     public static Task<User?> FindAsync(
         TenantDbContext tenantDbContext,
         string externalUserId,
@@ -26,7 +24,7 @@ internal static class TenantUsers
         CancellationToken cancellationToken) =>
         OwnerRoster.Of(await tenantDbContext.UserRoles
             .Join(
-                tenantDbContext.Roles.Where(role => role.Code == OwnerRoleCode),
+                tenantDbContext.Roles.Where(role => role.Code == AccessCatalog.OwnerRole.Code),
                 assignment => assignment.RoleId,
                 role => role.Id,
                 (assignment, _) => assignment.UserId)

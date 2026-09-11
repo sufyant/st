@@ -32,7 +32,7 @@ public sealed class ListMembersHandler(TenantDbContext tenantDbContext)
                 user.Status.ToString(),
                 assignments
                     .Where(assignment => assignment.UserId == user.Id)
-                    .Select(assignment => assignment.Code!)
+                    .Select(assignment => assignment.Code)
                     .OrderBy(code => code)
                     .ToArray()))
             .OrderBy(member => member.ExternalUserId)

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Tenants.Migrations
 {
     [DbContext(typeof(TenantDbContext))]
-    [Migration("20260910062201_AddMemberRole")]
-    partial class AddMemberRole
+    [Migration("20260911152902_InitialTenantAccess")]
+    partial class InitialTenantAccess
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,7 +25,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Access.Permissions.TenantPermission", b =>
+            modelBuilder.Entity("Domain.Authorization.Permission", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -94,13 +94,14 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Access.Roles.TenantRole", b =>
+            modelBuilder.Entity("Domain.Authorization.Role", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
                     b.Property<string>("Code")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("code");
@@ -141,7 +142,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Access.Roles.TenantRolePermission", b =>
+            modelBuilder.Entity("Domain.Authorization.RolePermission", b =>
                 {
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uuid")
@@ -195,7 +196,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Access.Users.TenantUser", b =>
+            modelBuilder.Entity("Domain.Authorization.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -221,7 +222,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.Users.TenantUserRole", b =>
+            modelBuilder.Entity("Domain.Authorization.UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -238,30 +239,30 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Access.Roles.TenantRolePermission", b =>
+            modelBuilder.Entity("Domain.Authorization.RolePermission", b =>
                 {
-                    b.HasOne("Domain.Access.Permissions.TenantPermission", null)
+                    b.HasOne("Domain.Authorization.Permission", null)
                         .WithMany()
                         .HasForeignKey("PermissionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Access.Roles.TenantRole", null)
+                    b.HasOne("Domain.Authorization.Role", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Access.Users.TenantUserRole", b =>
+            modelBuilder.Entity("Domain.Authorization.UserRole", b =>
                 {
-                    b.HasOne("Domain.Access.Roles.TenantRole", null)
+                    b.HasOne("Domain.Authorization.Role", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Domain.Access.Users.TenantUser", null)
+                    b.HasOne("Domain.Authorization.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)

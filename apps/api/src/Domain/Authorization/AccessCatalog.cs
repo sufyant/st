@@ -39,4 +39,8 @@ public static class AccessCatalog
                 .Select(permission => permission.Id)
                 .ToHashSet())
     ];
+
+    public static RoleDefinition OwnerRole { get; } = Roles.Single(role => role.Code == "owner");
+
+    public static RoleDefinition MemberRole { get; } = Roles.Single(role => role.Code == "member");
 }
