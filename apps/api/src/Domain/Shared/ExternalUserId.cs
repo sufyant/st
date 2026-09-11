@@ -1,6 +1,6 @@
 namespace Domain.Shared;
 
-public sealed class ExternalUserId : IEquatable<ExternalUserId>
+public sealed record ExternalUserId
 {
     public string Value { get; }
 
@@ -18,10 +18,4 @@ public sealed class ExternalUserId : IEquatable<ExternalUserId>
 
         return new ExternalUserId(value);
     }
-
-    public bool Equals(ExternalUserId? other) => other is not null && Value == other.Value;
-
-    public override bool Equals(object? obj) => obj is ExternalUserId other && Equals(other);
-
-    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
 }

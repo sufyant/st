@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Domain.Shared;
 
 public sealed record EmailAddress
@@ -16,7 +18,7 @@ public sealed record EmailAddress
             ? email
             : throw new ArgumentException("Email address is not valid.", nameof(value));
 
-    public static bool TryCreate(string? value, out EmailAddress email)
+    public static bool TryCreate(string? value, [MaybeNullWhen(false)] out EmailAddress email)
     {
         var normalised = value?.Trim().ToLowerInvariant();
         var atIndex = normalised?.IndexOf('@') ?? -1;
@@ -27,7 +29,7 @@ public sealed record EmailAddress
             atIndex == normalised.Length - 1 ||
             normalised.LastIndexOf('@') != atIndex)
         {
-            email = null!;
+            email = null;
 
             return false;
         }

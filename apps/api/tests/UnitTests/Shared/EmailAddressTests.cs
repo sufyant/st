@@ -66,6 +66,6 @@ public sealed class EmailAddressTests
 
         // Assert
         Assert.True(created);
-        Assert.Equal("someone@example.com", email.Value);
+        Assert.Equal("someone@example.com", email!.Value);
     }
 }
