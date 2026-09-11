@@ -11,7 +11,7 @@ namespace IntegrationTests;
 
 public sealed class TenantMigrationRunnerTests
 {
-    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     [Fact]
     public async Task RunAsync_MigratesActiveTenantsAndSkipsTheRest()
@@ -31,7 +31,7 @@ public sealed class TenantMigrationRunnerTests
             $"CREATE DATABASE {active.DatabaseName.Value}");
         var runner = new TenantMigrationRunner(
             controlPlaneContext,
-            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor)));
+            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, AuditInterceptor)));
 
         // Act
         var outcomes = await runner.RunAsync(null, TestContext.Current.CancellationToken);
@@ -58,7 +58,7 @@ public sealed class TenantMigrationRunnerTests
         await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         var runner = new TenantMigrationRunner(
             controlPlaneContext,
-            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor)));
+            new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, AuditInterceptor)));
 
         // Act
         var outcomes = await runner.RunAsync(null, TestContext.Current.CancellationToken);

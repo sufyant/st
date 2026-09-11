@@ -27,7 +27,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
     public const string OwnerUserId = "user_owner";
     public const string OwnerEmail = "owner@example.com";
 
-    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     private readonly PostgreSqlContainer postgres;
     private readonly WebApplicationFactory<Program> factory;
@@ -85,7 +85,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         await ExecuteAsync(connectionString, $"CREATE DATABASE {tenant.DatabaseName.Value}");
 
         await using (var tenantDbContext =
-                     new TenantDbContextFactory(connectionString, auditInterceptor).Create(tenant.DatabaseName.Value))
+                     new TenantDbContextFactory(connectionString, AuditInterceptor).Create(tenant.DatabaseName.Value))
         {
             await tenantDbContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
 
@@ -129,7 +129,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         CreateControlPlaneDbContext(ControlPlaneConnectionString);
 
     public TenantDbContext CreateTenantDbContext() =>
-        new TenantDbContextFactory(ServerConnectionString, auditInterceptor).Create(Tenant.DatabaseName.Value);
+        new TenantDbContextFactory(ServerConnectionString, AuditInterceptor).Create(Tenant.DatabaseName.Value);
 
     public async ValueTask DisposeAsync()
     {

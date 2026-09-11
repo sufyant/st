@@ -28,7 +28,7 @@ public sealed class TenantAccessEndpointTests
     private const string ActiveUser = "Active";
     private const string DisabledUser = "Disabled";
 
-    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     [Fact]
     public async Task GetWhoAmI_WithAnInvalidTenantAlias_ReturnsNotFound()
@@ -178,7 +178,7 @@ public sealed class TenantAccessEndpointTests
 
         await ExecuteAsync(connectionString, $"CREATE DATABASE {tenant.DatabaseName.Value}");
         await using var tenantContext =
-            new TenantDbContextFactory(connectionString, auditInterceptor).Create(tenant.DatabaseName.Value);
+            new TenantDbContextFactory(connectionString, AuditInterceptor).Create(tenant.DatabaseName.Value);
         await tenantContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
         var now = DateTimeOffset.UtcNow;
         await tenantContext.Database.ExecuteSqlInterpolatedAsync(

@@ -134,6 +134,8 @@ public sealed class UnitOfWorkBehaviorTests
                     invitee));
                 var user = User.Create(invitee, EmailAddress.Create("partial@example.com"), UserStatus.Active);
                 tenant.Users.Add(user);
+                // Forces the tenant save to fail: this default-constructed Role has a null
+                // Code, which violates the NOT NULL constraint on roles.code, not an FK.
                 user.AssignRoles([new Role()]);
 
                 return Task.FromResult(Result.Success());

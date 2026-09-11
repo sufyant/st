@@ -1,4 +1,4 @@
-// Bu klasördeki tipler tenant veritabanında yaşar; control plane onları hiç görmez.
+// Types in this folder live in the tenant database; the control plane never sees them.
 namespace Domain.Authorization;
 
 public sealed record PermissionDefinition(PermissionId Id, string Code, string Name, string Description);

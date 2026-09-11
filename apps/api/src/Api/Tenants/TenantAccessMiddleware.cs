@@ -87,6 +87,7 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
         var tenantUser = await tenantDbContext.Users
             .Include(user => user.Roles)
             .ThenInclude(role => role.Permissions)
+            .AsNoTracking()
             .SingleOrDefaultAsync(user => user.ExternalUserId == userId, context.RequestAborted);
 
         if (tenantUser?.Status != UserStatus.Active)

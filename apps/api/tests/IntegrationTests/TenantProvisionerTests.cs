@@ -9,7 +9,7 @@ namespace IntegrationTests;
 
 public sealed class TenantProvisionerTests
 {
-    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     private static readonly TenantDatabaseName DatabaseName = TenantDatabaseName.Create("tenant_acme");
 
@@ -19,7 +19,7 @@ public sealed class TenantProvisionerTests
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
-        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), auditInterceptor);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
 
         // Act
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
@@ -34,7 +34,7 @@ public sealed class TenantProvisionerTests
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
-        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), auditInterceptor);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
 
         // Act
@@ -50,7 +50,7 @@ public sealed class TenantProvisionerTests
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
-        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), auditInterceptor);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
 
         // Act
@@ -67,7 +67,7 @@ public sealed class TenantProvisionerTests
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         await ExecuteAsync(postgres.GetConnectionString(), "CREATE ROLE st_tenant LOGIN PASSWORD 'test'");
-        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), auditInterceptor);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
         await provisioner.MigrateSchemaAsync(DatabaseName, TestContext.Current.CancellationToken);
         await provisioner.GrantTenantAccessAsync(DatabaseName, TestContext.Current.CancellationToken);

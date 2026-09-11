@@ -27,7 +27,7 @@ public sealed class ListRolesHandler(TenantDbContext tenantDbContext)
             .ToListAsync(cancellationToken);
         var details = roles
             .Select(role => new TenantRoleDetail(
-                role.Code ?? string.Empty,
+                role.Code,
                 role.Name,
                 role.Description,
                 role.Permissions

@@ -11,7 +11,7 @@ namespace IntegrationTests;
 
 public sealed class TenantSchemaMigratorTests
 {
-    private static readonly AuditInterceptor auditInterceptor = new(TimeProvider.System);
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     [Fact]
     public async Task MigrateAsync_ForAnExistingDatabase_CreatesTheTenantSchema()
@@ -21,7 +21,7 @@ public sealed class TenantSchemaMigratorTests
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE tenant_acme");
-        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor));
+        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, AuditInterceptor));
 
         // Act
         await migrator.MigrateAsync("tenant_acme", TestContext.Current.CancellationToken);
@@ -37,7 +37,7 @@ public sealed class TenantSchemaMigratorTests
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         var connectionString = postgres.GetConnectionString();
-        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor));
+        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, AuditInterceptor));
 
         // Act
         var act = async () => await migrator.MigrateAsync("tenant_missing", TestContext.Current.CancellationToken);
@@ -55,7 +55,7 @@ public sealed class TenantSchemaMigratorTests
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE tenant_acme");
-        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, auditInterceptor));
+        var migrator = new TenantSchemaMigrator(new TenantDbContextFactory(connectionString, AuditInterceptor));
 
         // Act
         await migrator.MigrateAsync("tenant_acme", TestContext.Current.CancellationToken);
@@ -85,7 +85,7 @@ public sealed class TenantSchemaMigratorTests
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE tenant_upgraded");
         await ExecuteAsync(connectionString, "CREATE DATABASE tenant_fresh");
-        var contextFactory = new TenantDbContextFactory(connectionString, auditInterceptor);
+        var contextFactory = new TenantDbContextFactory(connectionString, AuditInterceptor);
 
         await using (var stepped = contextFactory.Create("tenant_upgraded"))
         {
