@@ -27,8 +27,9 @@ public static class PostgresServiceCollectionExtensions
             RequiredConnectionString(configuration, "TenantData"),
             provider.GetRequiredService<AuditInterceptor>()));
 
+        var provisionerConnectionString = RequiredConnectionString(configuration, "Provisioner");
         services.AddSingleton(provider => new TenantProvisioner(
-            RequiredConnectionString(configuration, "Provisioner"),
+            provisionerConnectionString,
             provider.GetRequiredService<AuditInterceptor>()));
 
 

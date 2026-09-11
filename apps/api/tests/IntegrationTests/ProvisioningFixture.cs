@@ -99,6 +99,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
             .UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+            .AddInterceptors(new AuditInterceptor(TimeProvider.System))
             .Options;
 
         return new ControlPlaneDbContext(options);

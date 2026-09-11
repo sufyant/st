@@ -1,8 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Domain.Authorization;
 using Domain.ControlPlane.Tenants;
 using Domain.Shared;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -84,5 +88,49 @@ public sealed class AuditStampTests
 
         // Assert
         Assert.NotEqual(default, user.CreatedAt);
+    }
+
+    [Fact]
+    public async Task ReplacingAMembersRolesThroughTheRealFlow_BumpsTheUsersUpdatedAt()
+    {
+        // Arrange
+        const string invitedUserId = "user_invited";
+        const string invitedEmail = "invited@example.com";
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+        using var invitationResponse = await fixture.Client.PostAsJsonAsync(
+            $"/{TenantSurfaceFixture.Alias}/api/v1/invitations",
+            new { email = invitedEmail, roleCode = "member" },
+            TestContext.Current.CancellationToken);
+        var invitationBody = await invitationResponse.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var token = invitationBody.GetProperty("token").GetString()!;
+        await using var invited = fixture.WithPrincipal(invitedUserId, invitedEmail);
+        using var acceptResponse = await invited.Client.PostAsJsonAsync(
+            "/api/v1/invitations/accept",
+            new { token },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, acceptResponse.StatusCode);
+        var externalUserId = ExternalUserId.Create(invitedUserId);
+        await using var before = fixture.CreateTenantDbContext();
+        var updatedAtBeforeRoleChange = await before.Users
+            .AsNoTracking()
+            .Where(user => user.ExternalUserId == externalUserId)
+            .Select(user => user.UpdatedAt)
+            .SingleAsync(TestContext.Current.CancellationToken);
+
+        // Act
+        using var response = await fixture.Client.PutAsJsonAsync(
+            $"/{TenantSurfaceFixture.Alias}/api/v1/members/{invitedUserId}/roles",
+            new { roleCodes = new[] { "owner" } },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await using var after = fixture.CreateTenantDbContext();
+        var updatedAtAfterRoleChange = await after.Users
+            .AsNoTracking()
+            .Where(user => user.ExternalUserId == externalUserId)
+            .Select(user => user.UpdatedAt)
+            .SingleAsync(TestContext.Current.CancellationToken);
+        Assert.True(updatedAtAfterRoleChange > updatedAtBeforeRoleChange);
     }
 }
