@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Application.Features.Provisioning;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +14,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
         await using var drainer = CreateDrainer(fixture);
 
         // Act
@@ -55,7 +55,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
 
         await using (var context = fixture.CreateControlPlane())
         {
@@ -85,7 +85,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
 
         await using (var context = fixture.CreateControlPlane())
         {
@@ -109,7 +109,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
         await using var first = CreateDrainer(fixture);
         await using var second = CreateDrainer(fixture);
 
@@ -158,8 +158,7 @@ public sealed class OutboxDrainerTests
             [
                 new TenantProvisioningHandler(
                     fixture.CreateControlPlane(),
-                    fixture.Provisioner,
-                    TimeProvider.System)
+                    fixture.Provisioner)
             ],
             TimeProvider.System);
 
@@ -169,7 +168,7 @@ public sealed class OutboxDrainerTests
         context.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
             TenantProvisioningRequested.MessageType,
-            $$"""{"TenantId":"{{tenantId}}","OwnerExternalUserId":"{{ProvisioningFixture.OwnerExternalUserId}}"}""",
+            $$"""{"TenantId":"{{tenantId}}","OwnerExternalUserId":"{{ProvisioningFixture.OwnerExternalUserId}}","OwnerEmail":"{{ProvisioningFixture.OwnerEmail}}"}""",
             DateTimeOffset.UtcNow));
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }

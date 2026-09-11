@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using Api.Authorization;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.Tenants;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -80,34 +80,27 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        tenantContext.Set(tenant.Id, tenant.Alias, tenant.DatabaseName);
+        tenantContext.Set(TenantId.From(tenant.Id), tenant.Alias, tenant.DatabaseName);
 
         var userId = ExternalUserId.Create(externalUserId);
         var tenantDbContext = services.GetRequiredService<TenantDbContext>();
-        var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
-            user => user.ExternalUserId == userId,
-            context.RequestAborted);
+        var tenantUser = await tenantDbContext.Users
+            .Include(user => user.Roles)
+            .ThenInclude(role => role.Permissions)
+            .AsNoTracking()
+            .SingleOrDefaultAsync(user => user.ExternalUserId == userId, context.RequestAborted);
 
-        if (tenantUser?.Status != TenantUserStatus.Active)
+        if (tenantUser?.Status != UserStatus.Active)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 
-        var permissions = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == tenantUser.Id)
-            .Join(
-                tenantDbContext.RolePermissions,
-                assignment => assignment.RoleId,
-                rolePermission => rolePermission.RoleId,
-                (_, rolePermission) => rolePermission.PermissionId)
-            .Join(
-                tenantDbContext.Permissions,
-                permissionId => permissionId,
-                permission => permission.Id,
-                (_, permission) => permission.Code)
+        var permissions = tenantUser.Roles
+            .SelectMany(role => role.Permissions)
+            .Select(permission => permission.Code)
             .Distinct()
-            .ToListAsync(context.RequestAborted);
+            .ToList();
         var identity = new ClaimsIdentity("Tenant");
         identity.AddClaim(new Claim(TenantClaims.TenantId, tenant.Id.ToString("N")));
 

@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access.Users;
+using Domain.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,21 +35,15 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
             }));
         }
 
-        if (!roles.Any(role => role.Code == TenantUsers.OwnerRoleCode))
+        if (!roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
         {
-            var roster = await TenantUsers.LoadOwnerRosterAsync(tenantDbContext, cancellationToken);
-
-            if (roster.IsLastOwner(user.Id))
+            if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
             {
                 return Result<Unit>.Failure(MemberErrors.LastOwner);
             }
         }
 
-        var existing = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == user.Id)
-            .ToListAsync(cancellationToken);
-        tenantDbContext.UserRoles.RemoveRange(existing);
-        tenantDbContext.UserRoles.AddRange(roles.Select(role => TenantUserRole.Create(user.Id, role.Id)));
+        user.AssignRoles(roles);
 
         return Result.Success();
     }

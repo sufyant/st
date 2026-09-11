@@ -31,7 +31,7 @@ public sealed class ListMyMembershipsHandler(
             .OrderBy(tenant => tenant.Alias)
             .ToListAsync(cancellationToken);
         var memberships = tenants
-            .Select(tenant => new MyMembership(tenant.Id, tenant.Alias.Value, tenant.Status.ToString()))
+            .Select(tenant => new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString()))
             .ToList();
 
         return Result<IReadOnlyList<MyMembership>>.Success(memberships);

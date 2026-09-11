@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -24,6 +26,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
     public const string Alias = "acme";
     public const string OwnerUserId = "user_owner";
     public const string OwnerEmail = "owner@example.com";
+
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     private readonly PostgreSqlContainer postgres;
     private readonly WebApplicationFactory<Program> factory;
@@ -65,15 +69,14 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlane = WithDatabase(connectionString, "control_plane");
-        var tenant = Tenant.Create(Guid.CreateVersion7(), TenantAlias.Create(Alias), DateTimeOffset.UtcNow);
-        tenant.CompleteProvisioning(DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(Alias));
+        tenant.CompleteProvisioning();
 
         await using (var context = CreateControlPlaneDbContext(controlPlane))
         {
             await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
             context.Tenants.Add(tenant);
             context.Memberships.Add(Membership.Create(
-                Guid.CreateVersion7(),
                 tenant.Id,
                 ExternalUserId.Create(externalUserId)));
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -82,21 +85,21 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         await ExecuteAsync(connectionString, $"CREATE DATABASE {tenant.DatabaseName.Value}");
 
         await using (var tenantDbContext =
-                     new TenantDbContextFactory(connectionString).Create(tenant.DatabaseName.Value))
+                     new TenantDbContextFactory(connectionString, AuditInterceptor).Create(tenant.DatabaseName.Value))
         {
             await tenantDbContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
 
             if (roleCode is not null)
             {
-                var user = TenantUser.Create(
-                    Guid.CreateVersion7(),
+                var user = User.Create(
                     ExternalUserId.Create(externalUserId),
-                    TenantUserStatus.Active);
+                    EmailAddress.Create(email!),
+                    UserStatus.Active);
                 tenantDbContext.Users.Add(user);
                 var role = await tenantDbContext.Roles.SingleAsync(
                     candidate => candidate.Code == roleCode,
                     TestContext.Current.CancellationToken);
-                tenantDbContext.UserRoles.Add(TenantUserRole.Create(user.Id, role.Id));
+                user.AssignRoles([role]);
                 await tenantDbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }
@@ -120,11 +123,13 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
     public Task<TenantSurfaceFixture> WithPrincipalAsync(string externalUserId, string? email) =>
         Task.FromResult(WithPrincipal(externalUserId, email));
 
+    public IServiceScope CreateScope() => factory.Services.CreateScope();
+
     public ControlPlaneDbContext CreateControlPlane() =>
         CreateControlPlaneDbContext(ControlPlaneConnectionString);
 
     public TenantDbContext CreateTenantDbContext() =>
-        new TenantDbContextFactory(ServerConnectionString).Create(Tenant.DatabaseName.Value);
+        new TenantDbContextFactory(ServerConnectionString, AuditInterceptor).Create(Tenant.DatabaseName.Value);
 
     public async ValueTask DisposeAsync()
     {

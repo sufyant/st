@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
+using Domain.Shared;
 using FluentValidation;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;
@@ -69,7 +70,6 @@ public sealed class CreateInvitationHandler(
 
         var token = InvitationTokens.Create();
         var invitation = Invitation.Create(
-            Guid.CreateVersion7(),
             tenantContext.TenantId,
             email,
             request.RoleCode,
@@ -81,7 +81,7 @@ public sealed class CreateInvitationHandler(
 
         // The plain token is returned once and never stored; only its digest is persisted.
         return Result<CreatedInvitation>.Success(new CreatedInvitation(
-            invitation.Id,
+            invitation.Id.Value,
             invitation.Email.Value,
             invitation.RoleCode,
             invitation.ExpiresAt,

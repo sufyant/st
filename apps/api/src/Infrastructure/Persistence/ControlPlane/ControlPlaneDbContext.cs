@@ -1,6 +1,8 @@
-using Domain.Access;
+using Domain.ControlPlane.Administration;
+using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Memberships;
 using Infrastructure.Messaging;
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.ControlPlane.Configurations;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,5 +26,13 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ControlPlaneDbContext).Assembly,
             type => type.Namespace == typeof(TenantConfiguration).Namespace);
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder builder)
+    {
+        builder.Properties<TenantId>().HaveConversion<TenantIdConverter>();
+        builder.Properties<MembershipId>().HaveConversion<MembershipIdConverter>();
+        builder.Properties<InvitationId>().HaveConversion<InvitationIdConverter>();
+        builder.Properties<PlatformAdminId>().HaveConversion<PlatformAdminIdConverter>();
     }
 }

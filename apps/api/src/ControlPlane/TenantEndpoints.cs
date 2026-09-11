@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.AspNetCore.Builder;
@@ -38,6 +38,14 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(user.FindFirstValue("email")))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The access token must carry an 'email' claim. Add it to the Clerk session token."
+            });
+        }
+
         TenantAlias alias;
 
         try
@@ -55,12 +63,12 @@ public static class TenantEndpoints
         }
 
         var now = timeProvider.GetUtcNow();
-        var tenant = Tenant.Create(Guid.CreateVersion7(), alias, now);
+        var tenant = Tenant.Create(alias);
         dbContext.Tenants.Add(tenant);
         Enqueue(dbContext, tenant.Id, user, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id }, ToDetail(tenant));
+        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id.Value }, ToDetail(tenant));
     }
 
     private static async Task<IResult> GetAsync(
@@ -68,9 +76,10 @@ public static class TenantEndpoints
         ControlPlaneDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var tenantId = new TenantId(id);
         var tenant = await dbContext.Tenants
             .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
 
         return tenant is null ? Results.NotFound() : Results.Ok(ToDetail(tenant));
     }
@@ -82,8 +91,17 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(user.FindFirstValue("email")))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The access token must carry an 'email' claim. Add it to the Clerk session token."
+            });
+        }
+
+        var tenantId = new TenantId(id);
         var tenant = await dbContext.Tenants
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
 
         if (tenant is null)
         {
@@ -98,24 +116,25 @@ public static class TenantEndpoints
         Enqueue(dbContext, tenant.Id, user, timeProvider.GetUtcNow());
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id }, ToDetail(tenant));
+        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id.Value }, ToDetail(tenant));
     }
 
     private static void Enqueue(
         ControlPlaneDbContext dbContext,
-        Guid tenantId,
+        TenantId tenantId,
         ClaimsPrincipal user,
         DateTimeOffset now) =>
         dbContext.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
             TenantProvisioningRequested.MessageType,
             JsonSerializer.Serialize(new TenantProvisioningRequested(
-                tenantId,
-                user.FindFirstValue("sub")!)),
+                tenantId.Value,
+                user.FindFirstValue("sub")!,
+                user.FindFirstValue("email")!)),
             now));
 
     private static TenantDetail ToDetail(Tenant tenant) => new(
-        tenant.Id,
+        tenant.Id.Value,
         tenant.Alias.Value,
         tenant.Status.ToString(),
         tenant.ProvisioningStep?.ToString(),

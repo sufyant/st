@@ -1,4 +1,5 @@
 using Application.Abstractions;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,7 +14,9 @@ public sealed class TenantDbContextScopeTests
         // Arrange
         var services = new ServiceCollection();
         services.AddScoped<TenantContext>();
-        services.AddScoped(_ => new TenantDbContextFactory("Host=localhost;Username=st_tenant"));
+        services.AddScoped(_ => new TenantDbContextFactory(
+            "Host=localhost;Username=st_tenant",
+            new AuditInterceptor(TimeProvider.System)));
         services.AddScoped(provider =>
         {
             var tenantContext = provider.GetRequiredService<TenantContext>();

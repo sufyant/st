@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +30,7 @@ public sealed class ListPendingInvitationsHandler(
                                  && invitation.Status == InvitationStatus.Pending)
             .OrderByDescending(invitation => invitation.CreatedAt)
             .Select(invitation => new PendingInvitation(
-                invitation.Id,
+                invitation.Id.Value,
                 invitation.Email.Value,
                 invitation.RoleCode,
                 invitation.CreatedAt,

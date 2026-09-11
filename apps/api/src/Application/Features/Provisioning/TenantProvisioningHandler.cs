@@ -1,7 +1,8 @@
 using System.Text.Json;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
@@ -11,8 +12,7 @@ namespace Application.Features.Provisioning;
 
 public sealed class TenantProvisioningHandler(
     ControlPlaneDbContext controlPlaneDbContext,
-    TenantProvisioner provisioner,
-    TimeProvider timeProvider) : IOutboxMessageHandler
+    TenantProvisioner provisioner) : IOutboxMessageHandler
 {
     public string MessageType => TenantProvisioningRequested.MessageType;
 
@@ -24,8 +24,9 @@ public sealed class TenantProvisioningHandler(
 
     public async Task HandleAsync(TenantProvisioningRequested message, CancellationToken cancellationToken)
     {
+        var tenantId = TenantId.From(message.TenantId);
         var tenant = await controlPlaneDbContext.Tenants.SingleOrDefaultAsync(
-                         candidate => candidate.Id == message.TenantId,
+                         candidate => candidate.Id == tenantId,
                          cancellationToken)
                      ?? throw new InvalidOperationException($"Tenant '{message.TenantId}' does not exist.");
 
@@ -51,14 +52,14 @@ public sealed class TenantProvisioningHandler(
 
             step = TenantProvisioningStep.SeedingOwner;
             await RecordAsync(tenant, step, cancellationToken);
-            await SeedOwnerAsync(tenant, message.OwnerExternalUserId, cancellationToken);
+            await SeedOwnerAsync(tenant, message.OwnerExternalUserId, message.OwnerEmail, cancellationToken);
 
-            tenant.CompleteProvisioning(timeProvider.GetUtcNow());
+            tenant.CompleteProvisioning();
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception exception)
         {
-            tenant.RecordProvisioningFailure(step, exception.Message, timeProvider.GetUtcNow());
+            tenant.RecordProvisioningFailure(step, exception.Message);
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
 
             throw;
@@ -67,34 +68,36 @@ public sealed class TenantProvisioningHandler(
 
     private async Task RecordAsync(Tenant tenant, TenantProvisioningStep step, CancellationToken cancellationToken)
     {
-        tenant.RecordProvisioningProgress(step, timeProvider.GetUtcNow());
+        tenant.RecordProvisioningProgress(step);
         await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task SeedOwnerAsync(Tenant tenant, string ownerExternalUserId, CancellationToken cancellationToken)
+    private async Task SeedOwnerAsync(
+        Tenant tenant,
+        string ownerExternalUserId,
+        string ownerEmail,
+        CancellationToken cancellationToken)
     {
         var externalUserId = ExternalUserId.Create(ownerExternalUserId);
-        var ownerRole = SystemAccessCatalog.Roles.Single(role => role.Code == "owner");
 
         await using var tenantDbContext = provisioner.CreateTenantDbContext(tenant.DatabaseName);
-        var user = await tenantDbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.ExternalUserId == externalUserId,
-            cancellationToken);
+        var user = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (user is null)
         {
-            user = TenantUser.Create(Guid.CreateVersion7(), externalUserId, TenantUserStatus.Active);
+            user = User.Create(externalUserId, EmailAddress.Create(ownerEmail), UserStatus.Active);
             tenantDbContext.Users.Add(user);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var hasRole = await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == user.Id && assignment.RoleId == ownerRole.Id,
-            cancellationToken);
-
-        if (!hasRole)
+        if (user.Roles.All(existing => existing.Code != AccessCatalog.OwnerRole.Code))
         {
-            tenantDbContext.UserRoles.Add(TenantUserRole.Create(user.Id, ownerRole.Id));
+            var ownerRole = await tenantDbContext.Roles.SingleAsync(
+                candidate => candidate.Code == AccessCatalog.OwnerRole.Code,
+                cancellationToken);
+            user.AssignRoles([.. user.Roles, ownerRole]);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -105,7 +108,7 @@ public sealed class TenantProvisioningHandler(
         if (!hasMembership)
         {
             controlPlaneDbContext.Memberships.Add(
-                Membership.Create(Guid.CreateVersion7(), tenant.Id, externalUserId));
+                Membership.Create(tenant.Id, externalUserId));
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
         }
     }

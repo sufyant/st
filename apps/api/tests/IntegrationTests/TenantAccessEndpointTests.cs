@@ -1,8 +1,10 @@
 using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Domain.Access;
-using Domain.Tenants;
+using Domain.ControlPlane.Memberships;
+using Domain.Shared;
+using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -22,9 +24,11 @@ namespace IntegrationTests;
 public sealed class TenantAccessEndpointTests
 {
     private const string ExternalUser = "user_2abc123";
+    private const string ExternalUserEmail = "user@example.com";
     private const string ActiveUser = "Active";
     private const string DisabledUser = "Disabled";
-    private static readonly Guid TenantId = Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9");
+
+    private static readonly AuditInterceptor AuditInterceptor = new(TimeProvider.System);
 
     [Fact]
     public async Task GetWhoAmI_WithAnInvalidTenantAlias_ReturnsNotFound()
@@ -151,8 +155,8 @@ public sealed class TenantAccessEndpointTests
         bool hasMembership = true)
     {
         var connectionString = postgres.GetConnectionString();
-        var tenant = Tenant.Create(TenantId, TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
-        tenant.ChangeStatus(tenantStatus, DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"));
+        MoveToStatus(tenant, tenantStatus);
 
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlaneOptions = new DbContextOptionsBuilder<ControlPlaneDbContext>()
@@ -167,17 +171,49 @@ public sealed class TenantAccessEndpointTests
         if (hasMembership)
         {
             controlPlaneContext.Memberships.Add(
-                Membership.Create(Guid.NewGuid(), tenant.Id, ExternalUserId.Create(ExternalUser)));
+                Membership.Create(tenant.Id, ExternalUserId.Create(ExternalUser)));
         }
 
         await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await ExecuteAsync(connectionString, $"CREATE DATABASE {tenant.DatabaseName.Value}");
-        await using var tenantContext = new TenantDbContextFactory(connectionString).Create(tenant.DatabaseName.Value);
+        await using var tenantContext =
+            new TenantDbContextFactory(connectionString, AuditInterceptor).Create(tenant.DatabaseName.Value);
         await tenantContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
+        var now = DateTimeOffset.UtcNow;
         await tenantContext.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO users (id, external_user_id, status) VALUES ({Guid.NewGuid()}, {ExternalUser}, {tenantUserStatus})",
+            $"""
+            INSERT INTO users (id, external_user_id, email, status, created_at, updated_at)
+            VALUES ({Guid.NewGuid()}, {ExternalUser}, {ExternalUserEmail}, {tenantUserStatus}, {now}, {now})
+            """,
             TestContext.Current.CancellationToken);
+    }
+
+    private static void MoveToStatus(Tenant tenant, TenantStatus status)
+    {
+        switch (status)
+        {
+            case TenantStatus.Provisioning:
+                break;
+            case TenantStatus.Active:
+                tenant.CompleteProvisioning();
+                break;
+            case TenantStatus.Suspended:
+                tenant.CompleteProvisioning();
+                tenant.Suspend();
+                break;
+            case TenantStatus.Deprovisioning:
+                tenant.CompleteProvisioning();
+                tenant.BeginDeprovisioning();
+                break;
+            case TenantStatus.Deleted:
+                tenant.CompleteProvisioning();
+                tenant.BeginDeprovisioning();
+                tenant.MarkDeleted();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status), status, null);
+        }
     }
 
     private static async Task ExecuteAsync(string connectionString, string sql)

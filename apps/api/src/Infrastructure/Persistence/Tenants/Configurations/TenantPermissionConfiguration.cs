@@ -1,13 +1,13 @@
-using Domain.Access;
-using Domain.Access.Permissions;
+using Domain.Shared;
+using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Persistence.Tenants.Configurations;
 
-public sealed class TenantPermissionConfiguration : IEntityTypeConfiguration<TenantPermission>
+public sealed class TenantPermissionConfiguration : IEntityTypeConfiguration<Permission>
 {
-    public void Configure(EntityTypeBuilder<TenantPermission> builder)
+    public void Configure(EntityTypeBuilder<Permission> builder)
     {
         builder.ToTable("permissions");
         builder.HasKey(x => x.Id);
@@ -16,7 +16,7 @@ public sealed class TenantPermissionConfiguration : IEntityTypeConfiguration<Ten
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(100);
         builder.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
         builder.HasIndex(x => x.Code).IsUnique();
-        builder.HasData(SystemAccessCatalog.Permissions.Select(permission => new
+        builder.HasData(AccessCatalog.Permissions.Select(permission => new
         {
             permission.Id,
             permission.Code,

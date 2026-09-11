@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.Shared;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -26,9 +26,7 @@ public sealed class RevokeMemberHandler(
             return Result<Unit>.Failure(MemberErrors.Missing);
         }
 
-        var roster = await TenantUsers.LoadOwnerRosterAsync(tenantDbContext, cancellationToken);
-
-        if (roster.IsLastOwner(user.Id))
+        if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
         {
             return Result<Unit>.Failure(MemberErrors.LastOwner);
         }
@@ -40,10 +38,7 @@ public sealed class RevokeMemberHandler(
             .ToListAsync(cancellationToken);
         controlPlaneDbContext.Memberships.RemoveRange(memberships);
 
-        var assignments = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == user.Id)
-            .ToListAsync(cancellationToken);
-        tenantDbContext.UserRoles.RemoveRange(assignments);
+        user.AssignRoles([]);
         user.Disable();
 
         return Result.Success();

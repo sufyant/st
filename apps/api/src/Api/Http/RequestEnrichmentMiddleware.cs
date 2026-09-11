@@ -14,7 +14,7 @@ public sealed class RequestEnrichmentMiddleware(RequestDelegate next)
         using (LogContext.PushProperty("user_id", context.User.FindFirstValue("sub")))
         using (LogContext.PushProperty(
                    "tenant_id",
-                   tenantContext.IsResolved ? tenantContext.TenantId : null))
+                   tenantContext.IsResolved ? tenantContext.TenantId.Value : null))
         {
             await next(context);
         }

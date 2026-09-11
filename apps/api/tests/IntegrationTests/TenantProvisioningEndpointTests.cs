@@ -45,6 +45,22 @@ public sealed class TenantProvisioningEndpointTests
     }
 
     [Fact]
+    public async Task PostTenant_WithoutAnEmailClaim_ReturnsBadRequest()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true, email: null);
+
+        // Act
+        using var response = await fixture.Client.PostAsJsonAsync(
+            "/admin/api/v1/tenants",
+            new { alias = "acme" },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PostTenant_ForADuplicateAlias_ReturnsConflict()
     {
         // Arrange
@@ -134,6 +150,37 @@ public sealed class TenantProvisioningEndpointTests
     }
 
     [Fact]
+    public async Task GetTenant_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+
+        // Act
+        using var response = await fixture.Client.GetAsync(
+            $"/admin/api/v1/tenants/{Guid.Empty}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RetryProvisioning_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+
+        // Act
+        using var response = await fixture.Client.PostAsync(
+            $"/admin/api/v1/tenants/{Guid.Empty}/retry-provisioning",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task RetryProvisioning_QueuesAnotherMessage()
     {
         // Arrange
@@ -154,5 +201,21 @@ public sealed class TenantProvisioningEndpointTests
         // Assert
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal(2, await fixture.CountControlPlaneRowsAsync("control.outbox_messages"));
+    }
+
+    [Fact]
+    public async Task RetryProvisioning_WithoutAnEmailClaim_ReturnsBadRequest()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true, email: null);
+
+        // Act
+        using var response = await fixture.Client.PostAsync(
+            $"/admin/api/v1/tenants/{Guid.CreateVersion7()}/retry-provisioning",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

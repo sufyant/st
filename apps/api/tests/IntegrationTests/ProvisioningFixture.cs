@@ -1,4 +1,5 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ namespace IntegrationTests;
 public sealed class ProvisioningFixture : IAsyncDisposable
 {
     public const string OwnerExternalUserId = "user_2abc123";
+    public const string OwnerEmail = "owner@example.com";
 
     private readonly PostgreSqlContainer postgres;
 
@@ -18,7 +20,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
     {
         this.postgres = postgres;
         ControlPlaneConnectionString = controlPlaneConnectionString;
-        Provisioner = new TenantProvisioner(postgres.GetConnectionString());
+        Provisioner = new TenantProvisioner(postgres.GetConnectionString(), new AuditInterceptor(TimeProvider.System));
     }
 
     public string ControlPlaneConnectionString { get; }
@@ -48,7 +50,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
 
     public async Task<Tenant> AddProvisioningTenantAsync(string alias)
     {
-        var tenant = Tenant.Create(Guid.CreateVersion7(), TenantAlias.Create(alias), DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(alias));
         await using var context = CreateControlPlane();
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -56,7 +58,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         return tenant;
     }
 
-    public async Task<Tenant> ReloadAsync(Guid tenantId)
+    public async Task<Tenant> ReloadAsync(TenantId tenantId)
     {
         await using var context = CreateControlPlane();
 
@@ -75,6 +77,21 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
 
+    public async Task<DateTimeOffset> GetUserCreatedAtAsync(string databaseName, string externalUserId)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(ServerConnectionString) { Database = databaseName };
+        await using var connection = new NpgsqlConnection(builder.ConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT created_at FROM users WHERE external_user_id = @externalUserId",
+            connection);
+        command.Parameters.AddWithValue("externalUserId", externalUserId);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        await reader.ReadAsync(TestContext.Current.CancellationToken);
+
+        return reader.GetFieldValue<DateTimeOffset>(0);
+    }
+
     public ValueTask DisposeAsync() => postgres.DisposeAsync();
 
     private static ControlPlaneDbContext CreateControlPlaneDbContext(string connectionString)
@@ -82,6 +99,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
             .UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+            .AddInterceptors(new AuditInterceptor(TimeProvider.System))
             .Options;
 
         return new ControlPlaneDbContext(options);

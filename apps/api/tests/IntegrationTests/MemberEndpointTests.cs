@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -36,6 +36,22 @@ public sealed class MemberEndpointTests
     }
 
     [Fact]
+    public async Task GetMembers_ReturnsTheEmailOfEachMember()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+
+        // Act
+        using var response = await fixture.Client.GetAsync(MembersUrl, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestContext.Current.CancellationToken);
+        var only = Assert.Single(body!);
+        Assert.Equal(TenantSurfaceFixture.OwnerEmail, only.GetProperty("email").GetString());
+    }
+
+    [Fact]
     public async Task DeleteMember_RevokesEntryAndDisablesTheUser()
     {
         // Arrange
@@ -54,13 +70,11 @@ public sealed class MemberEndpointTests
             membership => membership.ExternalUserId == invitedUserId,
             TestContext.Current.CancellationToken));
         await using var tenantDbContext = fixture.CreateTenantDbContext();
-        var user = await tenantDbContext.Users.SingleAsync(
-            candidate => candidate.ExternalUserId == invitedUserId,
-            TestContext.Current.CancellationToken);
-        Assert.Equal(TenantUserStatus.Disabled, user.Status);
-        Assert.False(await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == user.Id,
-            TestContext.Current.CancellationToken));
+        var user = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleAsync(candidate => candidate.ExternalUserId == invitedUserId, TestContext.Current.CancellationToken);
+        Assert.Equal(UserStatus.Disabled, user.Status);
+        Assert.Empty(user.Roles);
     }
 
     [Fact]
@@ -149,6 +163,51 @@ public sealed class MemberEndpointTests
         using var response = await fixture.Client.PutAsJsonAsync(
             $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}/roles",
             new { roleCodes = new[] { "member" } },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMember_WithAnotherActiveOwner_ReturnsNoContent()
+    {
+        // Arrange
+        await using var fixture = await AcceptedMemberAsync();
+        using var promoted = await fixture.Client.PutAsJsonAsync(
+            $"{MembersUrl}/{InvitedUserId}/roles",
+            new { roleCodes = new[] { "owner" } },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, promoted.StatusCode);
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMember_WithOnlyADisabledSecondOwner_ReturnsConflict()
+    {
+        // Arrange
+        await using var fixture = await AcceptedMemberAsync();
+        using var promoted = await fixture.Client.PutAsJsonAsync(
+            $"{MembersUrl}/{InvitedUserId}/roles",
+            new { roleCodes = new[] { "owner" } },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, promoted.StatusCode);
+        using var disabled = await fixture.Client.PostAsync(
+            $"{MembersUrl}/{InvitedUserId}/disable",
+            content: null,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}",
             TestContext.Current.CancellationToken);
 
         // Assert

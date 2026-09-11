@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,7 +43,7 @@ public sealed class ListMyInvitationsHandler(
             .ToListAsync(cancellationToken);
         var invitations = rows
             .Select(row => new MyInvitation(
-                row.Invitation.Id,
+                row.Invitation.Id.Value,
                 row.Tenant.Alias.Value,
                 row.Invitation.Email.Value,
                 row.Invitation.RoleCode,

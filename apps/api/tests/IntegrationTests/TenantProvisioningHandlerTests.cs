@@ -1,7 +1,8 @@
 using Application.Features.Provisioning;
-using Domain.Access;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
+using Infrastructure.Persistence;
 using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -19,11 +20,11 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -32,6 +33,10 @@ public sealed class TenantProvisioningHandlerTests
         Assert.Null(reloaded.ProvisioningStep);
         Assert.Equal(1, await fixture.CountAsync(tenant.DatabaseName.Value, "SELECT count(*) FROM users"));
         Assert.Equal(1, await fixture.CountAsync(tenant.DatabaseName.Value, "SELECT count(*) FROM user_roles"));
+        var ownerCreatedAt = await fixture.GetUserCreatedAtAsync(
+            tenant.DatabaseName.Value,
+            ProvisioningFixture.OwnerExternalUserId);
+        Assert.NotEqual(default, ownerCreatedAt);
     }
 
     [Fact]
@@ -41,11 +46,11 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -63,8 +68,8 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
-        var message = new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
         // Act
@@ -86,11 +91,11 @@ public sealed class TenantProvisioningHandlerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
 
         // Act
         var act = async () => await handler.HandleAsync(
-            new TenantProvisioningRequested(Guid.CreateVersion7(), ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(Guid.CreateVersion7(), ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -106,12 +111,11 @@ public sealed class TenantProvisioningHandlerTests
         await using var context = fixture.CreateControlPlane();
         var handler = new TenantProvisioningHandler(
             context,
-            new TenantProvisioner(Unreachable),
-            TimeProvider.System);
+            new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
 
         // Act
         var act = async () => await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -128,21 +132,20 @@ public sealed class TenantProvisioningHandlerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        var message = new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId);
+        var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail);
 
         await using (var failingContext = fixture.CreateControlPlane())
         {
             var failingHandler = new TenantProvisioningHandler(
                 failingContext,
-                new TenantProvisioner(Unreachable),
-                TimeProvider.System);
+                new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
             await Assert.ThrowsAnyAsync<Exception>(async () =>
                 await failingHandler.HandleAsync(message, TestContext.Current.CancellationToken));
         }
 
         // Act
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
         // Assert

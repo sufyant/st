@@ -1,5 +1,6 @@
-using Domain.Access;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -31,6 +32,7 @@ public sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitatio
             .HasConversion(userId => userId.Value, value => ExternalUserId.Create(value))
             .IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
         builder.Property(x => x.AcceptedAt).HasColumnName("accepted_at");
         builder.Property(x => x.AcceptedByExternalUserId)

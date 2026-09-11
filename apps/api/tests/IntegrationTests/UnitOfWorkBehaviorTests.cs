@@ -1,8 +1,9 @@
 using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -33,10 +34,9 @@ public sealed class UnitOfWorkBehaviorTests
             () =>
             {
                 controlPlane.Memberships.Add(Membership.Create(
-                    Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
-                tenant.Users.Add(TenantUser.Create(Guid.CreateVersion7(), invitee, TenantUserStatus.Active));
+                tenant.Users.Add(User.Create(invitee, EmailAddress.Create("invitee@example.com"), UserStatus.Active));
 
                 return Task.FromResult(Result.Success());
             },
@@ -69,7 +69,6 @@ public sealed class UnitOfWorkBehaviorTests
             () =>
             {
                 controlPlane.Memberships.Add(Membership.Create(
-                    Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
 
@@ -101,7 +100,6 @@ public sealed class UnitOfWorkBehaviorTests
             () =>
             {
                 controlPlane.Memberships.Add(Membership.Create(
-                    Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
 
@@ -132,12 +130,13 @@ public sealed class UnitOfWorkBehaviorTests
             () =>
             {
                 controlPlane.Memberships.Add(Membership.Create(
-                    Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
-                var user = TenantUser.Create(Guid.CreateVersion7(), invitee, TenantUserStatus.Active);
+                var user = User.Create(invitee, EmailAddress.Create("partial@example.com"), UserStatus.Active);
                 tenant.Users.Add(user);
-                tenant.UserRoles.Add(TenantUserRole.Create(user.Id, Guid.CreateVersion7()));
+                // Forces the tenant save to fail: this default-constructed Role has a null
+                // Code, which violates the NOT NULL constraint on roles.code, not an FK.
+                user.AssignRoles([new Role()]);
 
                 return Task.FromResult(Result.Success());
             },

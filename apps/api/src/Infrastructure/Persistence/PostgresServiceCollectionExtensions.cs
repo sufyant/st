@@ -15,16 +15,22 @@ public static class PostgresServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddDbContext<ControlPlaneDbContext>(options =>
-            options.UseNpgsql(
-                RequiredConnectionString(configuration, "ControlPlane"),
-                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control")));
+        services.AddSingleton<AuditInterceptor>();
+        services.AddDbContext<ControlPlaneDbContext>((provider, options) =>
+            options
+                .UseNpgsql(
+                    RequiredConnectionString(configuration, "ControlPlane"),
+                    npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+                .AddInterceptors(provider.GetRequiredService<AuditInterceptor>()));
 
-        services.AddScoped(_ => new TenantDbContextFactory(
-            RequiredConnectionString(configuration, "TenantData")));
+        services.AddScoped(provider => new TenantDbContextFactory(
+            RequiredConnectionString(configuration, "TenantData"),
+            provider.GetRequiredService<AuditInterceptor>()));
 
-        services.AddSingleton(new TenantProvisioner(
-            RequiredConnectionString(configuration, "Provisioner")));
+        var provisionerConnectionString = RequiredConnectionString(configuration, "Provisioner");
+        services.AddSingleton(provider => new TenantProvisioner(
+            provisionerConnectionString,
+            provider.GetRequiredService<AuditInterceptor>()));
 
 
         services.AddKeyedSingleton<NpgsqlDataSource>("control-plane-read", (_, _) =>

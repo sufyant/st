@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -122,6 +122,21 @@ public sealed class InvitationEndpointTests
         // Act
         using var response = await fixture.Client.DeleteAsync(
             $"{InvitationsUrl}/{Guid.CreateVersion7()}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteInvitation_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{InvitationsUrl}/{Guid.Empty}",
             TestContext.Current.CancellationToken);
 
         // Assert

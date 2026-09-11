@@ -74,7 +74,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 });
 app.MapGet("/{tenantAlias}/api/v1/whoami", (TenantContext tenantContext, ClaimsPrincipal user) => Results.Ok(new
 {
-    tenantId = tenantContext.TenantId,
+    tenantId = tenantContext.TenantId.Value,
     tenantAlias = tenantContext.Alias,
     userId = user.FindFirstValue("sub")
 })).RequireAuthorization();

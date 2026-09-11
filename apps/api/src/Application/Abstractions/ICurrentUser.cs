@@ -1,4 +1,5 @@
-using Domain.Access;
+using System.Diagnostics.CodeAnalysis;
+using Domain.Shared;
 
 namespace Application.Abstractions;
 
@@ -8,5 +9,5 @@ public interface ICurrentUser
 
     bool HasPermission(string code);
 
-    bool TryGetEmail(out EmailAddress email);
+    bool TryGetEmail([MaybeNullWhen(false)] out EmailAddress email);
 }

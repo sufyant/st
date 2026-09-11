@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Domain.Access;
+using Domain.ControlPlane.Administration;
+using Domain.Shared;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -10,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -19,6 +22,7 @@ namespace IntegrationTests;
 public sealed class ControlPlaneFixture : IAsyncDisposable
 {
     public const string TestUserId = "user_2abc123";
+    public const string TestEmail = "admin@example.com";
 
     private readonly PostgreSqlContainer postgres;
     private readonly WebApplicationFactory<Program> factory;
@@ -37,7 +41,12 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
     public HttpClient Client { get; }
 
-    public static async Task<ControlPlaneFixture> StartAsync(bool isPlatformAdmin)
+    public FakeTimeProvider Clock { get; } = new();
+
+    public static Task<ControlPlaneFixture> StartAsync(bool isPlatformAdmin) =>
+        StartAsync(isPlatformAdmin, TestEmail);
+
+    public static async Task<ControlPlaneFixture> StartAsync(bool isPlatformAdmin, string? email)
     {
         var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
@@ -54,10 +63,7 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
 
             if (isPlatformAdmin)
             {
-                context.PlatformAdmins.Add(PlatformAdmin.Create(
-                    Guid.NewGuid(),
-                    ExternalUserId.Create(TestUserId),
-                    DateTimeOffset.UtcNow));
+                context.PlatformAdmins.Add(PlatformAdmin.Create(ExternalUserId.Create(TestUserId)));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }
@@ -69,13 +75,28 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
             builder.UseSetting("ConnectionStrings:TenantData", connectionString);
             builder.UseSetting("ConnectionStrings:Provisioner", connectionString);
             builder.ConfigureTestServices(services =>
-                services.AddAuthentication(TestAuthenticationHandler.SchemeName)
+                services.AddSingleton(new TestPrincipal(email))
+                    .AddAuthentication(TestAuthenticationHandler.SchemeName)
                     .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                         TestAuthenticationHandler.SchemeName,
                         _ => { }));
         });
 
         return new ControlPlaneFixture(postgres, factory, controlPlane);
+    }
+
+    public IServiceScope CreateScope() => factory.Services.CreateScope();
+
+    public ControlPlaneDbContext CreateControlPlaneDbContext()
+    {
+        var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
+            .UseNpgsql(
+                controlPlaneConnectionString,
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "control"))
+            .AddInterceptors(new AuditInterceptor(Clock))
+            .Options;
+
+        return new ControlPlaneDbContext(options);
     }
 
     public async Task<long> CountControlPlaneRowsAsync(string qualifiedTable)
@@ -105,20 +126,31 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
+    private sealed record TestPrincipal(string? Email);
+
     private sealed class TestAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
+        UrlEncoder encoder,
+        TestPrincipal principal)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         public const string SchemeName = "Test";
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var identity = new ClaimsIdentity([new Claim("sub", TestUserId)], SchemeName);
-            var principal = new ClaimsPrincipal(identity);
+            var claims = new List<Claim> { new("sub", TestUserId) };
 
-            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName)));
+            if (principal.Email is not null)
+            {
+                claims.Add(new Claim("email", principal.Email));
+            }
+
+            var identity = new ClaimsIdentity(claims, SchemeName);
+            var claimsPrincipal = new ClaimsPrincipal(identity);
+
+            return Task.FromResult(AuthenticateResult.Success(
+                new AuthenticationTicket(claimsPrincipal, SchemeName)));
         }
     }
 }

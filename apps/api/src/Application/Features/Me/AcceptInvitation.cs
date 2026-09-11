@@ -1,8 +1,9 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Authorization;
+using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
@@ -83,13 +84,13 @@ public sealed class AcceptInvitationHandler(
         // user-scoped surface has no tenant in scope, so the unit of work behavior cannot commit it.
         // The tenant database is written first so that a failure in between leaves no membership,
         // and therefore no way in, until the retry completes.
-        var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.ExternalUserId == externalUserId,
-            cancellationToken);
+        var tenantUser = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (tenantUser is null)
         {
-            tenantUser = TenantUser.Create(Guid.CreateVersion7(), externalUserId, TenantUserStatus.Active);
+            tenantUser = User.Create(externalUserId, invitation.Email, UserStatus.Active);
             tenantDbContext.Users.Add(tenantUser);
         }
         else
@@ -97,13 +98,9 @@ public sealed class AcceptInvitationHandler(
             tenantUser.Enable();
         }
 
-        var hasRole = await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == tenantUser.Id && assignment.RoleId == role.Id,
-            cancellationToken);
-
-        if (!hasRole)
+        if (tenantUser.Roles.All(existing => existing.Id != role.Id))
         {
-            tenantDbContext.UserRoles.Add(TenantUserRole.Create(tenantUser.Id, role.Id));
+            tenantUser.AssignRoles([.. tenantUser.Roles, role]);
         }
 
         await tenantDbContext.SaveChangesAsync(cancellationToken);
@@ -115,12 +112,12 @@ public sealed class AcceptInvitationHandler(
 
         if (!hasMembership)
         {
-            dbContext.Memberships.Add(Membership.Create(Guid.CreateVersion7(), tenant.Id, externalUserId));
+            dbContext.Memberships.Add(Membership.Create(tenant.Id, externalUserId));
         }
 
         invitation.Accept(externalUserId, now);
 
         return Result<MyMembership>.Success(
-            new MyMembership(tenant.Id, tenant.Alias.Value, tenant.Status.ToString()));
+            new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString()));
     }
 }

@@ -1,7 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Api.Authorization;
 using Application.Abstractions;
-using Domain.Access;
+using Domain.Shared;
 
 namespace Api.Http;
 
@@ -18,13 +19,13 @@ public sealed class CurrentUser(IHttpContextAccessor accessor) : ICurrentUser
     public bool HasPermission(string code) =>
         Principal.HasClaim(TenantClaims.Permission, code);
 
-    public bool TryGetEmail(out EmailAddress email)
+    public bool TryGetEmail([MaybeNullWhen(false)] out EmailAddress email)
     {
         var value = Principal.FindFirstValue("email");
 
         if (string.IsNullOrWhiteSpace(value))
         {
-            email = null!;
+            email = null;
 
             return false;
         }
@@ -37,7 +38,7 @@ public sealed class CurrentUser(IHttpContextAccessor accessor) : ICurrentUser
         }
         catch (ArgumentException)
         {
-            email = null!;
+            email = null;
 
             return false;
         }
