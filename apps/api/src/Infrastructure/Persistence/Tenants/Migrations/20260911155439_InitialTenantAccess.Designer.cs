@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Tenants.Migrations
 {
     [DbContext(typeof(TenantDbContext))]
-    [Migration("20260911153806_InitialTenantAccess")]
+    [Migration("20260911155439_InitialTenantAccess")]
     partial class InitialTenantAccess
     {
         /// <inheritdoc />
@@ -147,6 +147,12 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
 
                     b.Property<string>("ExternalUserId")
                         .IsRequired()

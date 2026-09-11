@@ -11,6 +11,7 @@ namespace IntegrationTests;
 public sealed class ProvisioningFixture : IAsyncDisposable
 {
     public const string OwnerExternalUserId = "user_2abc123";
+    public const string OwnerEmail = "owner@example.com";
 
     private readonly PostgreSqlContainer postgres;
 

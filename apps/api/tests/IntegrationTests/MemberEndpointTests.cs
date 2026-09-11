@@ -36,6 +36,22 @@ public sealed class MemberEndpointTests
     }
 
     [Fact]
+    public async Task GetMembers_ReturnsTheEmailOfEachMember()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+
+        // Act
+        using var response = await fixture.Client.GetAsync(MembersUrl, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestContext.Current.CancellationToken);
+        var only = Assert.Single(body!);
+        Assert.Equal(TenantSurfaceFixture.OwnerEmail, only.GetProperty("email").GetString());
+    }
+
+    [Fact]
     public async Task DeleteMember_RevokesEntryAndDisablesTheUser()
     {
         // Arrange

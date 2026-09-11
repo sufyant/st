@@ -145,6 +145,12 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
                     b.Property<string>("ExternalUserId")
                         .IsRequired()
                         .HasMaxLength(255)

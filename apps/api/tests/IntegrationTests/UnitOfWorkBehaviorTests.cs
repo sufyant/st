@@ -36,7 +36,7 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                tenant.Users.Add(User.Create(invitee, UserStatus.Active));
+                tenant.Users.Add(User.Create(invitee, EmailAddress.Create("invitee@example.com"), UserStatus.Active));
 
                 return Task.FromResult(Result.Success());
             },
@@ -132,7 +132,7 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                var user = User.Create(invitee, UserStatus.Active);
+                var user = User.Create(invitee, EmailAddress.Create("partial@example.com"), UserStatus.Active);
                 tenant.Users.Add(user);
                 user.AssignRoles([new Role()]);
 

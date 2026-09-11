@@ -23,6 +23,7 @@ namespace IntegrationTests;
 public sealed class TenantAccessEndpointTests
 {
     private const string ExternalUser = "user_2abc123";
+    private const string ExternalUserEmail = "user@example.com";
     private const string ActiveUser = "Active";
     private const string DisabledUser = "Disabled";
 
@@ -176,7 +177,7 @@ public sealed class TenantAccessEndpointTests
         await using var tenantContext = new TenantDbContextFactory(connectionString).Create(tenant.DatabaseName.Value);
         await tenantContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
         await tenantContext.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO users (id, external_user_id, status) VALUES ({Guid.NewGuid()}, {ExternalUser}, {tenantUserStatus})",
+            $"INSERT INTO users (id, external_user_id, email, status) VALUES ({Guid.NewGuid()}, {ExternalUser}, {ExternalUserEmail}, {tenantUserStatus})",
             TestContext.Current.CancellationToken);
     }
 

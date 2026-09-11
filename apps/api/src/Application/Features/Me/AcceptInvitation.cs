@@ -90,7 +90,7 @@ public sealed class AcceptInvitationHandler(
 
         if (tenantUser is null)
         {
-            tenantUser = User.Create(externalUserId, UserStatus.Active);
+            tenantUser = User.Create(externalUserId, invitation.Email, UserStatus.Active);
             tenantDbContext.Users.Add(tenantUser);
         }
         else

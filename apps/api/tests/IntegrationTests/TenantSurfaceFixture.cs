@@ -90,6 +90,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             {
                 var user = User.Create(
                     ExternalUserId.Create(externalUserId),
+                    EmailAddress.Create(email!),
                     UserStatus.Active);
                 tenantDbContext.Users.Add(user);
                 var role = await tenantDbContext.Roles.SingleAsync(

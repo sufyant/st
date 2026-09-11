@@ -45,6 +45,22 @@ public sealed class TenantProvisioningEndpointTests
     }
 
     [Fact]
+    public async Task PostTenant_WithoutAnEmailClaim_ReturnsBadRequest()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true, email: null);
+
+        // Act
+        using var response = await fixture.Client.PostAsJsonAsync(
+            "/admin/api/v1/tenants",
+            new { alias = "acme" },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PostTenant_ForADuplicateAlias_ReturnsConflict()
     {
         // Arrange

@@ -38,6 +38,14 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(user.FindFirstValue("email")))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The access token must carry an 'email' claim. Add it to the Clerk session token."
+            });
+        }
+
         TenantAlias alias;
 
         try
@@ -83,6 +91,14 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(user.FindFirstValue("email")))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The access token must carry an 'email' claim. Add it to the Clerk session token."
+            });
+        }
+
         var tenantId = new TenantId(id);
         var tenant = await dbContext.Tenants
             .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
@@ -113,7 +129,8 @@ public static class TenantEndpoints
             TenantProvisioningRequested.MessageType,
             JsonSerializer.Serialize(new TenantProvisioningRequested(
                 tenantId.Value,
-                user.FindFirstValue("sub")!)),
+                user.FindFirstValue("sub")!,
+                user.FindFirstValue("email")!)),
             now));
 
     private static TenantDetail ToDetail(Tenant tenant) => new(

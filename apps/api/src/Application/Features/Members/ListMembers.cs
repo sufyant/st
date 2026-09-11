@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.Members;
 
-public sealed record TenantMember(string ExternalUserId, string Status, string[] RoleCodes);
+public sealed record TenantMember(string ExternalUserId, string Email, string Status, string[] RoleCodes);
 
 [RequiresPermission(TenantPermissions.MembersRead)]
 public sealed record ListMembersQuery : IQuery<IReadOnlyList<TenantMember>>;
@@ -24,6 +24,7 @@ public sealed class ListMembersHandler(TenantDbContext tenantDbContext)
         var members = users
             .Select(user => new TenantMember(
                 user.ExternalUserId.Value,
+                user.Email.Value,
                 user.Status.ToString(),
                 user.Roles
                     .Select(role => role.Code)

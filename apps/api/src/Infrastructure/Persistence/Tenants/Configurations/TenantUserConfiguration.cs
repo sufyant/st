@@ -13,6 +13,11 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(x => x.ExternalUserId).HasColumnName("external_user_id").HasMaxLength(255).HasConversion(x => x.Value, x => ExternalUserId.Create(x));
+        builder.Property(x => x.Email)
+            .HasColumnName("email")
+            .HasMaxLength(320)
+            .HasConversion(email => email.Value, value => EmailAddress.Create(value))
+            .IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(x => x.ExternalUserId).IsUnique();
         builder.HasMany(x => x.Roles)

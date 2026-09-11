@@ -19,6 +19,8 @@ public sealed class User : Entity<UserId>
 
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
+    public EmailAddress Email { get; private set; } = null!;
+
     public UserStatus Status { get; private set; }
 
     public IReadOnlyCollection<Role> Roles => roles;
@@ -27,14 +29,16 @@ public sealed class User : Entity<UserId>
     {
     }
 
-    public static User Create(ExternalUserId externalUserId, UserStatus status)
+    public static User Create(ExternalUserId externalUserId, EmailAddress email, UserStatus status)
     {
         ArgumentNullException.ThrowIfNull(externalUserId);
+        ArgumentNullException.ThrowIfNull(email);
 
         return new User
         {
             Id = UserId.New(),
             ExternalUserId = externalUserId,
+            Email = email,
             Status = status
         };
     }

@@ -169,7 +169,7 @@ public sealed class OutboxDrainerTests
         context.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
             TenantProvisioningRequested.MessageType,
-            $$"""{"TenantId":"{{tenantId}}","OwnerExternalUserId":"{{ProvisioningFixture.OwnerExternalUserId}}"}""",
+            $$"""{"TenantId":"{{tenantId}}","OwnerExternalUserId":"{{ProvisioningFixture.OwnerExternalUserId}}","OwnerEmail":"{{ProvisioningFixture.OwnerEmail}}"}""",
             DateTimeOffset.UtcNow));
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }

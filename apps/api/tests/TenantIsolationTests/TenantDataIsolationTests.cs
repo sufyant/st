@@ -24,7 +24,7 @@ public sealed class TenantDataIsolationTests
         await using var acme = contextFactory.Create("tenant_acme");
         await using var globex = contextFactory.Create("tenant_globex");
         await acme.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO users (id, external_user_id, status) VALUES ({Guid.NewGuid()}, {"user_2abc123"}, {"Active"})",
+            $"INSERT INTO users (id, external_user_id, email, status) VALUES ({Guid.NewGuid()}, {"user_2abc123"}, {"user@example.com"}, {"Active"})",
             TestContext.Current.CancellationToken);
 
         // Act

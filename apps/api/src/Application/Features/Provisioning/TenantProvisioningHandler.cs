@@ -53,7 +53,7 @@ public sealed class TenantProvisioningHandler(
 
             step = TenantProvisioningStep.SeedingOwner;
             await RecordAsync(tenant, step, cancellationToken);
-            await SeedOwnerAsync(tenant, message.OwnerExternalUserId, cancellationToken);
+            await SeedOwnerAsync(tenant, message.OwnerExternalUserId, message.OwnerEmail, cancellationToken);
 
             tenant.CompleteProvisioning(timeProvider.GetUtcNow());
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
@@ -73,7 +73,11 @@ public sealed class TenantProvisioningHandler(
         await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task SeedOwnerAsync(Tenant tenant, string ownerExternalUserId, CancellationToken cancellationToken)
+    private async Task SeedOwnerAsync(
+        Tenant tenant,
+        string ownerExternalUserId,
+        string ownerEmail,
+        CancellationToken cancellationToken)
     {
         var externalUserId = ExternalUserId.Create(ownerExternalUserId);
 
@@ -84,7 +88,7 @@ public sealed class TenantProvisioningHandler(
 
         if (user is null)
         {
-            user = User.Create(externalUserId, UserStatus.Active);
+            user = User.Create(externalUserId, EmailAddress.Create(ownerEmail), UserStatus.Active);
             tenantDbContext.Users.Add(user);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }

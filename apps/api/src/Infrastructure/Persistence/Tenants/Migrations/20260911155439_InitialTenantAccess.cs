@@ -47,6 +47,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     external_user_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
                 },
                 constraints: table =>
