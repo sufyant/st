@@ -134,6 +134,37 @@ public sealed class TenantProvisioningEndpointTests
     }
 
     [Fact]
+    public async Task GetTenant_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+
+        // Act
+        using var response = await fixture.Client.GetAsync(
+            $"/admin/api/v1/tenants/{Guid.Empty}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RetryProvisioning_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+
+        // Act
+        using var response = await fixture.Client.PostAsync(
+            $"/admin/api/v1/tenants/{Guid.Empty}/retry-provisioning",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task RetryProvisioning_QueuesAnotherMessage()
     {
         // Arrange

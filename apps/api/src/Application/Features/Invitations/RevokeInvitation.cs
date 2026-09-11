@@ -18,7 +18,9 @@ public sealed class RevokeInvitationHandler(
         RevokeInvitationCommand request,
         CancellationToken cancellationToken)
     {
-        var invitationId = InvitationId.From(request.Id);
+        // A lookup key skips the validating factory: an unmatched id should miss the query
+        // below and fall through to the not-found result, not throw.
+        var invitationId = new InvitationId(request.Id);
         var invitation = await controlPlaneDbContext.Invitations.SingleOrDefaultAsync(
             candidate => candidate.Id == invitationId
                          && candidate.TenantId == tenantContext.TenantId

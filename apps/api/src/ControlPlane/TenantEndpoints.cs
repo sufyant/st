@@ -68,7 +68,7 @@ public static class TenantEndpoints
         ControlPlaneDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        var tenantId = TenantId.From(id);
+        var tenantId = new TenantId(id);
         var tenant = await dbContext.Tenants
             .AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
@@ -83,7 +83,7 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var tenantId = TenantId.From(id);
+        var tenantId = new TenantId(id);
         var tenant = await dbContext.Tenants
             .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
 

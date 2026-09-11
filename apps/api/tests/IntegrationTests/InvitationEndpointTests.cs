@@ -127,4 +127,19 @@ public sealed class InvitationEndpointTests
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task DeleteInvitation_ForAnEmptyIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{InvitationsUrl}/{Guid.Empty}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }
