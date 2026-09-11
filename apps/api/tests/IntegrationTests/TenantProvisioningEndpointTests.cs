@@ -202,4 +202,20 @@ public sealed class TenantProvisioningEndpointTests
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal(2, await fixture.CountControlPlaneRowsAsync("control.outbox_messages"));
     }
+
+    [Fact]
+    public async Task RetryProvisioning_WithoutAnEmailClaim_ReturnsBadRequest()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true, email: null);
+
+        // Act
+        using var response = await fixture.Client.PostAsync(
+            $"/admin/api/v1/tenants/{Guid.CreateVersion7()}/retry-provisioning",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }
