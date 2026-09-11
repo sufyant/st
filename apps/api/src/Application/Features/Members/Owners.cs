@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.Members;
 
-// Son owner'ı kaybeden bir tenant yalnızca veritabanına elle müdahaleyle kurtarılabilir,
-// o yüzden üç yazma yolu da buradan geçer.
+// A tenant whose last owner is removed, disabled or demoted can only be recovered by editing the
+// database by hand, so the rule lives here rather than in whichever handler happens to need it.
 internal static class Owners
 {
     public static async Task<bool> IsLastOwnerAsync(
@@ -15,7 +15,11 @@ internal static class Owners
     {
         var ownerCode = AccessCatalog.OwnerRole.Code;
 
-        if (!user.Roles.Any(role => role.Code == ownerCode))
+        var holdsOwnerRole = await tenantDbContext.Users.AnyAsync(
+            candidate => candidate.Id == user.Id && candidate.Roles.Any(role => role.Code == ownerCode),
+            cancellationToken);
+
+        if (!holdsOwnerRole)
         {
             return false;
         }

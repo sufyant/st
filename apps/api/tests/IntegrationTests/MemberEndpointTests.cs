@@ -170,6 +170,51 @@ public sealed class MemberEndpointTests
     }
 
     [Fact]
+    public async Task DeleteMember_WithAnotherActiveOwner_ReturnsNoContent()
+    {
+        // Arrange
+        await using var fixture = await AcceptedMemberAsync();
+        using var promoted = await fixture.Client.PutAsJsonAsync(
+            $"{MembersUrl}/{InvitedUserId}/roles",
+            new { roleCodes = new[] { "owner" } },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, promoted.StatusCode);
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMember_WithOnlyADisabledSecondOwner_ReturnsConflict()
+    {
+        // Arrange
+        await using var fixture = await AcceptedMemberAsync();
+        using var promoted = await fixture.Client.PutAsJsonAsync(
+            $"{MembersUrl}/{InvitedUserId}/roles",
+            new { roleCodes = new[] { "owner" } },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, promoted.StatusCode);
+        using var disabled = await fixture.Client.PostAsync(
+            $"{MembersUrl}/{InvitedUserId}/disable",
+            content: null,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, disabled.StatusCode);
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PutRoles_ForAnUnknownRole_ReturnsBadRequest()
     {
         // Arrange
