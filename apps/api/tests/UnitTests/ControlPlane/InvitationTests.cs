@@ -69,7 +69,7 @@ public sealed class InvitationTests
         var invitation = CreateInvitation();
 
         // Act
-        invitation.Revoke(Now);
+        invitation.Revoke();
 
         // Assert
         Assert.Equal(InvitationStatus.Revoked, invitation.Status);
@@ -83,7 +83,7 @@ public sealed class InvitationTests
         invitation.Accept(ExternalUserId.Create("user_invited"), Now);
 
         // Act
-        var act = () => invitation.Revoke(Now);
+        var act = () => invitation.Revoke();
 
         // Assert
         Assert.Throws<InvalidOperationException>(act);

@@ -77,6 +77,21 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         return (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }
 
+    public async Task<DateTimeOffset> GetUserCreatedAtAsync(string databaseName, string externalUserId)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(ServerConnectionString) { Database = databaseName };
+        await using var connection = new NpgsqlConnection(builder.ConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT created_at FROM users WHERE external_user_id = @externalUserId",
+            connection);
+        command.Parameters.AddWithValue("externalUserId", externalUserId);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        await reader.ReadAsync(TestContext.Current.CancellationToken);
+
+        return reader.GetFieldValue<DateTimeOffset>(0);
+    }
+
     public ValueTask DisposeAsync() => postgres.DisposeAsync();
 
     private static ControlPlaneDbContext CreateControlPlaneDbContext(string connectionString)

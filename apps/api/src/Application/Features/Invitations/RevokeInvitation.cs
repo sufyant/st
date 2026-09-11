@@ -11,8 +11,7 @@ public sealed record RevokeInvitationCommand(Guid Id) : ICommand<Unit>;
 
 public sealed class RevokeInvitationHandler(
     ControlPlaneDbContext controlPlaneDbContext,
-    TenantContext tenantContext,
-    TimeProvider timeProvider) : IRequestHandler<RevokeInvitationCommand, Unit>
+    TenantContext tenantContext) : IRequestHandler<RevokeInvitationCommand, Unit>
 {
     public async Task<Result<Unit>> HandleAsync(
         RevokeInvitationCommand request,
@@ -34,7 +33,7 @@ public sealed class RevokeInvitationHandler(
                 "The invitation does not exist or is no longer pending."));
         }
 
-        invitation.Revoke(timeProvider.GetUtcNow());
+        invitation.Revoke();
 
         return Result.Success();
     }

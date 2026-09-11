@@ -123,6 +123,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
     public Task<TenantSurfaceFixture> WithPrincipalAsync(string externalUserId, string? email) =>
         Task.FromResult(WithPrincipal(externalUserId, email));
 
+    public IServiceScope CreateScope() => factory.Services.CreateScope();
+
     public ControlPlaneDbContext CreateControlPlane() =>
         CreateControlPlaneDbContext(ControlPlaneConnectionString);
 

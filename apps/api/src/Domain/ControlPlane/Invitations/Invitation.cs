@@ -80,7 +80,7 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
         AcceptedAt = acceptedAt;
     }
 
-    public void Revoke(DateTimeOffset revokedAt)
+    public void Revoke()
     {
         RequirePending();
 

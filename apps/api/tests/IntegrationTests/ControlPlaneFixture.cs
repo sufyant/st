@@ -85,6 +85,8 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
         return new ControlPlaneFixture(postgres, factory, controlPlane);
     }
 
+    public IServiceScope CreateScope() => factory.Services.CreateScope();
+
     public ControlPlaneDbContext CreateControlPlaneDbContext()
     {
         var options = new DbContextOptionsBuilder<ControlPlaneDbContext>()
