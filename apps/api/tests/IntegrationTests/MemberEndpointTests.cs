@@ -54,13 +54,11 @@ public sealed class MemberEndpointTests
             membership => membership.ExternalUserId == invitedUserId,
             TestContext.Current.CancellationToken));
         await using var tenantDbContext = fixture.CreateTenantDbContext();
-        var user = await tenantDbContext.Users.SingleAsync(
-            candidate => candidate.ExternalUserId == invitedUserId,
-            TestContext.Current.CancellationToken);
+        var user = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleAsync(candidate => candidate.ExternalUserId == invitedUserId, TestContext.Current.CancellationToken);
         Assert.Equal(UserStatus.Disabled, user.Status);
-        Assert.False(await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == user.Id,
-            TestContext.Current.CancellationToken));
+        Assert.Empty(user.Roles);
     }
 
     [Fact]

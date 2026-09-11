@@ -17,22 +17,16 @@ public sealed class ListMembersHandler(TenantDbContext tenantDbContext)
         ListMembersQuery request,
         CancellationToken cancellationToken)
     {
-        var users = await tenantDbContext.Users.AsNoTracking().ToListAsync(cancellationToken);
-        var assignments = await tenantDbContext.UserRoles
+        var users = await tenantDbContext.Users
+            .Include(user => user.Roles)
             .AsNoTracking()
-            .Join(
-                tenantDbContext.Roles,
-                assignment => assignment.RoleId,
-                role => role.Id,
-                (assignment, role) => new { assignment.UserId, role.Code })
             .ToListAsync(cancellationToken);
         var members = users
             .Select(user => new TenantMember(
                 user.ExternalUserId.Value,
                 user.Status.ToString(),
-                assignments
-                    .Where(assignment => assignment.UserId == user.Id)
-                    .Select(assignment => assignment.Code)
+                user.Roles
+                    .Select(role => role.Code)
                     .OrderBy(code => code)
                     .ToArray()))
             .OrderBy(member => member.ExternalUserId)

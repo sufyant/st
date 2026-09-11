@@ -15,5 +15,13 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.ExternalUserId).HasColumnName("external_user_id").HasMaxLength(255).HasConversion(x => x.Value, x => ExternalUserId.Create(x));
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(x => x.ExternalUserId).IsUnique();
+        builder.HasMany(x => x.Roles)
+            .WithMany()
+            .UsingEntity<Dictionary<string, object>>(
+                "user_roles",
+                right => right.HasOne<Role>().WithMany().HasForeignKey("role_id").OnDelete(DeleteBehavior.Cascade),
+                left => left.HasOne<User>().WithMany().HasForeignKey("user_id").OnDelete(DeleteBehavior.Cascade),
+                join => join.HasKey("user_id", "role_id"));
+        builder.Navigation(x => x.Roles).HasField("roles").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

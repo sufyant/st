@@ -134,7 +134,7 @@ public sealed class UnitOfWorkBehaviorTests
                     invitee));
                 var user = User.Create(invitee, UserStatus.Active);
                 tenant.Users.Add(user);
-                tenant.UserRoles.Add(UserRole.Create(user.Id, RoleId.New()));
+                user.AssignRoles([new Role()]);
 
                 return Task.FromResult(Result.Success());
             },

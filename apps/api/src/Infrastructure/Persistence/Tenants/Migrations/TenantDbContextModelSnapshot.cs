@@ -139,60 +139,6 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Authorization.RolePermission", b =>
-                {
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("role_id");
-
-                    b.Property<Guid>("PermissionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("permission_id");
-
-                    b.HasKey("RoleId", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.ToTable("role_permissions", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            RoleId = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
-                            PermissionId = new Guid("0f81cb90-d5a9-4c64-8b6f-a50378e81970")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
-                            PermissionId = new Guid("1a7bd5bd-0e5f-42aa-b0d9-a8144ea96574")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
-                            PermissionId = new Guid("292c9f17-f4c3-48b9-b66a-8de6f2d1e5b0")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
-                            PermissionId = new Guid("3c8c6534-6ca7-4b5f-93c5-1ba3c6d0a0b9")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
-                            PermissionId = new Guid("4d1b2a8e-8cf1-41a2-9d57-e5123e4ca92f")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("5b2c1a44-9d3e-4f81-b0a7-6c8e2f95d310"),
-                            PermissionId = new Guid("0f81cb90-d5a9-4c64-8b6f-a50378e81970")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("5b2c1a44-9d3e-4f81-b0a7-6c8e2f95d310"),
-                            PermissionId = new Guid("292c9f17-f4c3-48b9-b66a-8de6f2d1e5b0")
-                        });
-                });
-
             modelBuilder.Entity("Domain.Authorization.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -219,49 +165,99 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Authorization.UserRole", b =>
+            modelBuilder.Entity("role_permissions", b =>
                 {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                    b.Property<Guid>("role_id")
+                        .HasColumnType("uuid");
 
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("role_id");
+                    b.Property<Guid>("permission_id")
+                        .HasColumnType("uuid");
 
-                    b.HasKey("UserId", "RoleId");
+                    b.HasKey("role_id", "permission_id");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("permission_id");
 
-                    b.ToTable("user_roles", (string)null);
+                    b.ToTable("role_permissions");
+
+                    b.HasData(
+                        new
+                        {
+                            role_id = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
+                            permission_id = new Guid("0f81cb90-d5a9-4c64-8b6f-a50378e81970")
+                        },
+                        new
+                        {
+                            role_id = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
+                            permission_id = new Guid("1a7bd5bd-0e5f-42aa-b0d9-a8144ea96574")
+                        },
+                        new
+                        {
+                            role_id = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
+                            permission_id = new Guid("292c9f17-f4c3-48b9-b66a-8de6f2d1e5b0")
+                        },
+                        new
+                        {
+                            role_id = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
+                            permission_id = new Guid("3c8c6534-6ca7-4b5f-93c5-1ba3c6d0a0b9")
+                        },
+                        new
+                        {
+                            role_id = new Guid("e8d5f5ca-1b85-4ca3-99d2-a8534c9dc124"),
+                            permission_id = new Guid("4d1b2a8e-8cf1-41a2-9d57-e5123e4ca92f")
+                        },
+                        new
+                        {
+                            role_id = new Guid("5b2c1a44-9d3e-4f81-b0a7-6c8e2f95d310"),
+                            permission_id = new Guid("0f81cb90-d5a9-4c64-8b6f-a50378e81970")
+                        },
+                        new
+                        {
+                            role_id = new Guid("5b2c1a44-9d3e-4f81-b0a7-6c8e2f95d310"),
+                            permission_id = new Guid("292c9f17-f4c3-48b9-b66a-8de6f2d1e5b0")
+                        });
                 });
 
-            modelBuilder.Entity("Domain.Authorization.RolePermission", b =>
+            modelBuilder.Entity("user_roles", b =>
+                {
+                    b.Property<Guid>("user_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("role_id")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("user_id", "role_id");
+
+                    b.HasIndex("role_id");
+
+                    b.ToTable("user_roles");
+                });
+
+            modelBuilder.Entity("role_permissions", b =>
                 {
                     b.HasOne("Domain.Authorization.Permission", null)
                         .WithMany()
-                        .HasForeignKey("PermissionId")
+                        .HasForeignKey("permission_id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Domain.Authorization.Role", null)
                         .WithMany()
-                        .HasForeignKey("RoleId")
+                        .HasForeignKey("role_id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Authorization.UserRole", b =>
+            modelBuilder.Entity("user_roles", b =>
                 {
                     b.HasOne("Domain.Authorization.Role", null)
                         .WithMany()
-                        .HasForeignKey("RoleId")
+                        .HasForeignKey("role_id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Domain.Authorization.User", null)
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("user_id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

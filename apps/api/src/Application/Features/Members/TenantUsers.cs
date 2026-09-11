@@ -14,25 +14,17 @@ internal static class TenantUsers
     {
         var id = ExternalUserId.Create(externalUserId);
 
-        return tenantDbContext.Users.SingleOrDefaultAsync(
-            user => user.ExternalUserId == id,
-            cancellationToken);
+        return tenantDbContext.Users
+            .Include(user => user.Roles)
+            .SingleOrDefaultAsync(user => user.ExternalUserId == id, cancellationToken);
     }
 
     public static async Task<OwnerRoster> LoadOwnerRosterAsync(
         TenantDbContext tenantDbContext,
         CancellationToken cancellationToken) =>
-        OwnerRoster.Of(await tenantDbContext.UserRoles
-            .Join(
-                tenantDbContext.Roles.Where(role => role.Code == AccessCatalog.OwnerRole.Code),
-                assignment => assignment.RoleId,
-                role => role.Id,
-                (assignment, _) => assignment.UserId)
-            .Join(
-                tenantDbContext.Users.Where(user => user.Status == UserStatus.Active),
-                ownerId => ownerId,
-                user => user.Id,
-                (ownerId, _) => ownerId)
-            .Distinct()
+        OwnerRoster.Of(await tenantDbContext.Users
+            .Where(user => user.Status == UserStatus.Active
+                           && user.Roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
+            .Select(user => user.Id)
             .ToListAsync(cancellationToken));
 }

@@ -45,11 +45,7 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
             }
         }
 
-        var existing = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == user.Id)
-            .ToListAsync(cancellationToken);
-        tenantDbContext.UserRoles.RemoveRange(existing);
-        tenantDbContext.UserRoles.AddRange(roles.Select(role => UserRole.Create(user.Id, role.Id)));
+        user.AssignRoles(roles);
 
         return Result.Success();
     }

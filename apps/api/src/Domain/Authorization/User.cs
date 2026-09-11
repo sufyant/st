@@ -15,9 +15,13 @@ public readonly record struct UserId(Guid Value)
 
 public sealed class User : Entity<UserId>
 {
+    private readonly List<Role> roles = [];
+
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
     public UserStatus Status { get; private set; }
+
+    public IReadOnlyCollection<Role> Roles => roles;
 
     private User()
     {
@@ -38,4 +42,12 @@ public sealed class User : Entity<UserId>
     public void Enable() => Status = UserStatus.Active;
 
     public void Disable() => Status = UserStatus.Disabled;
+
+    public void AssignRoles(IEnumerable<Role> replacement)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+
+        roles.Clear();
+        roles.AddRange(replacement);
+    }
 }

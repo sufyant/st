@@ -84,9 +84,9 @@ public sealed class AcceptInvitationHandler(
         // user-scoped surface has no tenant in scope, so the unit of work behavior cannot commit it.
         // The tenant database is written first so that a failure in between leaves no membership,
         // and therefore no way in, until the retry completes.
-        var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.ExternalUserId == externalUserId,
-            cancellationToken);
+        var tenantUser = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (tenantUser is null)
         {
@@ -98,13 +98,9 @@ public sealed class AcceptInvitationHandler(
             tenantUser.Enable();
         }
 
-        var hasRole = await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == tenantUser.Id && assignment.RoleId == role.Id,
-            cancellationToken);
-
-        if (!hasRole)
+        if (tenantUser.Roles.All(existing => existing.Id != role.Id))
         {
-            tenantDbContext.UserRoles.Add(UserRole.Create(tenantUser.Id, role.Id));
+            tenantUser.AssignRoles([.. tenantUser.Roles, role]);
         }
 
         await tenantDbContext.SaveChangesAsync(cancellationToken);

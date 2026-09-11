@@ -40,10 +40,7 @@ public sealed class RevokeMemberHandler(
             .ToListAsync(cancellationToken);
         controlPlaneDbContext.Memberships.RemoveRange(memberships);
 
-        var assignments = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == user.Id)
-            .ToListAsync(cancellationToken);
-        tenantDbContext.UserRoles.RemoveRange(assignments);
+        user.AssignRoles([]);
         user.Disable();
 
         return Result.Success();

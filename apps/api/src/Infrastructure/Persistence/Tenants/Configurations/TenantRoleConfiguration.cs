@@ -23,5 +23,22 @@ public sealed class TenantRoleConfiguration : IEntityTypeConfiguration<Role>
             role.Name,
             role.Description
         }));
+        builder.HasMany(x => x.Permissions)
+            .WithMany()
+            .UsingEntity<Dictionary<string, object>>(
+                "role_permissions",
+                right => right.HasOne<Permission>().WithMany().HasForeignKey("permission_id").OnDelete(DeleteBehavior.Cascade),
+                left => left.HasOne<Role>().WithMany().HasForeignKey("role_id").OnDelete(DeleteBehavior.Cascade),
+                join =>
+                {
+                    join.HasKey("role_id", "permission_id");
+                    join.HasData(AccessCatalog.Roles.SelectMany(role =>
+                        role.PermissionIds.Select(permissionId => new
+                        {
+                            role_id = role.Id,
+                            permission_id = permissionId
+                        })));
+                });
+        builder.Navigation(x => x.Permissions).HasField("permissions").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

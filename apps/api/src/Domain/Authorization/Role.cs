@@ -11,8 +11,11 @@ public readonly record struct RoleId(Guid Value)
 
 public sealed class Role
 {
+    private readonly List<Permission> permissions = [];
+
     public RoleId Id { get; private set; }
     public string Code { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public string Description { get; private set; } = null!;
+    public IReadOnlyCollection<Permission> Permissions => permissions;
 }

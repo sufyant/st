@@ -76,12 +76,11 @@ public sealed class TenantProvisioningHandler(
     private async Task SeedOwnerAsync(Tenant tenant, string ownerExternalUserId, CancellationToken cancellationToken)
     {
         var externalUserId = ExternalUserId.Create(ownerExternalUserId);
-        var ownerRole = AccessCatalog.OwnerRole;
 
         await using var tenantDbContext = provisioner.CreateTenantDbContext(tenant.DatabaseName);
-        var user = await tenantDbContext.Users.SingleOrDefaultAsync(
-            candidate => candidate.ExternalUserId == externalUserId,
-            cancellationToken);
+        var user = await tenantDbContext.Users
+            .Include(candidate => candidate.Roles)
+            .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (user is null)
         {
@@ -90,13 +89,12 @@ public sealed class TenantProvisioningHandler(
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var hasRole = await tenantDbContext.UserRoles.AnyAsync(
-            assignment => assignment.UserId == user.Id && assignment.RoleId == ownerRole.Id,
-            cancellationToken);
-
-        if (!hasRole)
+        if (user.Roles.All(existing => existing.Code != AccessCatalog.OwnerRole.Code))
         {
-            tenantDbContext.UserRoles.Add(UserRole.Create(user.Id, ownerRole.Id));
+            var ownerRole = await tenantDbContext.Roles.SingleAsync(
+                candidate => candidate.Code == AccessCatalog.OwnerRole.Code,
+                cancellationToken);
+            user.AssignRoles([.. user.Roles, ownerRole]);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 

@@ -84,9 +84,10 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
 
         var userId = ExternalUserId.Create(externalUserId);
         var tenantDbContext = services.GetRequiredService<TenantDbContext>();
-        var tenantUser = await tenantDbContext.Users.SingleOrDefaultAsync(
-            user => user.ExternalUserId == userId,
-            context.RequestAborted);
+        var tenantUser = await tenantDbContext.Users
+            .Include(user => user.Roles)
+            .ThenInclude(role => role.Permissions)
+            .SingleOrDefaultAsync(user => user.ExternalUserId == userId, context.RequestAborted);
 
         if (tenantUser?.Status != UserStatus.Active)
         {
@@ -94,20 +95,11 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var permissions = await tenantDbContext.UserRoles
-            .Where(assignment => assignment.UserId == tenantUser.Id)
-            .Join(
-                tenantDbContext.RolePermissions,
-                assignment => assignment.RoleId,
-                rolePermission => rolePermission.RoleId,
-                (_, rolePermission) => rolePermission.PermissionId)
-            .Join(
-                tenantDbContext.Permissions,
-                permissionId => permissionId,
-                permission => permission.Id,
-                (_, permission) => permission.Code)
+        var permissions = tenantUser.Roles
+            .SelectMany(role => role.Permissions)
+            .Select(permission => permission.Code)
             .Distinct()
-            .ToListAsync(context.RequestAborted);
+            .ToList();
         var identity = new ClaimsIdentity("Tenant");
         identity.AddClaim(new Claim(TenantClaims.TenantId, tenant.Id.ToString("N")));
 
