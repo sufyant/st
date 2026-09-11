@@ -15,4 +15,11 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options) :
     protected override void OnModelCreating(ModelBuilder modelBuilder) => modelBuilder.ApplyConfigurationsFromAssembly(
         typeof(TenantDbContext).Assembly,
         type => type.Namespace == typeof(TenantUserConfiguration).Namespace);
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder builder)
+    {
+        builder.Properties<UserId>().HaveConversion<UserIdConverter>();
+        builder.Properties<RoleId>().HaveConversion<RoleIdConverter>();
+        builder.Properties<PermissionId>().HaveConversion<PermissionIdConverter>();
+    }
 }

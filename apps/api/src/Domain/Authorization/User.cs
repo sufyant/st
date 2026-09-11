@@ -4,10 +4,17 @@ namespace Domain.Authorization;
 
 public enum UserStatus { Active, Disabled }
 
-public sealed class User
+public readonly record struct UserId(Guid Value)
 {
-    public Guid Id { get; private set; }
+    public static UserId New() => new(Guid.CreateVersion7());
 
+    public static UserId From(Guid value) => value == Guid.Empty
+        ? throw new ArgumentException("Tenant user ID cannot be empty.", nameof(value))
+        : new UserId(value);
+}
+
+public sealed class User : Entity<UserId>
+{
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
     public UserStatus Status { get; private set; }
@@ -16,18 +23,13 @@ public sealed class User
     {
     }
 
-    public static User Create(Guid id, ExternalUserId externalUserId, UserStatus status)
+    public static User Create(ExternalUserId externalUserId, UserStatus status)
     {
-        if (id == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant user ID cannot be empty.", nameof(id));
-        }
-
         ArgumentNullException.ThrowIfNull(externalUserId);
 
         return new User
         {
-            Id = id,
+            Id = UserId.New(),
             ExternalUserId = externalUserId,
             Status = status
         };

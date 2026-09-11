@@ -36,7 +36,7 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                tenant.Users.Add(User.Create(Guid.CreateVersion7(), invitee, UserStatus.Active));
+                tenant.Users.Add(User.Create(invitee, UserStatus.Active));
 
                 return Task.FromResult(Result.Success());
             },
@@ -132,9 +132,9 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                var user = User.Create(Guid.CreateVersion7(), invitee, UserStatus.Active);
+                var user = User.Create(invitee, UserStatus.Active);
                 tenant.Users.Add(user);
-                tenant.UserRoles.Add(UserRole.Create(user.Id, Guid.CreateVersion7()));
+                tenant.UserRoles.Add(UserRole.Create(user.Id, RoleId.New()));
 
                 return Task.FromResult(Result.Success());
             },

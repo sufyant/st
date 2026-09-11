@@ -2,6 +2,6 @@ namespace Domain.Authorization;
 
 public sealed class RolePermission
 {
-    public Guid RoleId { get; private set; }
-    public Guid PermissionId { get; private set; }
+    public RoleId RoleId { get; private set; }
+    public PermissionId PermissionId { get; private set; }
 }

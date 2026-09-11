@@ -89,7 +89,6 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             if (roleCode is not null)
             {
                 var user = User.Create(
-                    Guid.CreateVersion7(),
                     ExternalUserId.Create(externalUserId),
                     UserStatus.Active);
                 tenantDbContext.Users.Add(user);

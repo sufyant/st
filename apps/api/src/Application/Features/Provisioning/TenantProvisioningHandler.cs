@@ -85,7 +85,7 @@ public sealed class TenantProvisioningHandler(
 
         if (user is null)
         {
-            user = User.Create(Guid.CreateVersion7(), externalUserId, UserStatus.Active);
+            user = User.Create(externalUserId, UserStatus.Active);
             tenantDbContext.Users.Add(user);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }

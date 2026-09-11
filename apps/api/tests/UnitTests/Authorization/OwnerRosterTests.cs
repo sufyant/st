@@ -9,7 +9,7 @@ public sealed class OwnerRosterTests
     public void IsLastOwner_ForTheOnlyOwner_IsTrue()
     {
         // Arrange
-        var owner = Guid.CreateVersion7();
+        var owner = new UserId(Guid.CreateVersion7());
         var roster = OwnerRoster.Of([owner]);
 
         // Act
@@ -23,8 +23,8 @@ public sealed class OwnerRosterTests
     public void IsLastOwner_WithASecondOwner_IsFalse()
     {
         // Arrange
-        var owner = Guid.CreateVersion7();
-        var roster = OwnerRoster.Of([owner, Guid.CreateVersion7()]);
+        var owner = new UserId(Guid.CreateVersion7());
+        var roster = OwnerRoster.Of([owner, new UserId(Guid.CreateVersion7())]);
 
         // Act
         var isLast = roster.IsLastOwner(owner);
@@ -37,10 +37,10 @@ public sealed class OwnerRosterTests
     public void IsLastOwner_ForSomeoneWhoIsNotAnOwner_IsFalse()
     {
         // Arrange
-        var roster = OwnerRoster.Of([Guid.CreateVersion7()]);
+        var roster = OwnerRoster.Of([new UserId(Guid.CreateVersion7())]);
 
         // Act
-        var isLast = roster.IsLastOwner(Guid.CreateVersion7());
+        var isLast = roster.IsLastOwner(new UserId(Guid.CreateVersion7()));
 
         // Assert
         Assert.False(isLast);
@@ -53,7 +53,7 @@ public sealed class OwnerRosterTests
         var roster = OwnerRoster.Of([]);
 
         // Act
-        var isLast = roster.IsLastOwner(Guid.CreateVersion7());
+        var isLast = roster.IsLastOwner(new UserId(Guid.CreateVersion7()));
 
         // Assert
         Assert.False(isLast);
