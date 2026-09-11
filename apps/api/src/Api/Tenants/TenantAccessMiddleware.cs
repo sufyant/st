@@ -80,7 +80,7 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        tenantContext.Set(tenant.Id, tenant.Alias, tenant.DatabaseName);
+        tenantContext.Set(TenantId.From(tenant.Id), tenant.Alias, tenant.DatabaseName);
 
         var userId = ExternalUserId.Create(externalUserId);
         var tenantDbContext = services.GetRequiredService<TenantDbContext>();

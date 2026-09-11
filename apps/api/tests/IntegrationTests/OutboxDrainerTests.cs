@@ -14,7 +14,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
         await using var drainer = CreateDrainer(fixture);
 
         // Act
@@ -55,7 +55,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
 
         await using (var context = fixture.CreateControlPlane())
         {
@@ -85,7 +85,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
 
         await using (var context = fixture.CreateControlPlane())
         {
@@ -109,7 +109,7 @@ public sealed class OutboxDrainerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        await EnqueueAsync(fixture, tenant.Id);
+        await EnqueueAsync(fixture, tenant.Id.Value);
         await using var first = CreateDrainer(fixture);
         await using var second = CreateDrainer(fixture);
 

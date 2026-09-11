@@ -25,8 +25,9 @@ public sealed class TenantProvisioningHandler(
 
     public async Task HandleAsync(TenantProvisioningRequested message, CancellationToken cancellationToken)
     {
+        var tenantId = TenantId.From(message.TenantId);
         var tenant = await controlPlaneDbContext.Tenants.SingleOrDefaultAsync(
-                         candidate => candidate.Id == message.TenantId,
+                         candidate => candidate.Id == tenantId,
                          cancellationToken)
                      ?? throw new InvalidOperationException($"Tenant '{message.TenantId}' does not exist.");
 
@@ -106,7 +107,7 @@ public sealed class TenantProvisioningHandler(
         if (!hasMembership)
         {
             controlPlaneDbContext.Memberships.Add(
-                Membership.Create(Guid.CreateVersion7(), tenant.Id, externalUserId));
+                Membership.Create(tenant.Id, externalUserId));
             await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
         }
     }

@@ -1,14 +1,22 @@
+using Domain.ControlPlane.Tenants;
 using Domain.Shared;
 
 namespace Domain.ControlPlane.Invitations;
 
 public enum InvitationStatus { Pending, Accepted, Revoked }
 
-public sealed class Invitation
+public readonly record struct InvitationId(Guid Value)
 {
-    public Guid Id { get; private set; }
+    public static InvitationId New() => new(Guid.CreateVersion7());
 
-    public Guid TenantId { get; private set; }
+    public static InvitationId From(Guid value) => value == Guid.Empty
+        ? throw new ArgumentException("Invitation ID cannot be empty.", nameof(value))
+        : new InvitationId(value);
+}
+
+public sealed class Invitation : Entity<InvitationId>
+{
+    public TenantId TenantId { get; private set; }
 
     public EmailAddress Email { get; private set; } = null!;
 
@@ -33,8 +41,7 @@ public sealed class Invitation
     }
 
     public static Invitation Create(
-        Guid id,
-        Guid tenantId,
+        TenantId tenantId,
         EmailAddress email,
         string roleCode,
         string tokenHash,
@@ -42,16 +49,6 @@ public sealed class Invitation
         DateTimeOffset createdAt,
         TimeSpan lifetime)
     {
-        if (id == Guid.Empty)
-        {
-            throw new ArgumentException("Invitation ID cannot be empty.", nameof(id));
-        }
-
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
-        }
-
         ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(invitedBy);
         ArgumentException.ThrowIfNullOrWhiteSpace(roleCode);
@@ -64,7 +61,7 @@ public sealed class Invitation
 
         return new Invitation
         {
-            Id = id,
+            Id = InvitationId.New(),
             TenantId = tenantId,
             Email = email,
             RoleCode = roleCode,

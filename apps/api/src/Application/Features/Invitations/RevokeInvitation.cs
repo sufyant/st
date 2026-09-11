@@ -18,8 +18,9 @@ public sealed class RevokeInvitationHandler(
         RevokeInvitationCommand request,
         CancellationToken cancellationToken)
     {
+        var invitationId = InvitationId.From(request.Id);
         var invitation = await controlPlaneDbContext.Invitations.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.Id
+            candidate => candidate.Id == invitationId
                          && candidate.TenantId == tenantContext.TenantId
                          && candidate.Status == InvitationStatus.Pending,
             cancellationToken);

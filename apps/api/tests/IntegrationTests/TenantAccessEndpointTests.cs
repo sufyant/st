@@ -25,7 +25,6 @@ public sealed class TenantAccessEndpointTests
     private const string ExternalUser = "user_2abc123";
     private const string ActiveUser = "Active";
     private const string DisabledUser = "Disabled";
-    private static readonly Guid TenantId = Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9");
 
     [Fact]
     public async Task GetWhoAmI_WithAnInvalidTenantAlias_ReturnsNotFound()
@@ -152,7 +151,7 @@ public sealed class TenantAccessEndpointTests
         bool hasMembership = true)
     {
         var connectionString = postgres.GetConnectionString();
-        var tenant = Tenant.Create(TenantId, TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
         tenant.ChangeStatus(tenantStatus, DateTimeOffset.UtcNow);
 
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
@@ -168,7 +167,7 @@ public sealed class TenantAccessEndpointTests
         if (hasMembership)
         {
             controlPlaneContext.Memberships.Add(
-                Membership.Create(Guid.NewGuid(), tenant.Id, ExternalUserId.Create(ExternalUser)));
+                Membership.Create(tenant.Id, ExternalUserId.Create(ExternalUser)));
         }
 
         await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);

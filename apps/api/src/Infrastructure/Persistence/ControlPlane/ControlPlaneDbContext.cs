@@ -27,4 +27,12 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             typeof(ControlPlaneDbContext).Assembly,
             type => type.Namespace == typeof(TenantConfiguration).Namespace);
     }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder builder)
+    {
+        builder.Properties<TenantId>().HaveConversion<TenantIdConverter>();
+        builder.Properties<MembershipId>().HaveConversion<MembershipIdConverter>();
+        builder.Properties<InvitationId>().HaveConversion<InvitationIdConverter>();
+        builder.Properties<PlatformAdminId>().HaveConversion<PlatformAdminIdConverter>();
+    }
 }

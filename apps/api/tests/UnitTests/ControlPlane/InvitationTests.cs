@@ -1,4 +1,5 @@
 using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Tenants;
 using Domain.Shared;
 using Xunit;
 
@@ -89,8 +90,7 @@ public sealed class InvitationTests
     }
 
     private static Invitation CreateInvitation() => Invitation.Create(
-        Guid.CreateVersion7(),
-        Guid.CreateVersion7(),
+        TenantId.New(),
         EmailAddress.Create("invited@example.com"),
         "member",
         "token-hash",

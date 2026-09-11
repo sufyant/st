@@ -23,7 +23,7 @@ public sealed class TenantProvisioningHandlerTests
 
         // Act
         await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -45,7 +45,7 @@ public sealed class TenantProvisioningHandlerTests
 
         // Act
         await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -64,7 +64,7 @@ public sealed class TenantProvisioningHandlerTests
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
         var handler = new TenantProvisioningHandler(context, fixture.Provisioner, TimeProvider.System);
-        var message = new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId);
+        var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
         // Act
@@ -111,7 +111,7 @@ public sealed class TenantProvisioningHandlerTests
 
         // Act
         var act = async () => await handler.HandleAsync(
-            new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId),
+            new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -128,7 +128,7 @@ public sealed class TenantProvisioningHandlerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
-        var message = new TenantProvisioningRequested(tenant.Id, ProvisioningFixture.OwnerExternalUserId);
+        var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId);
 
         await using (var failingContext = fixture.CreateControlPlane())
         {

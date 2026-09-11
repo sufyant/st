@@ -1,20 +1,22 @@
+using Domain.ControlPlane.Tenants;
+
 namespace Application.Abstractions;
 
 public sealed class TenantContext
 {
-    private Guid? tenantId;
+    private TenantId? tenantId;
     private string? alias;
     private string? databaseName;
 
     public bool IsResolved => tenantId is not null;
 
-    public Guid TenantId => tenantId ?? throw NotResolved();
+    public TenantId TenantId => tenantId ?? throw NotResolved();
 
     public string Alias => alias ?? throw NotResolved();
 
     public string DatabaseName => databaseName ?? throw NotResolved();
 
-    public void Set(Guid resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
+    public void Set(TenantId resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
     {
         tenantId = resolvedTenantId;
         alias = resolvedAlias;

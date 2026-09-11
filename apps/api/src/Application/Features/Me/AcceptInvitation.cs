@@ -116,12 +116,12 @@ public sealed class AcceptInvitationHandler(
 
         if (!hasMembership)
         {
-            dbContext.Memberships.Add(Membership.Create(Guid.CreateVersion7(), tenant.Id, externalUserId));
+            dbContext.Memberships.Add(Membership.Create(tenant.Id, externalUserId));
         }
 
         invitation.Accept(externalUserId, now);
 
         return Result<MyMembership>.Success(
-            new MyMembership(tenant.Id, tenant.Alias.Value, tenant.Status.ToString()));
+            new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString()));
     }
 }

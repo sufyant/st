@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
+using Domain.ControlPlane.Tenants;
 using Microsoft.Extensions.Caching.Memory;
 using Xunit;
 
@@ -121,7 +122,7 @@ public sealed class CachingBehaviorTests
         where TRequest : IRequest<TResponse>
     {
         var tenantContext = new TenantContext();
-        tenantContext.Set(tenantId, "acme", $"tenant_{tenantId:N}");
+        tenantContext.Set(TenantId.From(tenantId), "acme", $"tenant_{tenantId:N}");
 
         return new CachingBehavior<TRequest, TResponse>(cache, tenantContext);
     }

@@ -66,7 +66,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         var connectionString = postgres.GetConnectionString();
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlane = WithDatabase(connectionString, "control_plane");
-        var tenant = Tenant.Create(Guid.CreateVersion7(), TenantAlias.Create(Alias), DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(Alias), DateTimeOffset.UtcNow);
         tenant.CompleteProvisioning(DateTimeOffset.UtcNow);
 
         await using (var context = CreateControlPlaneDbContext(controlPlane))
@@ -74,7 +74,6 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
             context.Tenants.Add(tenant);
             context.Memberships.Add(Membership.Create(
-                Guid.CreateVersion7(),
                 tenant.Id,
                 ExternalUserId.Create(externalUserId)));
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);

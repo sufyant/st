@@ -1,4 +1,5 @@
 using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Domain.Shared;
 using Xunit;
 
@@ -10,15 +11,14 @@ public sealed class MembershipTests
     public void Create_SetsAnActiveMembership()
     {
         // Arrange
-        var membershipId = Guid.NewGuid();
-        var tenantId = Guid.NewGuid();
+        var tenantId = TenantId.New();
         var externalUserId = ExternalUserId.Create("user_2abc123");
 
         // Act
-        var membership = Membership.Create(membershipId, tenantId, externalUserId);
+        var membership = Membership.Create(tenantId, externalUserId);
 
         // Assert
-        Assert.Equal(membershipId, membership.Id);
+        Assert.NotEqual(Guid.Empty, membership.Id.Value);
         Assert.Equal(tenantId, membership.TenantId);
         Assert.Equal(ExternalUserId.Create("user_2abc123"), membership.ExternalUserId);
     }
@@ -30,24 +30,6 @@ public sealed class MembershipTests
     {
         // Arrange
         var action = () => ExternalUserId.Create(value);
-
-        // Act
-        var exception = Record.Exception(action);
-
-        // Assert
-        Assert.IsType<ArgumentException>(exception);
-    }
-
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void Create_WithEmptyRequiredId_ThrowsArgumentException(bool emptyMembershipId, bool emptyTenantId)
-    {
-        // Arrange
-        var membershipId = emptyMembershipId ? Guid.Empty : Guid.NewGuid();
-        var tenantId = emptyTenantId ? Guid.Empty : Guid.NewGuid();
-        var externalUserId = ExternalUserId.Create("user_2abc123");
-        var action = () => Membership.Create(membershipId, tenantId, externalUserId);
 
         // Act
         var exception = Record.Exception(action);

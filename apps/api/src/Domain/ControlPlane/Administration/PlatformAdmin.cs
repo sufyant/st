@@ -2,10 +2,17 @@ using Domain.Shared;
 
 namespace Domain.ControlPlane.Administration;
 
-public sealed class PlatformAdmin
+public readonly record struct PlatformAdminId(Guid Value)
 {
-    public Guid Id { get; private set; }
+    public static PlatformAdminId New() => new(Guid.CreateVersion7());
 
+    public static PlatformAdminId From(Guid value) => value == Guid.Empty
+        ? throw new ArgumentException("Platform admin ID cannot be empty.", nameof(value))
+        : new PlatformAdminId(value);
+}
+
+public sealed class PlatformAdmin : Entity<PlatformAdminId>
+{
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -14,18 +21,13 @@ public sealed class PlatformAdmin
     {
     }
 
-    public static PlatformAdmin Create(Guid id, ExternalUserId externalUserId, DateTimeOffset createdAt)
+    public static PlatformAdmin Create(ExternalUserId externalUserId, DateTimeOffset createdAt)
     {
-        if (id == Guid.Empty)
-        {
-            throw new ArgumentException("Platform admin ID cannot be empty.", nameof(id));
-        }
-
         ArgumentNullException.ThrowIfNull(externalUserId);
 
         return new PlatformAdmin
         {
-            Id = id,
+            Id = PlatformAdminId.New(),
             ExternalUserId = externalUserId,
             CreatedAt = createdAt
         };

@@ -48,7 +48,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
 
     public async Task<Tenant> AddProvisioningTenantAsync(string alias)
     {
-        var tenant = Tenant.Create(Guid.CreateVersion7(), TenantAlias.Create(alias), DateTimeOffset.UtcNow);
+        var tenant = Tenant.Create(TenantAlias.Create(alias), DateTimeOffset.UtcNow);
         await using var context = CreateControlPlane();
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -56,7 +56,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         return tenant;
     }
 
-    public async Task<Tenant> ReloadAsync(Guid tenantId)
+    public async Task<Tenant> ReloadAsync(TenantId tenantId)
     {
         await using var context = CreateControlPlane();
 

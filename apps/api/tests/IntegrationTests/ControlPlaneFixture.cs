@@ -56,7 +56,6 @@ public sealed class ControlPlaneFixture : IAsyncDisposable
             if (isPlatformAdmin)
             {
                 context.PlatformAdmins.Add(PlatformAdmin.Create(
-                    Guid.NewGuid(),
                     ExternalUserId.Create(TestUserId),
                     DateTimeOffset.UtcNow));
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);

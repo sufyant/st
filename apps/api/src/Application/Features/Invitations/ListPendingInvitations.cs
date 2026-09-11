@@ -30,7 +30,7 @@ public sealed class ListPendingInvitationsHandler(
                                  && invitation.Status == InvitationStatus.Pending)
             .OrderByDescending(invitation => invitation.CreatedAt)
             .Select(invitation => new PendingInvitation(
-                invitation.Id,
+                invitation.Id.Value,
                 invitation.Email.Value,
                 invitation.RoleCode,
                 invitation.CreatedAt,

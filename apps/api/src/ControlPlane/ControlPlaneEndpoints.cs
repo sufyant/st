@@ -32,7 +32,7 @@ public static class ControlPlaneEndpoints
                 .AsNoTracking()
                 .OrderByDescending(tenant => tenant.CreatedAt)
                 .Select(tenant => new TenantSummary(
-                    tenant.Id,
+                    tenant.Id.Value,
                     tenant.Alias.Value,
                     tenant.Status.ToString(),
                     tenant.CreatedAt))

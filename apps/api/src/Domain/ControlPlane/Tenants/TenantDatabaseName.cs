@@ -26,15 +26,8 @@ public sealed record TenantDatabaseName
         Value = value;
     }
 
-    public static TenantDatabaseName ForTenant(Guid tenantId)
-    {
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
-        }
-
-        return new TenantDatabaseName($"tenant_{tenantId:N}");
-    }
+    public static TenantDatabaseName ForTenant(TenantId tenantId) =>
+        new($"tenant_{tenantId.Value:N}");
 
     public static TenantDatabaseName Create(string value)
     {

@@ -21,7 +21,7 @@ public sealed class CachingBehavior<TRequest, TResponse>(
 
         // The tenant prefix belongs to the behavior, never to the query. A query author who
         // forgets it serves one tenant's answer to another.
-        var key = $"{tenantContext.TenantId:N}:{query.CacheKey}";
+        var key = $"{tenantContext.TenantId.Value:N}:{query.CacheKey}";
 
         if (cache.TryGetValue(key, out TResponse? cached))
         {

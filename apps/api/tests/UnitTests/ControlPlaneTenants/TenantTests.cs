@@ -8,36 +8,20 @@ public sealed class TenantTests
     private static readonly DateTimeOffset CreatedAt = new(2026, 9, 9, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Create_ForAnEmptyIdentifier_Throws()
+    public void Create_DerivesTheDatabaseNameFromTheGeneratedId()
     {
-        // Arrange
-        var alias = TenantAlias.Create("acme");
-
-        // Act
-        var act = () => Tenant.Create(Guid.Empty, alias, CreatedAt);
+        // Arrange & Act
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
 
         // Assert
-        Assert.Throws<ArgumentException>(act);
-    }
-
-    [Fact]
-    public void Create_DerivesTheDatabaseNameOnce()
-    {
-        // Arrange
-        var id = Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9");
-
-        // Act
-        var tenant = Tenant.Create(id, TenantAlias.Create("acme"), CreatedAt);
-
-        // Assert
-        Assert.Equal("tenant_018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.DatabaseName.Value);
+        Assert.Equal($"tenant_{tenant.Id.Value:N}", tenant.DatabaseName.Value);
     }
 
     [Fact]
     public void Create_StartsInTheProvisioningState()
     {
         // Arrange & Act
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
 
         // Assert
         Assert.Equal(TenantStatus.Provisioning, tenant.Status);
@@ -49,7 +33,7 @@ public sealed class TenantTests
     public void RenameAlias_ReplacesTheAliasAndBumpsTheTimestamp()
     {
         // Arrange
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
         var renamedAt = CreatedAt.AddMinutes(5);
 
         // Act
@@ -64,21 +48,21 @@ public sealed class TenantTests
     public void RenameAlias_DoesNotChangeTheDatabaseName()
     {
         // Arrange
-        var id = Guid.Parse("018f4e3b-7c9d-4a1b-a2c3-d4e5f6a7b8c9");
-        var tenant = Tenant.Create(id, TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
+        var databaseName = tenant.DatabaseName.Value;
 
         // Act
         tenant.RenameAlias(TenantAlias.Create("globex"), CreatedAt.AddMinutes(5));
 
         // Assert
-        Assert.Equal("tenant_018f4e3b7c9d4a1ba2c3d4e5f6a7b8c9", tenant.DatabaseName.Value);
+        Assert.Equal(databaseName, tenant.DatabaseName.Value);
     }
 
     [Fact]
     public void Create_StartsAtTheFirstProvisioningStep()
     {
         // Arrange & Act
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
 
         // Assert
         Assert.Equal(TenantProvisioningStep.CreatingDatabase, tenant.ProvisioningStep);
@@ -89,7 +73,7 @@ public sealed class TenantTests
     public void RecordProvisioningProgress_MovesTheStepAndClearsTheError()
     {
         // Arrange
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
         tenant.RecordProvisioningFailure(TenantProvisioningStep.CreatingDatabase, "boom", CreatedAt);
 
         // Act
@@ -105,7 +89,7 @@ public sealed class TenantTests
     public void RecordProvisioningFailure_KeepsTheTenantProvisioningAndRecordsTheError()
     {
         // Arrange
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
 
         // Act
         tenant.RecordProvisioningFailure(TenantProvisioningStep.GrantingAccess, "denied", CreatedAt.AddSeconds(2));
@@ -120,7 +104,7 @@ public sealed class TenantTests
     public void CompleteProvisioning_ActivatesTheTenantAndClearsProgress()
     {
         // Arrange
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
         tenant.RecordProvisioningFailure(TenantProvisioningStep.SeedingOwner, "boom", CreatedAt);
 
         // Act
@@ -137,7 +121,7 @@ public sealed class TenantTests
     public void ChangeStatus_ReplacesTheStatusAndBumpsTheTimestamp()
     {
         // Arrange
-        var tenant = Tenant.Create(Guid.NewGuid(), TenantAlias.Create("acme"), CreatedAt);
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
         var activatedAt = CreatedAt.AddSeconds(30);
 
         // Act

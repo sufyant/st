@@ -1,9 +1,18 @@
+using Domain.Shared;
+
 namespace Domain.ControlPlane.Tenants;
 
-public sealed class Tenant
+public readonly record struct TenantId(Guid Value)
 {
-    public Guid Id { get; private set; }
+    public static TenantId New() => new(Guid.CreateVersion7());
 
+    public static TenantId From(Guid value) => value == Guid.Empty
+        ? throw new ArgumentException("Tenant ID cannot be empty.", nameof(value))
+        : new TenantId(value);
+}
+
+public sealed class Tenant : Entity<TenantId>
+{
     public TenantAlias Alias { get; private set; } = null!;
 
     public TenantDatabaseName DatabaseName { get; private set; } = null!;
@@ -22,14 +31,11 @@ public sealed class Tenant
     {
     }
 
-    public static Tenant Create(Guid id, TenantAlias alias, DateTimeOffset createdAt)
+    public static Tenant Create(TenantAlias alias, DateTimeOffset createdAt)
     {
-        if (id == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant ID cannot be empty.", nameof(id));
-        }
-
         ArgumentNullException.ThrowIfNull(alias);
+
+        var id = TenantId.New();
 
         return new Tenant
         {

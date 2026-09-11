@@ -1,36 +1,34 @@
+using Domain.ControlPlane.Tenants;
 using Domain.Shared;
 
 namespace Domain.ControlPlane.Memberships;
 
-public sealed class Membership
+public readonly record struct MembershipId(Guid Value)
+{
+    public static MembershipId New() => new(Guid.CreateVersion7());
+
+    public static MembershipId From(Guid value) => value == Guid.Empty
+        ? throw new ArgumentException("Membership ID cannot be empty.", nameof(value))
+        : new MembershipId(value);
+}
+
+public sealed class Membership : Entity<MembershipId>
 {
     private Membership()
     {
     }
 
-    public Guid Id { get; private set; }
-
-    public Guid TenantId { get; private set; }
+    public TenantId TenantId { get; private set; }
 
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
-    public static Membership Create(Guid id, Guid tenantId, ExternalUserId externalUserId)
+    public static Membership Create(TenantId tenantId, ExternalUserId externalUserId)
     {
-        if (id == Guid.Empty)
-        {
-            throw new ArgumentException("Membership ID cannot be empty.", nameof(id));
-        }
-
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
-        }
-
         ArgumentNullException.ThrowIfNull(externalUserId);
 
         return new Membership
         {
-            Id = id,
+            Id = MembershipId.New(),
             TenantId = tenantId,
             ExternalUserId = externalUserId
         };

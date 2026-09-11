@@ -55,12 +55,12 @@ public static class TenantEndpoints
         }
 
         var now = timeProvider.GetUtcNow();
-        var tenant = Tenant.Create(Guid.CreateVersion7(), alias, now);
+        var tenant = Tenant.Create(alias, now);
         dbContext.Tenants.Add(tenant);
         Enqueue(dbContext, tenant.Id, user, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id }, ToDetail(tenant));
+        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id.Value }, ToDetail(tenant));
     }
 
     private static async Task<IResult> GetAsync(
@@ -68,9 +68,10 @@ public static class TenantEndpoints
         ControlPlaneDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var tenantId = TenantId.From(id);
         var tenant = await dbContext.Tenants
             .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
 
         return tenant is null ? Results.NotFound() : Results.Ok(ToDetail(tenant));
     }
@@ -82,8 +83,9 @@ public static class TenantEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
+        var tenantId = TenantId.From(id);
         var tenant = await dbContext.Tenants
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Id == tenantId, cancellationToken);
 
         if (tenant is null)
         {
@@ -98,24 +100,24 @@ public static class TenantEndpoints
         Enqueue(dbContext, tenant.Id, user, timeProvider.GetUtcNow());
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id }, ToDetail(tenant));
+        return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id.Value }, ToDetail(tenant));
     }
 
     private static void Enqueue(
         ControlPlaneDbContext dbContext,
-        Guid tenantId,
+        TenantId tenantId,
         ClaimsPrincipal user,
         DateTimeOffset now) =>
         dbContext.OutboxMessages.Add(OutboxMessage.Create(
             Guid.CreateVersion7(),
             TenantProvisioningRequested.MessageType,
             JsonSerializer.Serialize(new TenantProvisioningRequested(
-                tenantId,
+                tenantId.Value,
                 user.FindFirstValue("sub")!)),
             now));
 
     private static TenantDetail ToDetail(Tenant tenant) => new(
-        tenant.Id,
+        tenant.Id.Value,
         tenant.Alias.Value,
         tenant.Status.ToString(),
         tenant.ProvisioningStep?.ToString(),
