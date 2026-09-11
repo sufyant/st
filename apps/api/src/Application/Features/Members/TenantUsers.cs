@@ -18,13 +18,4 @@ internal static class TenantUsers
             .Include(user => user.Roles)
             .SingleOrDefaultAsync(user => user.ExternalUserId == id, cancellationToken);
     }
-
-    public static async Task<OwnerRoster> LoadOwnerRosterAsync(
-        TenantDbContext tenantDbContext,
-        CancellationToken cancellationToken) =>
-        OwnerRoster.Of(await tenantDbContext.Users
-            .Where(user => user.Status == UserStatus.Active
-                           && user.Roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
-            .Select(user => user.Id)
-            .ToListAsync(cancellationToken));
 }

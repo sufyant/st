@@ -37,9 +37,7 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
 
         if (!roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
         {
-            var roster = await TenantUsers.LoadOwnerRosterAsync(tenantDbContext, cancellationToken);
-
-            if (roster.IsLastOwner(user.Id))
+            if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
             {
                 return Result<Unit>.Failure(MemberErrors.LastOwner);
             }
