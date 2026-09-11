@@ -118,17 +118,75 @@ public sealed class TenantTests
     }
 
     [Fact]
-    public void ChangeStatus_ReplacesTheStatusAndBumpsTheTimestamp()
+    public void Suspend_FromProvisioning_Throws()
     {
         // Arrange
         var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
-        var activatedAt = CreatedAt.AddSeconds(30);
 
         // Act
-        tenant.ChangeStatus(TenantStatus.Active, activatedAt);
+        var act = () => tenant.Suspend(CreatedAt.AddMinutes(1));
 
         // Assert
-        Assert.Equal(TenantStatus.Active, tenant.Status);
-        Assert.Equal(activatedAt, tenant.UpdatedAt);
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void Resume_FromActive_Throws()
+    {
+        // Arrange
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
+        tenant.CompleteProvisioning(CreatedAt.AddMinutes(1));
+
+        // Act
+        var act = () => tenant.Resume(CreatedAt.AddMinutes(2));
+
+        // Assert
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void CompleteProvisioning_Twice_Throws()
+    {
+        // Arrange
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
+        tenant.CompleteProvisioning(CreatedAt.AddMinutes(1));
+
+        // Act
+        var act = () => tenant.CompleteProvisioning(CreatedAt.AddMinutes(2));
+
+        // Assert
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void MarkDeleted_WithoutDeprovisioning_Throws()
+    {
+        // Arrange
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
+        tenant.CompleteProvisioning(CreatedAt.AddMinutes(1));
+
+        // Act
+        var act = () => tenant.MarkDeleted(CreatedAt.AddMinutes(2));
+
+        // Assert
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void TheLifecycleRunsEndToEnd()
+    {
+        // Arrange
+        var tenant = Tenant.Create(TenantAlias.Create("acme"), CreatedAt);
+
+        // Act
+        tenant.CompleteProvisioning(CreatedAt.AddMinutes(1));
+        tenant.Suspend(CreatedAt.AddMinutes(2));
+        tenant.Resume(CreatedAt.AddMinutes(3));
+        tenant.BeginDeprovisioning(CreatedAt.AddMinutes(4));
+        tenant.MarkDeleted(CreatedAt.AddMinutes(5));
+
+        // Assert
+        Assert.Equal(TenantStatus.Deleted, tenant.Status);
+        Assert.Equal(CreatedAt.AddMinutes(5), tenant.UpdatedAt);
     }
 }

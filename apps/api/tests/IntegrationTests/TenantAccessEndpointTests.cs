@@ -152,7 +152,7 @@ public sealed class TenantAccessEndpointTests
     {
         var connectionString = postgres.GetConnectionString();
         var tenant = Tenant.Create(TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
-        tenant.ChangeStatus(tenantStatus, DateTimeOffset.UtcNow);
+        MoveToStatus(tenant, tenantStatus, DateTimeOffset.UtcNow);
 
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlaneOptions = new DbContextOptionsBuilder<ControlPlaneDbContext>()
@@ -178,6 +178,33 @@ public sealed class TenantAccessEndpointTests
         await tenantContext.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO users (id, external_user_id, status) VALUES ({Guid.NewGuid()}, {ExternalUser}, {tenantUserStatus})",
             TestContext.Current.CancellationToken);
+    }
+
+    private static void MoveToStatus(Tenant tenant, TenantStatus status, DateTimeOffset updatedAt)
+    {
+        switch (status)
+        {
+            case TenantStatus.Provisioning:
+                break;
+            case TenantStatus.Active:
+                tenant.CompleteProvisioning(updatedAt);
+                break;
+            case TenantStatus.Suspended:
+                tenant.CompleteProvisioning(updatedAt);
+                tenant.Suspend(updatedAt);
+                break;
+            case TenantStatus.Deprovisioning:
+                tenant.CompleteProvisioning(updatedAt);
+                tenant.BeginDeprovisioning(updatedAt);
+                break;
+            case TenantStatus.Deleted:
+                tenant.CompleteProvisioning(updatedAt);
+                tenant.BeginDeprovisioning(updatedAt);
+                tenant.MarkDeleted(updatedAt);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status), status, null);
+        }
     }
 
     private static async Task ExecuteAsync(string connectionString, string sql)

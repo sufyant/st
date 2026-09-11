@@ -19,7 +19,7 @@ public sealed class TenantMigrationRunnerTests
         var connectionString = postgres.GetConnectionString();
         await using var controlPlaneContext = await CreateControlPlaneAsync(connectionString);
         var active = Tenant.Create(TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
-        active.ChangeStatus(TenantStatus.Active, DateTimeOffset.UtcNow);
+        active.CompleteProvisioning(DateTimeOffset.UtcNow);
         var provisioning = Tenant.Create(TenantAlias.Create("globex"), DateTimeOffset.UtcNow);
         controlPlaneContext.Tenants.AddRange(active, provisioning);
         await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -50,7 +50,7 @@ public sealed class TenantMigrationRunnerTests
         var connectionString = postgres.GetConnectionString();
         await using var controlPlaneContext = await CreateControlPlaneAsync(connectionString);
         var tenant = Tenant.Create(TenantAlias.Create("acme"), DateTimeOffset.UtcNow);
-        tenant.ChangeStatus(TenantStatus.Active, DateTimeOffset.UtcNow);
+        tenant.CompleteProvisioning(DateTimeOffset.UtcNow);
         controlPlaneContext.Tenants.Add(tenant);
         await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         var runner = new TenantMigrationRunner(

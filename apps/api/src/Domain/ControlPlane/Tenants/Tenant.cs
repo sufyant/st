@@ -57,12 +57,6 @@ public sealed class Tenant : Entity<TenantId>
         UpdatedAt = updatedAt;
     }
 
-    public void ChangeStatus(TenantStatus status, DateTimeOffset updatedAt)
-    {
-        Status = status;
-        UpdatedAt = updatedAt;
-    }
-
     public void RecordProvisioningProgress(TenantProvisioningStep step, DateTimeOffset updatedAt)
     {
         ProvisioningStep = step;
@@ -81,9 +75,33 @@ public sealed class Tenant : Entity<TenantId>
 
     public void CompleteProvisioning(DateTimeOffset updatedAt)
     {
-        Status = TenantStatus.Active;
+        RequireStatus(updatedAt, TenantStatus.Active, TenantStatus.Provisioning);
+
         ProvisioningStep = null;
         ProvisioningError = null;
+    }
+
+    public void Suspend(DateTimeOffset updatedAt) =>
+        RequireStatus(updatedAt, TenantStatus.Suspended, TenantStatus.Active);
+
+    public void Resume(DateTimeOffset updatedAt) =>
+        RequireStatus(updatedAt, TenantStatus.Active, TenantStatus.Suspended);
+
+    public void BeginDeprovisioning(DateTimeOffset updatedAt) =>
+        RequireStatus(updatedAt, TenantStatus.Deprovisioning, TenantStatus.Active, TenantStatus.Suspended);
+
+    public void MarkDeleted(DateTimeOffset updatedAt) =>
+        RequireStatus(updatedAt, TenantStatus.Deleted, TenantStatus.Deprovisioning);
+
+    private void RequireStatus(DateTimeOffset updatedAt, TenantStatus target, params TenantStatus[] allowed)
+    {
+        if (!allowed.Contains(Status))
+        {
+            throw new InvalidOperationException(
+                $"A tenant cannot move from {Status} to {target}.");
+        }
+
+        Status = target;
         UpdatedAt = updatedAt;
     }
 }
