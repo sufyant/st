@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -57,7 +57,7 @@ public sealed class MemberEndpointTests
         var user = await tenantDbContext.Users.SingleAsync(
             candidate => candidate.ExternalUserId == invitedUserId,
             TestContext.Current.CancellationToken);
-        Assert.Equal(TenantUserStatus.Disabled, user.Status);
+        Assert.Equal(UserStatus.Disabled, user.Status);
         Assert.False(await tenantDbContext.UserRoles.AnyAsync(
             assignment => assignment.UserId == user.Id,
             TestContext.Current.CancellationToken));

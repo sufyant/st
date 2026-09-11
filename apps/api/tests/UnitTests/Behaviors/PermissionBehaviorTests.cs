@@ -1,7 +1,7 @@
 using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
-using Domain.Access;
+using Domain.Shared;
 using Xunit;
 
 namespace UnitTests.Behaviors;

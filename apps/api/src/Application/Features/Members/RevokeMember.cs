@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.Shared;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;

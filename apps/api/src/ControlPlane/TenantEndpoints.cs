@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.AspNetCore.Builder;

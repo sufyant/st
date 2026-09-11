@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Api.Authorization;
 using Application.Abstractions;
-using Domain.Access;
+using Domain.Shared;
 
 namespace Api.Http;
 

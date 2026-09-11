@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access.Users;
+using Domain.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,7 +49,7 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
             .Where(assignment => assignment.UserId == user.Id)
             .ToListAsync(cancellationToken);
         tenantDbContext.UserRoles.RemoveRange(existing);
-        tenantDbContext.UserRoles.AddRange(roles.Select(role => TenantUserRole.Create(user.Id, role.Id)));
+        tenantDbContext.UserRoles.AddRange(roles.Select(role => UserRole.Create(user.Id, role.Id)));
 
         return Result.Success();
     }

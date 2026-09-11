@@ -1,22 +1,22 @@
-using Domain.Access;
-using Domain.Access.Permissions;
-using Domain.Access.Roles;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Persistence.Tenants.Configurations;
 
-public sealed class TenantRolePermissionConfiguration : IEntityTypeConfiguration<TenantRolePermission>
+public sealed class TenantRolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
 {
-    public void Configure(EntityTypeBuilder<TenantRolePermission> builder)
+    public void Configure(EntityTypeBuilder<RolePermission> builder)
     {
         builder.ToTable("role_permissions");
         builder.HasKey(x => new { x.RoleId, x.PermissionId });
         builder.Property(x => x.RoleId).HasColumnName("role_id");
         builder.Property(x => x.PermissionId).HasColumnName("permission_id");
-        builder.HasOne<TenantRole>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<TenantPermission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasData(SystemAccessCatalog.Roles.SelectMany(role =>
+        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasData(AccessCatalog.Roles.SelectMany(role =>
             role.PermissionIds.Select(permissionId => new { RoleId = role.Id, PermissionId = permissionId })));
     }
 }

@@ -1,13 +1,13 @@
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Persistence.Tenants.Configurations;
 
-public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUser>
+public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
 {
-    public void Configure(EntityTypeBuilder<TenantUser> builder)
+    public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("users");
         builder.HasKey(x => x.Id);

@@ -1,4 +1,4 @@
-using Domain.Access;
+using Domain.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -68,9 +68,9 @@ public sealed class TenantSchemaMigratorTests
         await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
         await reader.ReadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(SystemAccessCatalog.Permissions.Count, reader.GetInt64(0));
-        Assert.Equal(SystemAccessCatalog.Roles.Count, reader.GetInt64(1));
-        Assert.Equal(SystemAccessCatalog.Roles.Sum(role => role.PermissionIds.Count), reader.GetInt64(2));
+        Assert.Equal(AccessCatalog.Permissions.Count, reader.GetInt64(0));
+        Assert.Equal(AccessCatalog.Roles.Count, reader.GetInt64(1));
+        Assert.Equal(AccessCatalog.Roles.Sum(role => role.PermissionIds.Count), reader.GetInt64(2));
     }
 
     [Fact]

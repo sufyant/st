@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using Api.Authorization;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.Tenants;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -88,7 +88,7 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             user => user.ExternalUserId == userId,
             context.RequestAborted);
 
-        if (tenantUser?.Status != TenantUserStatus.Active)
+        if (tenantUser?.Status != UserStatus.Active)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;

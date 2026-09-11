@@ -1,8 +1,9 @@
 using Application.Abstractions;
 using Application.Behaviors;
 using Application.Results;
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,7 @@ public sealed class UnitOfWorkBehaviorTests
                     Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
-                tenant.Users.Add(TenantUser.Create(Guid.CreateVersion7(), invitee, TenantUserStatus.Active));
+                tenant.Users.Add(User.Create(Guid.CreateVersion7(), invitee, UserStatus.Active));
 
                 return Task.FromResult(Result.Success());
             },
@@ -135,9 +136,9 @@ public sealed class UnitOfWorkBehaviorTests
                     Guid.CreateVersion7(),
                     fixture.Tenant.Id,
                     invitee));
-                var user = TenantUser.Create(Guid.CreateVersion7(), invitee, TenantUserStatus.Active);
+                var user = User.Create(Guid.CreateVersion7(), invitee, UserStatus.Active);
                 tenant.Users.Add(user);
-                tenant.UserRoles.Add(TenantUserRole.Create(user.Id, Guid.CreateVersion7()));
+                tenant.UserRoles.Add(UserRole.Create(user.Id, Guid.CreateVersion7()));
 
                 return Task.FromResult(Result.Success());
             },

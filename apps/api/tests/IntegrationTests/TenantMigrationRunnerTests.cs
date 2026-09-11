@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;

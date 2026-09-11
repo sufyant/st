@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Provisioning;
 using Npgsql;
 using Testcontainers.PostgreSql;

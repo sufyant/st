@@ -1,8 +1,9 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Authorization;
+using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
@@ -89,7 +90,7 @@ public sealed class AcceptInvitationHandler(
 
         if (tenantUser is null)
         {
-            tenantUser = TenantUser.Create(Guid.CreateVersion7(), externalUserId, TenantUserStatus.Active);
+            tenantUser = User.Create(Guid.CreateVersion7(), externalUserId, UserStatus.Active);
             tenantDbContext.Users.Add(tenantUser);
         }
         else
@@ -103,7 +104,7 @@ public sealed class AcceptInvitationHandler(
 
         if (!hasRole)
         {
-            tenantDbContext.UserRoles.Add(TenantUserRole.Create(tenantUser.Id, role.Id));
+            tenantDbContext.UserRoles.Add(UserRole.Create(tenantUser.Id, role.Id));
         }
 
         await tenantDbContext.SaveChangesAsync(cancellationToken);

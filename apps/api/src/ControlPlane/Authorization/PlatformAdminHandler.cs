@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Domain.Access;
+using Domain.Shared;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;

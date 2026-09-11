@@ -1,7 +1,8 @@
 using System.Text.Json;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
@@ -74,7 +75,7 @@ public sealed class TenantProvisioningHandler(
     private async Task SeedOwnerAsync(Tenant tenant, string ownerExternalUserId, CancellationToken cancellationToken)
     {
         var externalUserId = ExternalUserId.Create(ownerExternalUserId);
-        var ownerRole = SystemAccessCatalog.Roles.Single(role => role.Code == "owner");
+        var ownerRole = AccessCatalog.Roles.Single(role => role.Code == "owner");
 
         await using var tenantDbContext = provisioner.CreateTenantDbContext(tenant.DatabaseName);
         var user = await tenantDbContext.Users.SingleOrDefaultAsync(
@@ -83,7 +84,7 @@ public sealed class TenantProvisioningHandler(
 
         if (user is null)
         {
-            user = TenantUser.Create(Guid.CreateVersion7(), externalUserId, TenantUserStatus.Active);
+            user = User.Create(Guid.CreateVersion7(), externalUserId, UserStatus.Active);
             tenantDbContext.Users.Add(user);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
@@ -94,7 +95,7 @@ public sealed class TenantProvisioningHandler(
 
         if (!hasRole)
         {
-            tenantDbContext.UserRoles.Add(TenantUserRole.Create(user.Id, ownerRole.Id));
+            tenantDbContext.UserRoles.Add(UserRole.Create(user.Id, ownerRole.Id));
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 

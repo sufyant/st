@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

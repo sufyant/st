@@ -1,8 +1,9 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Domain.Access;
-using Domain.Access.Users;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.Authorization;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
@@ -88,15 +89,15 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
 
             if (roleCode is not null)
             {
-                var user = TenantUser.Create(
+                var user = User.Create(
                     Guid.CreateVersion7(),
                     ExternalUserId.Create(externalUserId),
-                    TenantUserStatus.Active);
+                    UserStatus.Active);
                 tenantDbContext.Users.Add(user);
                 var role = await tenantDbContext.Roles.SingleAsync(
                     candidate => candidate.Code == roleCode,
                     TestContext.Current.CancellationToken);
-                tenantDbContext.UserRoles.Add(TenantUserRole.Create(user.Id, role.Id));
+                tenantDbContext.UserRoles.Add(UserRole.Create(user.Id, role.Id));
                 await tenantDbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }

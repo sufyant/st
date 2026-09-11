@@ -1,4 +1,4 @@
-using Domain.Access;
+using Domain.Shared;
 
 namespace Application.Abstractions;
 

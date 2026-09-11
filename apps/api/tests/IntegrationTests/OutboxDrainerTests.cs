@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Application.Features.Provisioning;
 using Microsoft.EntityFrameworkCore;

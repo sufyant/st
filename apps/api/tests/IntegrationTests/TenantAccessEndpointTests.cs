@@ -1,8 +1,9 @@
 using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Domain.Access;
-using Domain.Tenants;
+using Domain.ControlPlane.Memberships;
+using Domain.Shared;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;

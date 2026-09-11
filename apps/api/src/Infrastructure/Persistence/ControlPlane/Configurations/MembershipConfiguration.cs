@@ -1,5 +1,6 @@
-using Domain.Access;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.ControlPlane.Memberships;
+using Domain.ControlPlane.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

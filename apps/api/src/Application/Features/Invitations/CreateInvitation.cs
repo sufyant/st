@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
+using Domain.Shared;
 using FluentValidation;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;

@@ -1,6 +1,8 @@
-using Domain.Access;
+using Domain.ControlPlane.Administration;
+using Domain.ControlPlane.Invitations;
+using Domain.ControlPlane.Memberships;
 using Infrastructure.Messaging;
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.ControlPlane.Configurations;
 using Microsoft.EntityFrameworkCore;
 

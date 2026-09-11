@@ -1,6 +1,6 @@
 using Application.Features.Provisioning;
-using Domain.Access;
-using Domain.Tenants;
+using Domain.Shared;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;

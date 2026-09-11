@@ -1,4 +1,4 @@
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence.Tenants;
 using Npgsql;
 
@@ -6,7 +6,7 @@ namespace Infrastructure.Provisioning;
 
 public sealed class TenantProvisioner(string connectionString)
 {
-    private const string TenantRole = "st_tenant";
+    private const string Role = "st_tenant";
 
     public async Task CreateDatabaseAsync(TenantDatabaseName databaseName, CancellationToken cancellationToken)
     {
@@ -46,7 +46,7 @@ public sealed class TenantProvisioner(string connectionString)
         await using var maintenance = new NpgsqlConnection(MaintenanceConnectionString());
         await maintenance.OpenAsync(cancellationToken);
         await using var connectCommand = new NpgsqlCommand(
-            $"GRANT CONNECT ON DATABASE \"{databaseName.Value}\" TO {TenantRole}",
+            $"GRANT CONNECT ON DATABASE \"{databaseName.Value}\" TO {Role}",
             maintenance);
         await connectCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -54,10 +54,10 @@ public sealed class TenantProvisioner(string connectionString)
         await tenant.OpenAsync(cancellationToken);
         await using var grantCommand = new NpgsqlCommand(
             $"""
-            GRANT USAGE ON SCHEMA public TO {TenantRole};
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {TenantRole};
+            GRANT USAGE ON SCHEMA public TO {Role};
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {Role};
             ALTER DEFAULT PRIVILEGES IN SCHEMA public
-                GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {TenantRole};
+                GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {Role};
             """,
             tenant);
         await grantCommand.ExecuteNonQueryAsync(cancellationToken);

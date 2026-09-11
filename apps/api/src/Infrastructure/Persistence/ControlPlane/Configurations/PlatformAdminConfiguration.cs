@@ -1,4 +1,5 @@
-using Domain.Access;
+using Domain.Shared;
+using Domain.ControlPlane.Administration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

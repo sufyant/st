@@ -1,5 +1,5 @@
-using Domain.Access;
-using Domain.Access.Users;
+using Domain.Shared;
+using Domain.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,7 +9,7 @@ internal static class TenantUsers
 {
     public const string OwnerRoleCode = "owner";
 
-    public static Task<TenantUser?> FindAsync(
+    public static Task<User?> FindAsync(
         TenantDbContext tenantDbContext,
         string externalUserId,
         CancellationToken cancellationToken)
@@ -31,7 +31,7 @@ internal static class TenantUsers
                 role => role.Id,
                 (assignment, _) => assignment.UserId)
             .Join(
-                tenantDbContext.Users.Where(user => user.Status == TenantUserStatus.Active),
+                tenantDbContext.Users.Where(user => user.Status == UserStatus.Active),
                 ownerId => ownerId,
                 user => user.Id,
                 (ownerId, _) => ownerId)

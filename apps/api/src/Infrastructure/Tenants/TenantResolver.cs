@@ -1,5 +1,5 @@
 using Dapper;
-using Domain.Tenants;
+using Domain.ControlPlane.Tenants;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;

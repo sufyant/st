@@ -1,6 +1,6 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Access;
+using Domain.ControlPlane.Invitations;
 using Infrastructure.Persistence.ControlPlane;
 using Microsoft.EntityFrameworkCore;
 
