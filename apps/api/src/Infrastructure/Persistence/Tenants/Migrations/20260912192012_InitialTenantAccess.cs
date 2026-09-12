@@ -75,7 +75,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    role_id = table.Column<Guid>(type: "uuid", nullable: true)
+                    role_id = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {

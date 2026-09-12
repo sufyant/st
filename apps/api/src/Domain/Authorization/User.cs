@@ -25,23 +25,25 @@ public sealed class User : Entity<UserId>, IAuditable
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public Role? Role { get; private set; }
+    public Role Role { get; private set; } = null!;
 
     private User()
     {
     }
 
-    public static User Create(ExternalUserId externalUserId, EmailAddress email, UserStatus status)
+    public static User Create(ExternalUserId externalUserId, EmailAddress email, UserStatus status, Role role)
     {
         ArgumentNullException.ThrowIfNull(externalUserId);
         ArgumentNullException.ThrowIfNull(email);
+        ArgumentNullException.ThrowIfNull(role);
 
         return new User
         {
             Id = UserId.New(),
             ExternalUserId = externalUserId,
             Email = email,
-            Status = status
+            Status = status,
+            Role = role
         };
     }
 
@@ -49,5 +51,10 @@ public sealed class User : Entity<UserId>, IAuditable
 
     public void Disable() => Status = UserStatus.Disabled;
 
-    public void AssignRole(Role? role) => Role = role;
+    public void AssignRole(Role role)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        Role = role;
+    }
 }

@@ -91,15 +91,15 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
 
             if (roleCode is not null)
             {
-                var user = User.Create(
-                    ExternalUserId.Create(externalUserId),
-                    EmailAddress.Create(email!),
-                    UserStatus.Active);
-                tenantDbContext.Users.Add(user);
                 var role = await tenantDbContext.Roles.SingleAsync(
                     candidate => candidate.Code == roleCode,
                     TestContext.Current.CancellationToken);
-                user.AssignRole(role);
+                var user = User.Create(
+                    ExternalUserId.Create(externalUserId),
+                    EmailAddress.Create(email!),
+                    UserStatus.Active,
+                    role);
+                tenantDbContext.Users.Add(user);
                 await tenantDbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }

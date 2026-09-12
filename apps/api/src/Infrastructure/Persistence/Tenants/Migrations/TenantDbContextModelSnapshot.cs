@@ -171,7 +171,7 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid?>("role_id")
+                    b.Property<Guid>("role_id")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -241,7 +241,8 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.HasOne("Domain.Authorization.Role", "Role")
                         .WithMany()
                         .HasForeignKey("role_id")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Role");
                 });

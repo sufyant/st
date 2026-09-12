@@ -27,6 +27,9 @@ public sealed class UnitOfWorkBehaviorTests
         await using var tenant = fixture.CreateTenantDbContext();
         var behavior = NewBehavior<SaveBothCommand>(fixture, controlPlane, tenant);
         var invitee = ExternalUserId.Create("user_invitee");
+        var role = await tenant.Roles.SingleAsync(
+            candidate => candidate.Code == "member",
+            TestContext.Current.CancellationToken);
 
         // Act
         await behavior.HandleAsync(
@@ -36,7 +39,7 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                tenant.Users.Add(User.Create(invitee, EmailAddress.Create("invitee@example.com"), UserStatus.Active));
+                tenant.Users.Add(User.Create(invitee, EmailAddress.Create("invitee@example.com"), UserStatus.Active, role));
 
                 return Task.FromResult(Result.Success());
             },
@@ -132,11 +135,10 @@ public sealed class UnitOfWorkBehaviorTests
                 controlPlane.Memberships.Add(Membership.Create(
                     fixture.Tenant.Id,
                     invitee));
-                var user = User.Create(invitee, EmailAddress.Create("partial@example.com"), UserStatus.Active);
-                tenant.Users.Add(user);
                 // Forces the tenant save to fail: this default-constructed Role has a null
                 // Code, which violates the NOT NULL constraint on roles.code, not an FK.
-                user.AssignRole(new Role());
+                var user = User.Create(invitee, EmailAddress.Create("partial@example.com"), UserStatus.Active, new Role());
+                tenant.Users.Add(user);
 
                 return Task.FromResult(Result.Success());
             },

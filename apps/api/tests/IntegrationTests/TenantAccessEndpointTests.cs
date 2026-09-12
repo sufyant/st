@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Domain.Authorization;
 using Domain.ControlPlane.Memberships;
 using Domain.Shared;
 using Domain.ControlPlane.Tenants;
@@ -183,8 +184,8 @@ public sealed class TenantAccessEndpointTests
         var now = DateTimeOffset.UtcNow;
         await tenantContext.Database.ExecuteSqlInterpolatedAsync(
             $"""
-            INSERT INTO users (id, external_user_id, email, status, created_at, updated_at)
-            VALUES ({Guid.NewGuid()}, {ExternalUser}, {ExternalUserEmail}, {tenantUserStatus}, {now}, {now})
+            INSERT INTO users (id, external_user_id, email, status, role_id, created_at, updated_at)
+            VALUES ({Guid.NewGuid()}, {ExternalUser}, {ExternalUserEmail}, {tenantUserStatus}, {AccessCatalog.MemberRole.Id.Value}, {now}, {now})
             """,
             TestContext.Current.CancellationToken);
     }

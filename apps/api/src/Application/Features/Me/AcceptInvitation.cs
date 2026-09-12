@@ -90,15 +90,14 @@ public sealed class AcceptInvitationHandler(
 
         if (tenantUser is null)
         {
-            tenantUser = User.Create(externalUserId, invitation.Email, UserStatus.Active);
+            tenantUser = User.Create(externalUserId, invitation.Email, UserStatus.Active, role);
             tenantDbContext.Users.Add(tenantUser);
         }
         else
         {
             tenantUser.Enable();
+            tenantUser.AssignRole(role);
         }
-
-        tenantUser.AssignRole(role);
 
         await tenantDbContext.SaveChangesAsync(cancellationToken);
 

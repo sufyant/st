@@ -25,6 +25,7 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
         builder.HasOne(x => x.Role)
             .WithMany()
             .HasForeignKey("role_id")
+            .IsRequired()
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

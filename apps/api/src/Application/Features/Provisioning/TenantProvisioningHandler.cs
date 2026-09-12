@@ -87,12 +87,14 @@ public sealed class TenantProvisioningHandler(
 
         if (user is null)
         {
-            user = User.Create(externalUserId, EmailAddress.Create(ownerEmail), UserStatus.Active);
+            var ownerRole = await tenantDbContext.Roles.SingleAsync(
+                candidate => candidate.Code == AccessCatalog.OwnerRole.Code,
+                cancellationToken);
+            user = User.Create(externalUserId, EmailAddress.Create(ownerEmail), UserStatus.Active, ownerRole);
             tenantDbContext.Users.Add(user);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
-
-        if (user.Role?.Code != AccessCatalog.OwnerRole.Code)
+        else if (user.Role.Code != AccessCatalog.OwnerRole.Code)
         {
             var ownerRole = await tenantDbContext.Roles.SingleAsync(
                 candidate => candidate.Code == AccessCatalog.OwnerRole.Code,

@@ -77,10 +77,14 @@ public sealed class AuditStampTests
         using var scope = owner.CreateScope();
         var tenantDbContextFactory = scope.ServiceProvider.GetRequiredService<TenantDbContextFactory>();
         await using var tenantDbContext = tenantDbContextFactory.Create(owner.Tenant.DatabaseName.Value);
+        var role = await tenantDbContext.Roles.SingleAsync(
+            candidate => candidate.Code == "member",
+            TestContext.Current.CancellationToken);
         var user = User.Create(
             ExternalUserId.Create("user_wiring"),
             EmailAddress.Create("wiring@example.com"),
-            UserStatus.Active);
+            UserStatus.Active,
+            role);
 
         // Act
         tenantDbContext.Users.Add(user);

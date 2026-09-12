@@ -312,6 +312,24 @@ düz döngüsü onu zaten yakalıyor.
 `ReplaceMemberRoleCommand(string ExternalUserId, string RoleCode)` artık tekil,
 `PUT .../members/{externalUserId}/role` tekil `{ roleCode }` gövdesi alıyor.
 
+> **2026-09-12, aynı gün içinde ikinci düzeltme:** `Role` başta nullable yazılmıştı,
+> gerekçesi "revoke edilen kullanıcının rolü temizlenir" idi. O gerekçe kendisi de
+> yanlış çıktı: `TenantAccessMiddleware` erişimi membership'in varlığına bakarak
+> kesiyor, role hiç bakmadan önce, yani role'ü temizlemenin hiçbir erişimi
+> engellemediği görüldü ve `RevokeMember` artık role'e dokunmuyor, sadece
+> membership'i silip kullanıcıyı `Disable` ediyor — geçmişte kim olduğu bilgisini
+> koruyor.
+>
+> Bu noktada `Role`ün nullable kalmasının gerçek gerekçesi de sorgulandı: `User.Create`
+> yalnızca iki yerden çağrılıyor (`AcceptInvitation`, `TenantProvisioningHandler`), ikisi
+> de rolü aynı akışta hemen atıyor. `TenantProvisioningHandler.SeedOwnerAsync` ise
+> kullanıcıyı önce rolsüz kaydedip ikinci bir `SaveChangesAsync`'te rol atıyordu; bu tek
+> gerçek "rolsüz ama var olan kullanıcı" durumunu yaratıyordu. Çözüm nullable'ı korumak
+> değil, iki adımı birleştirmekti: rol, `User.Create`'e zorunlu bir parametre olarak
+> girdi, kullanıcı hiçbir zaman rolsüz diske yazılamıyor. `Role` artık `Role?` değil
+> `Role`, `AssignRole` de `null` kabul etmiyor. "Geçersiz durum inşa edilemez" ilkesi
+> burada da uygulandı.
+
 ### 9. `Role` ve `Permission` katalogdur; her rolün kodu olur
 
 Bu iki tipin bugün factory'si, mutasyonu, davranışı yoktur. Gerçek model

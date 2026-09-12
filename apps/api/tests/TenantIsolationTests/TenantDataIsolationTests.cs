@@ -1,3 +1,4 @@
+using Domain.Authorization;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -27,8 +28,8 @@ public sealed class TenantDataIsolationTests
         var now = DateTimeOffset.UtcNow;
         await acme.Database.ExecuteSqlInterpolatedAsync(
             $"""
-            INSERT INTO users (id, external_user_id, email, status, created_at, updated_at)
-            VALUES ({Guid.NewGuid()}, {"user_2abc123"}, {"user@example.com"}, {"Active"}, {now}, {now})
+            INSERT INTO users (id, external_user_id, email, status, role_id, created_at, updated_at)
+            VALUES ({Guid.NewGuid()}, {"user_2abc123"}, {"user@example.com"}, {"Active"}, {AccessCatalog.MemberRole.Id.Value}, {now}, {now})
             """,
             TestContext.Current.CancellationToken);
 
