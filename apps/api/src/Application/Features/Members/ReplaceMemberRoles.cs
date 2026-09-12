@@ -1,6 +1,5 @@
 using Application.Abstractions;
 using Application.Results;
-using Domain.Authorization;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,14 +32,6 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
             {
                 [nameof(request.RoleCodes)] = ["One or more roles do not exist."]
             });
-        }
-
-        if (!roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
-        {
-            if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
-            {
-                return MemberErrors.LastOwner;
-            }
         }
 
         user.AssignRoles(roles);

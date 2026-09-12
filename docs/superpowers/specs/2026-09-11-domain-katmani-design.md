@@ -56,7 +56,7 @@ yanlış varsayımını düzeltir.
 - Davetten token'ın kalkması, kararın doğrulanmış e-posta claim'ine bağlanması
 - Clerk'in restricted sign-up modu ile birlikte çalışan davet akışı
 - `User` satırının e-posta taşıması
-- Son owner korumasının korkuluğa inmesi
+- Son owner korumasının kaldırılması (bkz. karar 14, 2026-09-12 güncellemesi)
 - Denetim damgalarının EF interceptor'üne taşınması
 - Migration'ların sıfırlanması
 - Değişen uçlar için OpenAPI şemasının ve TypeScript istemcisinin yeniden üretilmesi
@@ -425,22 +425,52 @@ bağlıdır ve IdP değişirse o değerlerin hepsi geçersiz olur.
 İsim alanı eklenmez; gerçekten bayatlayan bir kopya olur ve kimliği e-posta zaten verir.
 Tetikleyicisi, üye listesinde insan adı göstermenin gerekli hale gelmesidir.
 
-### 14. Son owner koruması korkuluğa iner, domainden çıkar
+### 14. Son owner koruması tamamen kaldırılır — DÜZELTİLDİ
 
-Kural şudur: bir tenant'ın her zaman en az bir aktif owner'ı kalmalı. Aksi halde tenant
-yönetilemez hale gelir. Üç yoldan delinebilir: son owner'ın üyeliğinin iptali, devre dışı
+> **2026-09-12 güncellemesi:** Bu kararın önceki hali (korkuluk olarak `Application` katmanına
+> indirilmesi) uygulanmış ve bir süre çalışmıştı. Sonradan bilerek tamamen kaldırıldı; aşağıdaki
+> paragraf o kararı ve gerekçesini kayda geçiriyor, orijinal metin tarihsel referans için bırakıldı.
+
+Bir tenant'ın son owner'ı artık üyelikten çıkarılabilir, devre dışı bırakılabilir ve rolü
+düşürülebilir. `RevokeMember`, `DisableMember` ve `ReplaceMemberRoles` hiçbir kontrol
+yapmadan işlemi tamamlıyor. `Owners.IsLastOwnerAsync` ve onu barındıran `Owners.cs` silindi;
+`MemberErrors.LastOwner` kaldırıldı.
+
+Gerekçe: bu kural hiçbir zaman bir güvenlik invariant'ı değildi, kullanıcıyı kendi hatasından
+koruyan bir korkuluktu. Kaldırılmasının bilinen sonucu şu — bir tenant'ın son owner'ı gidince o
+tenant'ta `invitations.manage` yetkisi taşıyan kimse kalmaz (yalnızca `owner` rolü bu yetkiye
+sahip), yani tenant içinden yeni bir owner davet edilemez. Bugün platform admin yüzeyinde de
+(`/admin/api/v1/tenants`) bir tenant'a dışarıdan owner atayan/davet eden bir uç nokta yok. Yani
+sahipsiz kalan bir tenant'ın kurtarılması bugün için veritabanına elle müdahaledir.
+
+Bu risk bilerek kabul edildi. Admin kurtarma uç noktası (bir tenant'a platform admin'in owner
+atayabilmesi) yazılmadı; tetikleyicisi ilk gerçek sahipsiz kalma olayıdır. O gün bu uç nokta
+outbox üzerinden gitmeli, çünkü admin yüzeyinin tenant veritabanına doğrudan yazma yetkisi yok
+(karar 32).
+
+Servis hesabı hâlâ reddedilir, gerekçesi değişmedi: her tenant'ın veritabanında bizim elimizde
+duran silinemez bir owner hesabı, saklanması gereken bir parola ve bütün tenant'ları birden
+düşürebilecek bir ana anahtar demektir; karar 3 ve karar 34'ü çiğner.
+
+---
+
+<details>
+<summary>Orijinal karar (2026-09-11) — korkuluk olarak Application katmanına indirme</summary>
+
+Kural şuydu: bir tenant'ın her zaman en az bir aktif owner'ı kalmalı. Aksi halde tenant
+yönetilemez hale gelir. Üç yoldan delinebilirdi: son owner'ın üyeliğinin iptali, devre dışı
 bırakılması, rolünün düşürülmesi.
 
-Bu bir güvenlik invariant'ı değil, kullanıcıyı kendinden koruyan bir korkuluktur. GitHub
-ve Slack da aynısını yapar. `OwnerRoster` silinir; yerine `Application/Features/Members/` altında tek bir yardımcı
-gelir: hedef kullanıcı çıkarıldığında geriye aktif owner kalıyor mu. `RevokeMember`,
-`DisableMember` ve `ReplaceMemberRoles` onu çağırır.
+Bu bir güvenlik invariant'ı değildi, kullanıcıyı kendinden koruyan bir korkuluktu. GitHub
+ve Slack da aynısını yapar. `OwnerRoster` silinmişti; yerine `Application/Features/Members/`
+altında tek bir yardımcı gelmişti: hedef kullanıcı çıkarıldığında geriye aktif owner kalıyor mu.
+`RevokeMember`, `DisableMember` ve `ReplaceMemberRoles` onu çağırıyordu.
 
-Bu, **Spec 4'ün 11. kararını geri alır.** O karar kuralı "projedeki ilk gerçek domain
-kuralı" diyerek domaine taşımıştı. Geri alma gerekçesi: kural bir invariant değil, ve
-nesne onu zorlayamıyordu çünkü kararı yine handler veriyordu. Nesne sığ bir sarmalayıcıydı.
+Bu, Spec 4'ün 11. kararını geri almıştı. O karar kuralı "projedeki ilk gerçek domain kuralı"
+diyerek domaine taşımıştı. Geri alma gerekçesi: kural bir invariant değildi, ve nesne onu
+zorlayamıyordu çünkü kararı yine handler veriyordu. Nesne sığ bir sarmalayıcıydı.
 
-Kuralı atlanamaz kılmanın iki yolu tartışıldı ve ikisi de reddedildi:
+Kuralı atlanamaz kılmanın iki yolu tartışılmış ve ikisi de reddedilmişti:
 
 - **Roster aggregate'i.** Tenant'ın bütün kullanıcı ve rol atamalarını tek aggregate
   yapmak kuralı atlanamaz kılardı ama tek kişinin rolünü değiştirmek için tenant'ın bütün
@@ -448,16 +478,7 @@ Kuralı atlanamaz kılmanın iki yolu tartışıldı ve ikisi de reddedildi:
 - **Veritabanı seviyesinde trigger.** En güçlü garanti, ama kural domain dilinden çıkar,
   temiz hata mesajı üretmek ve birim testi yazmak zorlaşır.
 
-İkisinin de tetikleyicisi aynıdır: korkuluğun atlandığı ilk gerçek olay.
-
-Ayrıca kilitlenmiş bir tenant'ı kurtarmak için **servis hesabı açılmaz.** Her tenant'ın
-veritabanında bizim elimizde duran silinemez bir owner hesabı, saklanması gereken bir
-parola ve bütün tenant'ları birden düşürebilecek bir ana anahtar demektir. Alias'tan
-türeyen e-posta tahmin edilebilir olur, karar 3 (Clerk yalnızca kimlik doğrulama, biz
-kimlik bilgisi tutmayız) ve karar 34 (platform yetkisi tenant rolü doğurmaz) çiğnenir.
-Kurtarmanın doğru yolu platform admin yüzeyinden yapılan, denetlenebilir bir "bu tenant'a
-owner ata" işlemidir; bugün admin yüzeyinin tenant veritabanına yazma yetkisi olmadığı
-için (karar 32) o iş de outbox üzerinden gider. Tetikleyicisi ilk gerçek kilitlenmedir.
+</details>
 
 ### 15. Denetim damgaları EF interceptor'ünde yaşar
 
@@ -530,7 +551,7 @@ olur ama tenant'ta kullanıcı olmaz; bu da anlamsız bir 403 demektir.
 | 23 — Genel cache katmanı yok | Değişmez. Sizin üretim ortamınızdaki "davet silindi ama cache'te duruyor" sınıfı hata, üyelik ve yetkinin cache'lenmemesi kararını doğrular. |
 | 36 — Token'ın SHA-256 özeti | **Geri alınır.** Token tamamen kalkar; kararı doğrulanmış e-posta claim'i verir. |
 | Spec 3 / karar 4 — `role_code` | Korunur ve çoğullaşır (`role_codes`). |
-| Spec 4 / karar 11 — Son owner domain kuralı | **Geri alınır.** Kural korkuluğa iner, `OwnerRoster` silinir. |
+| Spec 4 / karar 11 — Son owner domain kuralı | **Geri alınır.** Kural önce korkuluğa iner, sonra (2026-09-12) tamamen kaldırılır. |
 | Spec 3 — "Davet e-postası gönderilmez" | Düşer; Clerk gönderir. |
 | 22 — Timezone ve damgalar | Genişler: damga EF interceptor'üne taşınır ve `Membership` ile `User`a da uygulanır. |
 
@@ -555,7 +576,7 @@ yazılır.
 | Clerk dağıtımı, mevcut hesap | Hesabı olan kullanıcıda adım atlanıyor |
 | Kabul, uçtan uca | Ayşe davet ediyor, Ali giriş yapıp kabul ediyor, tenant endpoint'ini çağırabiliyor |
 | Permission çözümlemesi | Skip navigation'lar üzerinden aynı claim'ler üretiliyor |
-| Son owner korkuluğu | Üç yolun üçü de ayrı ayrı engelleniyor |
+| Son owner koruması kaldırıldı | Üç yolun üçü de artık engellenmeden başarıyla tamamlanıyor (karar 14, 2026-09-12) |
 | Üye listesi | E-posta dönüyor, liste okunabilir |
 | Kimlik sınırı | Değişmeden geçiyor (karar 32) |
 
@@ -567,7 +588,7 @@ tenant endpoint'ini çağırmasına kadar bütün zinciri kanıtlar.
 | Yapılmayan | Tetikleyici |
 |---|---|
 | İkinci somut domain event | Kendi gerekçesi olan ilk ihtiyaç; provisioning'in outbox satırını event'e taşımak bunun adayı |
-| Roster aggregate'i ve veritabanı seviyesinde son owner koruması | Korkuluğun atlandığı ilk gerçek olay |
+| Herhangi bir son owner koruması (korkuluk, roster aggregate, veritabanı trigger) | İlk gerçek sahipsiz kalma olayı |
 | Kilitlenmiş tenant için admin kurtarma işlemi | İlk gerçek kilitlenme |
 | Tenant'a özel rol tanımlama | Bir tenant sistem rollerinin yetmediğini söylediğinde |
 | Alan adı doğrulama ve otomatik katılma | Kendi IdP'si olan ilk müşteri |

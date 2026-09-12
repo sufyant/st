@@ -26,11 +26,6 @@ public sealed class RevokeMemberHandler(
             return MemberErrors.Missing;
         }
 
-        if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
-        {
-            return MemberErrors.LastOwner;
-        }
-
         var externalUserId = ExternalUserId.Create(request.ExternalUserId);
         var memberships = await controlPlaneDbContext.Memberships
             .Where(membership => membership.TenantId == tenantContext.TenantId

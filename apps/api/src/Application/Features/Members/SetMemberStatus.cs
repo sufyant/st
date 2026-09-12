@@ -24,11 +24,6 @@ public sealed class DisableMemberHandler(TenantDbContext tenantDbContext)
             return MemberErrors.Missing;
         }
 
-        if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
-        {
-            return MemberErrors.LastOwner;
-        }
-
         user.Disable();
 
         return Result.Success();
