@@ -49,10 +49,10 @@ public sealed class CreateInvitationHandler(
 
         if (!roleExists)
         {
-            return Result<CreatedInvitation>.Failure(Error.Validation(new Dictionary<string, string[]>
+            return Error.Validation(new Dictionary<string, string[]>
             {
                 [nameof(request.RoleCode)] = [$"Role '{request.RoleCode}' does not exist."]
-            }));
+            });
         }
 
         var alreadyInvited = await controlPlaneDbContext.Invitations.AnyAsync(
@@ -63,9 +63,9 @@ public sealed class CreateInvitationHandler(
 
         if (alreadyInvited)
         {
-            return Result<CreatedInvitation>.Failure(Error.Conflict(
+            return Error.Conflict(
                 "invitation.duplicate",
-                $"'{email.Value}' already has a pending invitation."));
+                $"'{email.Value}' already has a pending invitation.");
         }
 
         var token = InvitationTokens.Create();
@@ -80,11 +80,11 @@ public sealed class CreateInvitationHandler(
         controlPlaneDbContext.Invitations.Add(invitation);
 
         // The plain token is returned once and never stored; only its digest is persisted.
-        return Result<CreatedInvitation>.Success(new CreatedInvitation(
+        return new CreatedInvitation(
             invitation.Id.Value,
             invitation.Email.Value,
             invitation.RoleCode,
             invitation.ExpiresAt,
-            token));
+            token);
     }
 }

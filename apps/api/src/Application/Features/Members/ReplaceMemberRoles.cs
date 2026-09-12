@@ -20,7 +20,7 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
 
         if (user is null)
         {
-            return Result<Unit>.Failure(MemberErrors.Missing);
+            return MemberErrors.Missing;
         }
 
         var roles = await tenantDbContext.Roles
@@ -29,17 +29,17 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
 
         if (roles.Count != request.RoleCodes.Distinct().Count())
         {
-            return Result<Unit>.Failure(Error.Validation(new Dictionary<string, string[]>
+            return Error.Validation(new Dictionary<string, string[]>
             {
                 [nameof(request.RoleCodes)] = ["One or more roles do not exist."]
-            }));
+            });
         }
 
         if (!roles.Any(role => role.Code == AccessCatalog.OwnerRole.Code))
         {
             if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
             {
-                return Result<Unit>.Failure(MemberErrors.LastOwner);
+                return MemberErrors.LastOwner;
             }
         }
 

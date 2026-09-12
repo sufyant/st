@@ -25,8 +25,8 @@ public sealed class PermissionBehavior<TRequest, TResponse>(ICurrentUser current
             return next();
         }
 
-        return Task.FromResult(Result<TResponse>.Failure(Error.Forbidden(
+        return Task.FromResult<Result<TResponse>>(Error.Forbidden(
             "permission.missing",
-            $"The permission '{permission}' is required.")));
+            $"The permission '{permission}' is required."));
     }
 }

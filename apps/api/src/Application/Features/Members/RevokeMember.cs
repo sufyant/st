@@ -23,12 +23,12 @@ public sealed class RevokeMemberHandler(
 
         if (user is null)
         {
-            return Result<Unit>.Failure(MemberErrors.Missing);
+            return MemberErrors.Missing;
         }
 
         if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
         {
-            return Result<Unit>.Failure(MemberErrors.LastOwner);
+            return MemberErrors.LastOwner;
         }
 
         var externalUserId = ExternalUserId.Create(request.ExternalUserId);

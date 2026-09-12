@@ -34,6 +34,6 @@ public sealed class ListMyMembershipsHandler(
             .Select(tenant => new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString()))
             .ToList();
 
-        return Result<IReadOnlyList<MyMembership>>.Success(memberships);
+        return memberships;
     }
 }

@@ -37,7 +37,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
             return await next();
         }
 
-        return Result<TResponse>.Failure(Error.Validation(
-            failures.ToDictionary(entry => entry.Key, entry => entry.Value.ToArray())));
+        return Error.Validation(
+            failures.ToDictionary(entry => entry.Key, entry => entry.Value.ToArray()));
     }
 }

@@ -33,6 +33,6 @@ public sealed class ListMembersHandler(TenantDbContext tenantDbContext)
             .OrderBy(member => member.ExternalUserId)
             .ToList();
 
-        return Result<IReadOnlyList<TenantMember>>.Success(members);
+        return members;
     }
 }

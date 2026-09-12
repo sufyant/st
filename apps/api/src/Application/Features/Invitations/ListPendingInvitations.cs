@@ -37,6 +37,6 @@ public sealed class ListPendingInvitationsHandler(
                 invitation.ExpiresAt))
             .ToListAsync(cancellationToken);
 
-        return Result<IReadOnlyList<PendingInvitation>>.Success(invitations);
+        return invitations;
     }
 }

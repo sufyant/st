@@ -25,7 +25,7 @@ public sealed class AcceptInvitationHandler(
     {
         if (string.IsNullOrWhiteSpace(request.Token))
         {
-            return Result<MyMembership>.Failure(MeErrors.UnknownToken);
+            return MeErrors.UnknownToken;
         }
 
         var tokenHash = InvitationTokens.Hash(request.Token);
@@ -36,24 +36,24 @@ public sealed class AcceptInvitationHandler(
 
         if (invitation is null)
         {
-            return Result<MyMembership>.Failure(MeErrors.UnknownToken);
+            return MeErrors.UnknownToken;
         }
 
         var now = timeProvider.GetUtcNow();
 
         if (invitation.IsExpired(now))
         {
-            return Result<MyMembership>.Failure(MeErrors.Expired);
+            return MeErrors.Expired;
         }
 
         if (!currentUser.TryGetEmail(out var email))
         {
-            return Result<MyMembership>.Failure(MeErrors.EmailClaimRequired);
+            return MeErrors.EmailClaimRequired;
         }
 
         if (email != invitation.Email)
         {
-            return Result<MyMembership>.Failure(MeErrors.EmailMismatch);
+            return MeErrors.EmailMismatch;
         }
 
         var tenant = await dbContext.Tenants.SingleAsync(
@@ -62,9 +62,9 @@ public sealed class AcceptInvitationHandler(
 
         if (tenant.Status is not TenantStatus.Active)
         {
-            return Result<MyMembership>.Failure(Error.Conflict(
+            return Error.Conflict(
                 "tenant.not_active",
-                $"Tenant is {tenant.Status}, not Active."));
+                $"Tenant is {tenant.Status}, not Active.");
         }
 
         var externalUserId = currentUser.Id;
@@ -75,9 +75,9 @@ public sealed class AcceptInvitationHandler(
 
         if (role is null)
         {
-            return Result<MyMembership>.Failure(Error.Conflict(
+            return Error.Conflict(
                 "role.missing",
-                $"Role '{invitation.RoleCode}' no longer exists."));
+                $"Role '{invitation.RoleCode}' no longer exists.");
         }
 
         // This context is opened by the handler rather than resolved from the request, because the
@@ -117,7 +117,6 @@ public sealed class AcceptInvitationHandler(
 
         invitation.Accept(externalUserId, now);
 
-        return Result<MyMembership>.Success(
-            new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString()));
+        return new MyMembership(tenant.Id.Value, tenant.Alias.Value, tenant.Status.ToString());
     }
 }

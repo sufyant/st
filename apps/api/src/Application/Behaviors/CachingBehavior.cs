@@ -25,7 +25,7 @@ public sealed class CachingBehavior<TRequest, TResponse>(
 
         if (cache.TryGetValue(key, out TResponse? cached))
         {
-            return Result<TResponse>.Success(cached!);
+            return cached!;
         }
 
         var result = await next();

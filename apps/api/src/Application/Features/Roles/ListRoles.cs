@@ -37,6 +37,6 @@ public sealed class ListRolesHandler(TenantDbContext tenantDbContext)
             .OrderBy(role => role.Code)
             .ToList();
 
-        return Result<IReadOnlyList<TenantRoleDetail>>.Success(details);
+        return details;
     }
 }

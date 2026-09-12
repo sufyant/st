@@ -26,7 +26,7 @@ public sealed class ListMyInvitationsHandler(
     {
         if (!currentUser.TryGetEmail(out var email))
         {
-            return Result<IReadOnlyList<MyInvitation>>.Failure(MeErrors.EmailClaimRequired);
+            return MeErrors.EmailClaimRequired;
         }
 
         var now = timeProvider.GetUtcNow();
@@ -50,6 +50,6 @@ public sealed class ListMyInvitationsHandler(
                 row.Invitation.ExpiresAt))
             .ToList();
 
-        return Result<IReadOnlyList<MyInvitation>>.Success(invitations);
+        return invitations;
     }
 }

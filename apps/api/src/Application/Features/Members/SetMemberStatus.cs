@@ -21,12 +21,12 @@ public sealed class DisableMemberHandler(TenantDbContext tenantDbContext)
 
         if (user is null)
         {
-            return Result<Unit>.Failure(MemberErrors.Missing);
+            return MemberErrors.Missing;
         }
 
         if (await Owners.IsLastOwnerAsync(tenantDbContext, user, cancellationToken))
         {
-            return Result<Unit>.Failure(MemberErrors.LastOwner);
+            return MemberErrors.LastOwner;
         }
 
         user.Disable();
@@ -46,7 +46,7 @@ public sealed class EnableMemberHandler(TenantDbContext tenantDbContext)
 
         if (user is null)
         {
-            return Result<Unit>.Failure(MemberErrors.Missing);
+            return MemberErrors.Missing;
         }
 
         user.Enable();

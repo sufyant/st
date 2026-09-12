@@ -28,9 +28,9 @@ public sealed class RevokeInvitationHandler(
 
         if (invitation is null)
         {
-            return Result<Unit>.Failure(Error.NotFound(
+            return Error.NotFound(
                 "invitation.missing",
-                "The invitation does not exist or is no longer pending."));
+                "The invitation does not exist or is no longer pending.");
         }
 
         invitation.Revoke();
