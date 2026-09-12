@@ -15,7 +15,7 @@ internal static class MemberQueries
         var id = ExternalUserId.Create(externalUserId);
 
         return tenantDbContext.Users
-            .Include(user => user.Roles)
+            .Include(user => user.Role)
             .SingleOrDefaultAsync(user => user.ExternalUserId == id, cancellationToken);
     }
 }

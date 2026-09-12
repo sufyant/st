@@ -85,7 +85,7 @@ public sealed class AcceptInvitationHandler(
         // The tenant database is written first so that a failure in between leaves no membership,
         // and therefore no way in, until the retry completes.
         var tenantUser = await tenantDbContext.Users
-            .Include(candidate => candidate.Roles)
+            .Include(candidate => candidate.Role)
             .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (tenantUser is null)
@@ -98,10 +98,7 @@ public sealed class AcceptInvitationHandler(
             tenantUser.Enable();
         }
 
-        if (tenantUser.Roles.All(existing => existing.Id != role.Id))
-        {
-            tenantUser.AssignRoles([.. tenantUser.Roles, role]);
-        }
+        tenantUser.AssignRole(role);
 
         await tenantDbContext.SaveChangesAsync(cancellationToken);
 

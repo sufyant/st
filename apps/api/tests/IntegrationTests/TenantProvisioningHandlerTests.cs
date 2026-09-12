@@ -32,7 +32,7 @@ public sealed class TenantProvisioningHandlerTests
         Assert.Equal(TenantStatus.Active, reloaded.Status);
         Assert.Null(reloaded.ProvisioningStep);
         Assert.Equal(1, await fixture.CountAsync(tenant.DatabaseName.Value, "SELECT count(*) FROM users"));
-        Assert.Equal(1, await fixture.CountAsync(tenant.DatabaseName.Value, "SELECT count(*) FROM user_roles"));
+        Assert.Equal(1, await fixture.CountAsync(tenant.DatabaseName.Value, "SELECT count(*) FROM users WHERE role_id IS NOT NULL"));
         var ownerCreatedAt = await fixture.GetUserCreatedAtAsync(
             tenant.DatabaseName.Value,
             ProvisioningFixture.OwnerExternalUserId);

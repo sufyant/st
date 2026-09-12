@@ -221,7 +221,7 @@
         }
       }
     },
-    "/{tenantAlias}/api/v1/members/{externalUserId}/roles": {
+    "/{tenantAlias}/api/v1/members/{externalUserId}/role": {
       "put": {
         "tags": [
           "MemberEndpoints"
@@ -240,7 +240,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReplaceRolesRequest"
+                "$ref": "#/components/schemas/ReplaceRoleRequest"
               }
             }
           },
@@ -359,17 +359,14 @@
           }
         }
       },
-      "ReplaceRolesRequest": {
+      "ReplaceRoleRequest": {
         "required": [
-          "roleCodes"
+          "roleCode"
         ],
         "type": "object",
         "properties": {
-          "roleCodes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "roleCode": {
+            "type": "string"
           }
         }
       }

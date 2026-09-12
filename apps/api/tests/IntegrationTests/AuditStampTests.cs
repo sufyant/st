@@ -91,7 +91,7 @@ public sealed class AuditStampTests
     }
 
     [Fact]
-    public async Task ReplacingAMembersRolesThroughTheRealFlow_BumpsTheUsersUpdatedAt()
+    public async Task ReplacingAMembersRoleThroughTheRealFlow_BumpsTheUsersUpdatedAt()
     {
         // Arrange
         const string invitedUserId = "user_invited";
@@ -119,8 +119,8 @@ public sealed class AuditStampTests
 
         // Act
         using var response = await fixture.Client.PutAsJsonAsync(
-            $"/{TenantSurfaceFixture.Alias}/api/v1/members/{invitedUserId}/roles",
-            new { roleCodes = new[] { "owner" } },
+            $"/{TenantSurfaceFixture.Alias}/api/v1/members/{invitedUserId}/role",
+            new { roleCode = "owner" },
             TestContext.Current.CancellationToken);
 
         // Assert

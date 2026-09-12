@@ -22,13 +22,9 @@ public sealed class TenantUserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(x => x.ExternalUserId).IsUnique();
-        builder.HasMany(x => x.Roles)
+        builder.HasOne(x => x.Role)
             .WithMany()
-            .UsingEntity<Dictionary<string, object>>(
-                "user_roles",
-                right => right.HasOne<Role>().WithMany().HasForeignKey("role_id").OnDelete(DeleteBehavior.Cascade),
-                left => left.HasOne<User>().WithMany().HasForeignKey("user_id").OnDelete(DeleteBehavior.Cascade),
-                join => join.HasKey("user_id", "role_id"));
-        builder.Navigation(x => x.Roles).HasField("roles").UsePropertyAccessMode(PropertyAccessMode.Field);
+            .HasForeignKey("role_id")
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

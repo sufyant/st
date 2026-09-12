@@ -171,10 +171,15 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("role_id")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExternalUserId")
                         .IsUnique();
+
+                    b.HasIndex("role_id");
 
                     b.ToTable("users", (string)null);
                 });
@@ -231,19 +236,14 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                         });
                 });
 
-            modelBuilder.Entity("user_roles", b =>
+            modelBuilder.Entity("Domain.Authorization.User", b =>
                 {
-                    b.Property<Guid>("user_id")
-                        .HasColumnType("uuid");
+                    b.HasOne("Domain.Authorization.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("role_id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Property<Guid>("role_id")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("user_id", "role_id");
-
-                    b.HasIndex("role_id");
-
-                    b.ToTable("user_roles");
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("role_permissions", b =>
@@ -257,21 +257,6 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                     b.HasOne("Domain.Authorization.Role", null)
                         .WithMany()
                         .HasForeignKey("role_id")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("user_roles", b =>
-                {
-                    b.HasOne("Domain.Authorization.Role", null)
-                        .WithMany()
-                        .HasForeignKey("role_id")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Authorization.User", null)
-                        .WithMany()
-                        .HasForeignKey("user_id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

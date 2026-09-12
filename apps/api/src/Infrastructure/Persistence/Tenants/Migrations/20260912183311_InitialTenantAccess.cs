@@ -42,22 +42,6 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "users",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    external_user_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
-                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_users", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "role_permissions",
                 columns: table => new
                 {
@@ -82,27 +66,26 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "user_roles",
+                name: "users",
                 columns: table => new
                 {
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    role_id = table.Column<Guid>(type: "uuid", nullable: false)
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    external_user_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
+                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    role_id = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_user_roles", x => new { x.user_id, x.role_id });
+                    table.PrimaryKey("PK_users", x => x.id);
                     table.ForeignKey(
-                        name: "FK_user_roles_roles_role_id",
+                        name: "FK_users_roles_role_id",
                         column: x => x.role_id,
                         principalTable: "roles",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_user_roles_users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.InsertData(
@@ -158,15 +141,15 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_user_roles_role_id",
-                table: "user_roles",
-                column: "role_id");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_users_external_user_id",
                 table: "users",
                 column: "external_user_id",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_users_role_id",
+                table: "users",
+                column: "role_id");
         }
 
         /// <inheritdoc />
@@ -176,16 +159,13 @@ namespace Infrastructure.Persistence.Tenants.Migrations
                 name: "role_permissions");
 
             migrationBuilder.DropTable(
-                name: "user_roles");
+                name: "users");
 
             migrationBuilder.DropTable(
                 name: "permissions");
 
             migrationBuilder.DropTable(
                 name: "roles");
-
-            migrationBuilder.DropTable(
-                name: "users");
         }
     }
 }

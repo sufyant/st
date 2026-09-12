@@ -33,7 +33,7 @@ public sealed class RevokeMemberHandler(
             .ToListAsync(cancellationToken);
         controlPlaneDbContext.Memberships.RemoveRange(memberships);
 
-        user.AssignRoles([]);
+        user.AssignRole(null);
         user.Disable();
 
         return Result.Success();

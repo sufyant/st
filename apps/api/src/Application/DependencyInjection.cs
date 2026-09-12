@@ -28,7 +28,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
 
         services.AddScoped<IRequestHandler<ListMembersQuery, IReadOnlyList<TenantMember>>, ListMembersHandler>();
-        services.AddScoped<IRequestHandler<ReplaceMemberRolesCommand, Unit>, ReplaceMemberRolesHandler>();
+        services.AddScoped<IRequestHandler<ReplaceMemberRoleCommand, Unit>, ReplaceMemberRoleHandler>();
         services.AddScoped<IRequestHandler<RevokeMemberCommand, Unit>, RevokeMemberHandler>();
         services.AddScoped<IRequestHandler<DisableMemberCommand, Unit>, DisableMemberHandler>();
         services.AddScoped<IRequestHandler<EnableMemberCommand, Unit>, EnableMemberHandler>();

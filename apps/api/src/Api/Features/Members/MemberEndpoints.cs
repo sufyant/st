@@ -5,7 +5,7 @@ using Application.Features.Members;
 
 namespace Api.Features.Members;
 
-public sealed record ReplaceRolesRequest(string[] RoleCodes);
+public sealed record ReplaceRoleRequest(string RoleCode);
 
 public static class MemberEndpoints
 {
@@ -18,13 +18,13 @@ public static class MemberEndpoints
                 (await mediator.SendAsync(new ListMembersQuery(), cancellationToken)).ToOk())
             .RequirePermission(TenantPermissions.MembersRead);
 
-        group.MapPut("/{externalUserId}/roles", async (
+        group.MapPut("/{externalUserId}/role", async (
                     string externalUserId,
-                    ReplaceRolesRequest request,
+                    ReplaceRoleRequest request,
                     IMediator mediator,
                     CancellationToken cancellationToken) =>
                 (await mediator.SendAsync(
-                    new ReplaceMemberRolesCommand(externalUserId, request.RoleCodes),
+                    new ReplaceMemberRoleCommand(externalUserId, request.RoleCode),
                     cancellationToken)).ToNoContent())
             .RequirePermission(TenantPermissions.RolesManage);
 

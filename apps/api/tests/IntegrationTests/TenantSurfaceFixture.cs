@@ -99,7 +99,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
                 var role = await tenantDbContext.Roles.SingleAsync(
                     candidate => candidate.Code == roleCode,
                     TestContext.Current.CancellationToken);
-                user.AssignRoles([role]);
+                user.AssignRole(role);
                 await tenantDbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
         }

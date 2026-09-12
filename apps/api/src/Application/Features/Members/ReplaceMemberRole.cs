@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.Features.Members;
 
 [RequiresPermission(TenantPermissions.RolesManage)]
-public sealed record ReplaceMemberRolesCommand(string ExternalUserId, string[] RoleCodes) : ICommand<Unit>;
+public sealed record ReplaceMemberRoleCommand(string ExternalUserId, string RoleCode) : ICommand<Unit>;
 
-public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
-    : IRequestHandler<ReplaceMemberRolesCommand, Unit>
+public sealed class ReplaceMemberRoleHandler(TenantDbContext tenantDbContext)
+    : IRequestHandler<ReplaceMemberRoleCommand, Unit>
 {
     public async Task<Result<Unit>> HandleAsync(
-        ReplaceMemberRolesCommand request,
+        ReplaceMemberRoleCommand request,
         CancellationToken cancellationToken)
     {
         var user = await MemberQueries.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
@@ -22,19 +22,18 @@ public sealed class ReplaceMemberRolesHandler(TenantDbContext tenantDbContext)
             return MemberErrors.Missing;
         }
 
-        var roles = await tenantDbContext.Roles
-            .Where(role => request.RoleCodes.Contains(role.Code))
-            .ToListAsync(cancellationToken);
+        var role = await tenantDbContext.Roles
+            .SingleOrDefaultAsync(role => role.Code == request.RoleCode, cancellationToken);
 
-        if (roles.Count != request.RoleCodes.Distinct().Count())
+        if (role is null)
         {
             return Error.Validation(new Dictionary<string, string[]>
             {
-                [nameof(request.RoleCodes)] = ["One or more roles do not exist."]
+                [nameof(request.RoleCode)] = [$"Role '{request.RoleCode}' does not exist."]
             });
         }
 
-        user.AssignRoles(roles);
+        user.AssignRole(role);
 
         return Result.Success();
     }

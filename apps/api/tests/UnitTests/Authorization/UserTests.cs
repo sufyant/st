@@ -24,33 +24,32 @@ public sealed class UserTests
     }
 
     [Fact]
-    public void AssignRoles_ReplacesTheWholeSet()
+    public void AssignRole_ReplacesThePreviousOne()
     {
         // Arrange
         var user = User.Create(ExternalUserId.Create("user_2abc123"), EmailAddress.Create("user@example.com"), UserStatus.Active);
         var owner = new Role();
         var member = new Role();
-        user.AssignRoles([owner]);
+        user.AssignRole(owner);
 
         // Act
-        user.AssignRoles([member]);
+        user.AssignRole(member);
 
         // Assert
-        Assert.Single(user.Roles);
-        Assert.Same(member, user.Roles.Single());
+        Assert.Same(member, user.Role);
     }
 
     [Fact]
-    public void AssignRoles_WithAnEmptySet_LeavesNoRoles()
+    public void AssignRole_WithNull_LeavesNoRole()
     {
         // Arrange
         var user = User.Create(ExternalUserId.Create("user_2abc123"), EmailAddress.Create("user@example.com"), UserStatus.Active);
-        user.AssignRoles([new Role()]);
+        user.AssignRole(new Role());
 
         // Act
-        user.AssignRoles([]);
+        user.AssignRole(null);
 
         // Assert
-        Assert.Empty(user.Roles);
+        Assert.Null(user.Role);
     }
 }

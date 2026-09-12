@@ -30,9 +30,7 @@ public sealed class MemberEndpointTests
         var only = Assert.Single(body!);
         Assert.Equal(TenantSurfaceFixture.OwnerUserId, only.GetProperty("externalUserId").GetString());
         Assert.Equal("Active", only.GetProperty("status").GetString());
-        Assert.Contains(
-            "owner",
-            only.GetProperty("roleCodes").EnumerateArray().Select(role => role.GetString()));
+        Assert.Equal("owner", only.GetProperty("roleCode").GetString());
     }
 
     [Fact]
@@ -71,10 +69,10 @@ public sealed class MemberEndpointTests
             TestContext.Current.CancellationToken));
         await using var tenantDbContext = fixture.CreateTenantDbContext();
         var user = await tenantDbContext.Users
-            .Include(candidate => candidate.Roles)
+            .Include(candidate => candidate.Role)
             .SingleAsync(candidate => candidate.ExternalUserId == invitedUserId, TestContext.Current.CancellationToken);
         Assert.Equal(UserStatus.Disabled, user.Status);
-        Assert.Empty(user.Roles);
+        Assert.Null(user.Role);
     }
 
     [Fact]
@@ -140,8 +138,8 @@ public sealed class MemberEndpointTests
 
         // Act
         using var upgraded = await fixture.Client.PutAsJsonAsync(
-            $"{MembersUrl}/{InvitedUserId}/roles",
-            new { roleCodes = new[] { "owner" } },
+            $"{MembersUrl}/{InvitedUserId}/role",
+            new { roleCode = "owner" },
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -161,8 +159,8 @@ public sealed class MemberEndpointTests
 
         // Act
         using var response = await fixture.Client.PutAsJsonAsync(
-            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}/roles",
-            new { roleCodes = new[] { "member" } },
+            $"{MembersUrl}/{TenantSurfaceFixture.OwnerUserId}/role",
+            new { roleCode = "member" },
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -177,8 +175,8 @@ public sealed class MemberEndpointTests
 
         // Act
         using var response = await fixture.Client.PutAsJsonAsync(
-            $"{MembersUrl}/{InvitedUserId}/roles",
-            new { roleCodes = new[] { "sorcerer" } },
+            $"{MembersUrl}/{InvitedUserId}/role",
+            new { roleCode = "sorcerer" },
             TestContext.Current.CancellationToken);
 
         // Assert

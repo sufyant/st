@@ -400,7 +400,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/{tenantAlias}/api/v1/members/{externalUserId}/roles": {
+    "/{tenantAlias}/api/v1/members/{externalUserId}/role": {
         parameters: {
             query?: never;
             header?: never;
@@ -419,7 +419,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ReplaceRolesRequest"];
+                    "application/json": components["schemas"]["ReplaceRoleRequest"];
                 };
             };
             responses: {
@@ -558,8 +558,8 @@ export interface components {
         CreateTenantRequest: {
             alias: string;
         };
-        ReplaceRolesRequest: {
-            roleCodes: string[];
+        ReplaceRoleRequest: {
+            roleCode: string;
         };
     };
     responses: never;

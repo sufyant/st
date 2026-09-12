@@ -82,7 +82,7 @@ public sealed class TenantProvisioningHandler(
 
         await using var tenantDbContext = provisioner.CreateTenantDbContext(tenant.DatabaseName);
         var user = await tenantDbContext.Users
-            .Include(candidate => candidate.Roles)
+            .Include(candidate => candidate.Role)
             .SingleOrDefaultAsync(candidate => candidate.ExternalUserId == externalUserId, cancellationToken);
 
         if (user is null)
@@ -92,12 +92,12 @@ public sealed class TenantProvisioningHandler(
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 
-        if (user.Roles.All(existing => existing.Code != AccessCatalog.OwnerRole.Code))
+        if (user.Role?.Code != AccessCatalog.OwnerRole.Code)
         {
             var ownerRole = await tenantDbContext.Roles.SingleAsync(
                 candidate => candidate.Code == AccessCatalog.OwnerRole.Code,
                 cancellationToken);
-            user.AssignRoles([.. user.Roles, ownerRole]);
+            user.AssignRole(ownerRole);
             await tenantDbContext.SaveChangesAsync(cancellationToken);
         }
 

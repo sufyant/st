@@ -15,8 +15,6 @@ public readonly record struct UserId(Guid Value)
 
 public sealed class User : Entity<UserId>, IAuditable
 {
-    private readonly List<Role> roles = [];
-
     public ExternalUserId ExternalUserId { get; private set; } = null!;
 
     public EmailAddress Email { get; private set; } = null!;
@@ -27,7 +25,7 @@ public sealed class User : Entity<UserId>, IAuditable
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public IReadOnlyCollection<Role> Roles => roles;
+    public Role? Role { get; private set; }
 
     private User()
     {
@@ -51,11 +49,5 @@ public sealed class User : Entity<UserId>, IAuditable
 
     public void Disable() => Status = UserStatus.Disabled;
 
-    public void AssignRoles(IEnumerable<Role> replacement)
-    {
-        ArgumentNullException.ThrowIfNull(replacement);
-
-        roles.Clear();
-        roles.AddRange(replacement);
-    }
+    public void AssignRole(Role? role) => Role = role;
 }

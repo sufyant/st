@@ -136,7 +136,7 @@ public sealed class UnitOfWorkBehaviorTests
                 tenant.Users.Add(user);
                 // Forces the tenant save to fail: this default-constructed Role has a null
                 // Code, which violates the NOT NULL constraint on roles.code, not an FK.
-                user.AssignRoles([new Role()]);
+                user.AssignRole(new Role());
 
                 return Task.FromResult(Result.Success());
             },

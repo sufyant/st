@@ -272,37 +272,45 @@ programlama hatasıdır; `Result` ile temsil edilmez.
 `ChangeStatus` üretim kodunda hiç kullanılmıyor, yalnızca testlerde geçiyor. Yani bu
 değişikliğin maliyeti testlerin okunaklılaşmasından ibarettir.
 
-### 8. İlişki sınıfları domainden çıkar, `User` rollerini kendi taşır
+### 8. İlişki sınıfları domainden çıkar — DÜZELTİLDİ, `User` tek bir role taşır
+
+> **2026-09-12 güncellemesi:** Bu kararın önceki hali `User`e çoklu rol taşıyan bir
+> koleksiyon vermişti (`User.Roles`, `AssignRoles`, skip navigation üzerinden
+> `user_roles` join tablosu). Sonradan tek role indirildi; aşağıki paragraf o kararı ve
+> gerekçesini kayda geçiriyor, orijinal metin tarihsel referans için bırakıldı.
 
 ```csharp
-public sealed class User : AggregateRoot<UserId>
+public sealed class User : Entity<UserId>, IAuditable
 {
-    private readonly List<Role> roles = [];
-    public IReadOnlyCollection<Role> Roles => roles;
+    public Role? Role { get; private set; }
 
-    public void AssignRoles(IEnumerable<Role> replacement)
-    {
-        roles.Clear();
-        roles.AddRange(replacement);
-    }
+    public void AssignRole(Role? role) => Role = role;
 }
 ```
 
-`TenantUserRole` ve `TenantRolePermission` domainden çıkar; EF ikisini de skip navigation
-olarak kurar. Tablo adları (`user_roles`, `role_permissions`), kolon adları ve tohum
-verisi aynı kalır.
+`User`, `Role` ile many-to-many değil many-to-one ilişkide: `users` tablosunda doğrudan
+nullable bir `role_id` foreign key kolonu var, ayrı `user_roles` join tablosu kalktı.
+`Role.Permissions` ise dokunulmadı, o hâlâ skip navigation üzerinden many-to-many
+(`role_permissions`), çünkü bir rolün birden fazla izni olması hâlâ gerçek bir ihtiyaç.
 
-Kazanç somuttur. Middleware'deki elle yazılmış iki `Join` tek ifadeye iner:
+Gerekçe: `User.Roles`un çoğul olmasının iki dayanağı vardı. Biri, owner devri sırasında
+bir an için iki owner'ın aynı anda var olabilmesiydi; bu gerekçe karar 14'ün son owner
+korumasını tamamen kaldırmasıyla ortadan kalktı, çünkü artık sıfır owner anına bile
+katlanılıyor. Öbürü, tenant'a özel roller geldiğinde birinin "member" + "faturalama"
+gibi iki rolü birden taşıyabilmesiydi; bu, karar 9'un kendi tetikleyicisi henüz
+dolmamış bir ihtiyaç, yani projenin geri kalanında uyguladığı "önce gerçek ihtiyaç,
+sonra altyapı" disiplininin bu noktada uygulanmamış hâliydi.
 
-```csharp
-user.Roles.SelectMany(role => role.Permissions).Select(permission => permission.Code).Distinct()
-```
+Yan fayda: `AuditInterceptor`deki join-satırı yürüyen ~50 satırlık mekanizma
+(karar 11'de `updated_at`in skip navigation değişikliklerinde de basılması için
+eklenmişti) tamamen ölü koda döndü ve silindi. Sebebi: o mekanizma yalnızca
+`user_roles` join'i için gerekliydi; `Role.Permissions` tarafındaki `Role`/`Permission`
+zaten `IAuditable` değil. Tek role artık `User`in kendi skaler alanı olduğu için,
+`AssignRole` çağrısı `User` satırını doğrudan `Modified` işaretliyor, interceptor'ün
+düz döngüsü onu zaten yakalıyor.
 
-`ReplaceMemberRoles` handler'ı ilişki satırlarını tek tek silip eklemeyi bırakır,
-`user.AssignRoles(roles)` çağırır.
-
-Bedeli tek bir yerdedir: `role_permissions` tohum verisi açık bir sınıf üzerinden değil,
-EF'in sözlük tabanlı join eşlemesi üzerinden yazılır.
+`ReplaceMemberRoleCommand(string ExternalUserId, string RoleCode)` artık tekil,
+`PUT .../members/{externalUserId}/role` tekil `{ roleCode }` gövdesi alıyor.
 
 ### 9. `Role` ve `Permission` katalogdur; her rolün kodu olur
 
@@ -590,7 +598,7 @@ tenant endpoint'ini çağırmasına kadar bütün zinciri kanıtlar.
 | İkinci somut domain event | Kendi gerekçesi olan ilk ihtiyaç; provisioning'in outbox satırını event'e taşımak bunun adayı |
 | Herhangi bir son owner koruması (korkuluk, roster aggregate, veritabanı trigger) | İlk gerçek sahipsiz kalma olayı |
 | Kilitlenmiş tenant için admin kurtarma işlemi | İlk gerçek kilitlenme |
-| Tenant'a özel rol tanımlama | Bir tenant sistem rollerinin yetmediğini söylediğinde |
+| Tenant'a özel rol tanımlama, ve onunla birlikte `User`ın birden fazla rol taşıyabilmesi | Bir tenant sistem rollerinin yetmediğini söylediğinde |
 | Alan adı doğrulama ve otomatik katılma | Kendi IdP'si olan ilk müşteri |
 | SCIM ve dizin senkronu | Müşterinin kullanıcı yaşam döngüsünü kendi tarafından yönetmek istemesi |
 | Tenant başına "yalnızca şu alan adı" politikası | Bir tenant dışarıdan davete kapanmak istediğinde |
