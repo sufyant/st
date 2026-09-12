@@ -86,7 +86,7 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
         var tenantDbContext = services.GetRequiredService<TenantDbContext>();
         var tenantUser = await tenantDbContext.Users
             .Include(user => user.Role)
-            .ThenInclude(role => role!.Permissions)
+            .ThenInclude(role => role.Permissions)
             .AsNoTracking()
             .SingleOrDefaultAsync(user => user.ExternalUserId == userId, context.RequestAborted);
 
@@ -96,9 +96,9 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        var permissions = tenantUser.Role?.Permissions
+        var permissions = tenantUser.Role.Permissions
             .Select(permission => permission.Code)
-            .ToList() ?? [];
+            .ToList();
         var identity = new ClaimsIdentity("Tenant");
         identity.AddClaim(new Claim(TenantClaims.TenantId, tenant.Id.ToString("N")));
 

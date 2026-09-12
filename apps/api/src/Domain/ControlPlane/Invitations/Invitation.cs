@@ -5,6 +5,8 @@ namespace Domain.ControlPlane.Invitations;
 
 public enum InvitationStatus { Pending, Accepted, Revoked }
 
+public sealed record InvitationAcceptance(ExternalUserId By, DateTimeOffset At);
+
 public readonly record struct InvitationId(Guid Value)
 {
     public static InvitationId New() => new(Guid.CreateVersion7());
@@ -34,9 +36,7 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
 
     public DateTimeOffset ExpiresAt { get; private set; }
 
-    public DateTimeOffset? AcceptedAt { get; private set; }
-
-    public ExternalUserId? AcceptedByExternalUserId { get; private set; }
+    public InvitationAcceptance? Acceptance { get; private set; }
 
     private Invitation()
     {
@@ -82,8 +82,7 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
         RequirePending();
 
         Status = InvitationStatus.Accepted;
-        AcceptedByExternalUserId = acceptedBy;
-        AcceptedAt = acceptedAt;
+        Acceptance = new InvitationAcceptance(acceptedBy, acceptedAt);
     }
 
     public void Revoke()
@@ -91,7 +90,6 @@ public sealed class Invitation : Entity<InvitationId>, IAuditable
         RequirePending();
 
         Status = InvitationStatus.Revoked;
-        AcceptedAt = null;
     }
 
     private void RequirePending()

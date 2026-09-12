@@ -18,7 +18,7 @@ public sealed class InvitationTests
         // Assert
         Assert.Equal(InvitationStatus.Pending, invitation.Status);
         Assert.Equal(Now.AddDays(7), invitation.ExpiresAt);
-        Assert.Null(invitation.AcceptedAt);
+        Assert.Null(invitation.Acceptance);
     }
 
     [Fact]
@@ -44,8 +44,8 @@ public sealed class InvitationTests
 
         // Assert
         Assert.Equal(InvitationStatus.Accepted, invitation.Status);
-        Assert.Equal(acceptedBy, invitation.AcceptedByExternalUserId);
-        Assert.Equal(Now.AddHours(1), invitation.AcceptedAt);
+        Assert.Equal(acceptedBy, invitation.Acceptance?.By);
+        Assert.Equal(Now.AddHours(1), invitation.Acceptance?.At);
     }
 
     [Fact]

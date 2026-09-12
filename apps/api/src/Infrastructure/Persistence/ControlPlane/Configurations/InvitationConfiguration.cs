@@ -34,13 +34,14 @@ public sealed class InvitationConfiguration : IEntityTypeConfiguration<Invitatio
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
-        builder.Property(x => x.AcceptedAt).HasColumnName("accepted_at");
-        builder.Property(x => x.AcceptedByExternalUserId)
-            .HasColumnName("accepted_by_external_user_id")
-            .HasMaxLength(255)
-            .HasConversion(
-                userId => userId!.Value,
-                value => ExternalUserId.Create(value));
+        builder.OwnsOne(x => x.Acceptance, ownership =>
+        {
+            ownership.Property(x => x.At).HasColumnName("accepted_at");
+            ownership.Property(x => x.By)
+                .HasColumnName("accepted_by_external_user_id")
+                .HasMaxLength(255)
+                .HasConversion(userId => userId.Value, value => ExternalUserId.Create(value));
+        });
         builder.HasIndex(x => x.TokenHash).IsUnique();
         builder.HasIndex(x => new { x.TenantId, x.Email })
             .IsUnique()
