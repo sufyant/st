@@ -10,7 +10,7 @@ public static class MeEndpoints
 {
     public static IEndpointRouteBuilder MapMe(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1")
+        var group = endpoints.MapGroup($"/api/{ApiRoutes.Version1}")
             .RequireAuthorization()
             .WithTags("MeEndpoints");
 

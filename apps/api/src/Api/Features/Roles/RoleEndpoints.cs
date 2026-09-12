@@ -9,7 +9,7 @@ public static class RoleEndpoints
 {
     public static IEndpointRouteBuilder MapTenantRoles(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/{tenantAlias}/api/v1/roles", async (
+        endpoints.MapGet($"/{{tenantAlias}}/api/{ApiRoutes.Version1}/roles", async (
                     IMediator mediator,
                     CancellationToken cancellationToken) =>
                 (await mediator.SendAsync(new ListRolesQuery(), cancellationToken)).ToOk())

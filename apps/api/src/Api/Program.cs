@@ -72,7 +72,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready")
 });
-app.MapGet("/{tenantAlias}/api/v1/whoami", (TenantContext tenantContext, ClaimsPrincipal user) => Results.Ok(new
+app.MapGet($"/{{tenantAlias}}/api/{ApiRoutes.Version1}/whoami", (TenantContext tenantContext, ClaimsPrincipal user) => Results.Ok(new
 {
     tenantId = tenantContext.TenantId.Value,
     tenantAlias = tenantContext.Alias,

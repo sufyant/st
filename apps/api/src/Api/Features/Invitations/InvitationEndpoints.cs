@@ -11,7 +11,7 @@ public static class InvitationEndpoints
 {
     public static IEndpointRouteBuilder MapTenantInvitations(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/{tenantAlias}/api/v1/invitations")
+        var group = endpoints.MapGroup($"/{{tenantAlias}}/api/{ApiRoutes.Version1}/invitations")
             .WithTags("InvitationEndpoints");
 
         group.MapPost("/", async (
@@ -23,7 +23,7 @@ public static class InvitationEndpoints
                         new CreateInvitationCommand(request.Email, request.RoleCode),
                         cancellationToken))
                     .ToCreated(invitation =>
-                        $"/{tenantContext.Alias}/api/v1/invitations/{invitation.Id}"))
+                        $"{ApiRoutes.ForTenant(tenantContext.Alias)}/invitations/{invitation.Id}"))
             .RequirePermission(TenantPermissions.InvitationsManage);
 
         group.MapGet("/", async (IMediator mediator, CancellationToken cancellationToken) =>
