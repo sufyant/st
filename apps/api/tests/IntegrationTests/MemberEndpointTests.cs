@@ -72,7 +72,7 @@ public sealed class MemberEndpointTests
             .Include(candidate => candidate.Role)
             .SingleAsync(candidate => candidate.ExternalUserId == invitedUserId, TestContext.Current.CancellationToken);
         Assert.Equal(UserStatus.Disabled, user.Status);
-        Assert.Null(user.Role);
+        Assert.Equal("member", user.Role?.Code);
     }
 
     [Fact]

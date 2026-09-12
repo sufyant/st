@@ -33,7 +33,8 @@ public sealed class RevokeMemberHandler(
             .ToListAsync(cancellationToken);
         controlPlaneDbContext.Memberships.RemoveRange(memberships);
 
-        user.AssignRole(null);
+        // The role stays on the row: revoking access does not erase who this person was while
+        // they had it, and a future re-invite always assigns a fresh role before it matters again.
         user.Disable();
 
         return Result.Success();
