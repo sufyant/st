@@ -17,7 +17,7 @@ public sealed class DisableMemberHandler(TenantDbContext tenantDbContext)
         DisableMemberCommand request,
         CancellationToken cancellationToken)
     {
-        var user = await TenantUsers.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
+        var user = await MemberQueries.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
 
         if (user is null)
         {
@@ -37,7 +37,7 @@ public sealed class EnableMemberHandler(TenantDbContext tenantDbContext)
         EnableMemberCommand request,
         CancellationToken cancellationToken)
     {
-        var user = await TenantUsers.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
+        var user = await MemberQueries.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
 
         if (user is null)
         {

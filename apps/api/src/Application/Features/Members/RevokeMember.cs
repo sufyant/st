@@ -19,7 +19,7 @@ public sealed class RevokeMemberHandler(
         RevokeMemberCommand request,
         CancellationToken cancellationToken)
     {
-        var user = await TenantUsers.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
+        var user = await MemberQueries.FindAsync(tenantDbContext, request.ExternalUserId, cancellationToken);
 
         if (user is null)
         {

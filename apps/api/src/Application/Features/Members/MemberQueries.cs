@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.Members;
 
-internal static class TenantUsers
+internal static class MemberQueries
 {
     public static Task<User?> FindAsync(
         TenantDbContext tenantDbContext,
