@@ -13,6 +13,7 @@ using Infrastructure.Messaging;
 using Infrastructure.Tenants;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Scalar.AspNetCore;
 using Serilog;
 using Application.Abstractions;
 
@@ -59,6 +60,12 @@ app.UseMiddleware<TenantAccessMiddleware>();
 app.UseMiddleware<RequestEnrichmentMiddleware>();
 app.UseAuthorization();
 app.MapOpenApi();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapScalarApiReference();
+}
+
 app.MapControlPlane();
 app.MapTenantInvitations();
 app.MapMe();
