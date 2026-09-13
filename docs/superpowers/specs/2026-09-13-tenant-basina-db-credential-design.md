@@ -80,13 +80,23 @@ Bugün [Program.cs:36-42](apps/api/src/Api/Program.cs:36) sabit bir base connect
 - `grant-control-plane.sql`: `st_tenant` → `resolver`, `tenant_credentials` tablosuna `SELECT` eklenir.
 - Tenant başına `CREATE ROLE`/`GRANT` artık bootstrap'te değil, `TenantProvisioner` içinde çalışır (zaten öyleydi, sadece hedef rol adı değişiyor).
 
+### 7. Gecikmeli hard-delete: yeni bir scheduler değil, outbox'ın `NextAttemptAt`'i
+
+Bugün `Tenant.MarkDeleted()` yalnızca status değiştiriyor; fiziksel `DROP DATABASE`/`DROP ROLE` hiç yazılmamış. Bunu bir bekleme süresiyle (örn. 30 gün) kapatıyoruz, ama ayrı bir zamanlayıcı (Quartz vb.) kurmadan: `OutboxMessage` zaten bir `NextAttemptAt` kolonu taşıyor ve `OutboxDrainer` zaten yalnızca `next_attempt_at <= now()` olan satırları işliyor ([OutboxDrainer.cs:19-27](apps/api/src/Infrastructure/Messaging/OutboxDrainer.cs:19)). Bu, retry backoff için yazılmıştı ama "gecikmeli çalıştır" için de birebir aynı mekanizma.
+
+Akış: tenant `Deprovisioning`'e geçtiğinde (aynı transaction'da) bir `TenantHardDeleteRequested` mesajı yazılır, `NextAttemptAt = now() + 30 gün` ile. Hiçbir yeni polling/cron döngüsüne gerek yok — mevcut `OutboxProcessor` zaten 10 saniyede bir çalışıyor, vakti gelmemiş mesajı otomatik atlıyor, 30 gün sonra normal akışında işliyor (`DROP DATABASE`, `DROP ROLE access_<id>`, `tenant_credentials` satırını sil, `Tenant.Status = Deleted`).
+
+Gerekli tek kod değişikliği: `OutboxMessage.Create(...)` bugün `NextAttemptAt = createdAt` sabitliyor ([OutboxMessage.cs:29-47](apps/api/src/Infrastructure/Messaging/OutboxMessage.cs:29)) — buna gecikmeli bir `executeAt` parametresi alan ikinci bir factory (örn. `CreateDelayed`) eklenir.
+
+**Neden Quartz değil:** Quartz'ın asıl sattığı şey (takvime bağlı tetikleyiciler, cron ifadeleri, DB satırından bağımsız zaman-tabanlı işler) burada yok — "30 gün sonra şu satır işlensin" tamamen event-kaynaklı (tenant silme eventi tetikliyor) ve mevcut mekanizmanın zaten yaptığı şey. Çok-pod (K8s) ortamında da ek bir şey gerekmez: `FOR UPDATE SKIP LOCKED` zaten birden fazla worker'ın aynı satırı iki kere işlememesini garanti ediyor, ayrı bir lider seçimi/dağıtık kilide gerek yok.
+
 ## Bilinçli olarak yapmadıklarımız
 
 | Yapılmadı | Tetikleyici |
 |---|---|
 | Şifre rotasyonu | İlk gerçek rotasyon ihtiyacı/politikası |
 | Admin portalı için ayrı DB rolü modeli | Ayrı tasarım — decision 34 ile ilişkili, bu spec'in kapsamına alınmadı |
-| Tenant silindiğinde rol/DB'nin fiilen temizlenmesi | Deprovisioning'in fiziksel temizlik akışı yazıldığında (bugün zaten yok) |
+| Grace period'un (30 gün) konfigüre edilebilir/iptal edilebilir olması | İlk gerçek "silmeyi geri al" talebi geldiğinde |
 | Outbox worker'ın ayrı deployable'a taşınması | Worker'ın kendi kaynak/scale ihtiyacı doğduğunda |
 
 ## Not
