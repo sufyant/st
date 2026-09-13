@@ -7,8 +7,6 @@ namespace Infrastructure.Provisioning;
 
 public sealed class TenantProvisioner(string connectionString, AuditInterceptor auditInterceptor)
 {
-    private const string TenantRole = "resolver";
-
     public async Task CreateDatabaseAsync(TenantDatabaseName databaseName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(databaseName);
@@ -40,14 +38,33 @@ public sealed class TenantProvisioner(string connectionString, AuditInterceptor 
         return migrator.MigrateAsync(databaseName.Value, cancellationToken);
     }
 
-    public async Task GrantTenantAccessAsync(TenantDatabaseName databaseName, CancellationToken cancellationToken)
+    public async Task<string> GrantTenantAccessAsync(
+        TenantDatabaseName databaseName,
+        TenantRoleName roleName,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(databaseName);
+        ArgumentNullException.ThrowIfNull(roleName);
+
+        var password = GeneratePassword();
 
         await using var maintenance = new NpgsqlConnection(MaintenanceConnectionString());
         await maintenance.OpenAsync(cancellationToken);
+        await using var existsCommand = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = @name)",
+            maintenance);
+        existsCommand.Parameters.AddWithValue("name", roleName.Value);
+        var roleExists = (bool)(await existsCommand.ExecuteScalarAsync(cancellationToken))!;
+
+        await using var roleCommand = new NpgsqlCommand(
+            roleExists
+                ? $"ALTER ROLE \"{roleName.Value}\" PASSWORD '{password}'"
+                : $"CREATE ROLE \"{roleName.Value}\" LOGIN PASSWORD '{password}'",
+            maintenance);
+        await roleCommand.ExecuteNonQueryAsync(cancellationToken);
+
         await using var connectCommand = new NpgsqlCommand(
-            $"GRANT CONNECT ON DATABASE \"{databaseName.Value}\" TO {TenantRole}",
+            $"GRANT CONNECT ON DATABASE \"{databaseName.Value}\" TO \"{roleName.Value}\"",
             maintenance);
         await connectCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -55,14 +72,22 @@ public sealed class TenantProvisioner(string connectionString, AuditInterceptor 
         await tenant.OpenAsync(cancellationToken);
         await using var grantCommand = new NpgsqlCommand(
             $"""
-            GRANT USAGE ON SCHEMA public TO {TenantRole};
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {TenantRole};
+            GRANT USAGE ON SCHEMA public TO "{roleName.Value}";
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "{roleName.Value}";
             ALTER DEFAULT PRIVILEGES IN SCHEMA public
-                GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {TenantRole};
+                GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{roleName.Value}";
             """,
             tenant);
         await grantCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        return password;
     }
+
+    private static string GeneratePassword() =>
+        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
 
     public TenantDbContext CreateTenantDbContext(TenantDatabaseName databaseName)
     {

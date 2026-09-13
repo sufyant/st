@@ -48,7 +48,8 @@ public sealed class TenantProvisioningHandler(
 
             step = TenantProvisioningStep.GrantingAccess;
             await RecordAsync(tenant, step, cancellationToken);
-            await provisioner.GrantTenantAccessAsync(tenant.DatabaseName, cancellationToken);
+            await provisioner.GrantTenantAccessAsync(
+                tenant.DatabaseName, TenantRoleName.ForTenant(tenant.Id), cancellationToken);
 
             step = TenantProvisioningStep.SeedingOwner;
             await RecordAsync(tenant, step, cancellationToken);

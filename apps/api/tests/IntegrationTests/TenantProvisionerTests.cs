@@ -61,26 +61,58 @@ public sealed class TenantProvisionerTests
     }
 
     [Fact]
-    public async Task GrantTenantAccessAsync_RunTwice_LetsTheTenantRoleReadTheTables()
+    public async Task GrantTenantAccessAsync_CreatesADedicatedRoleThatCanReadTheTables()
     {
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
-        await ExecuteAsync(postgres.GetConnectionString(), "CREATE ROLE resolver LOGIN PASSWORD 'test'");
         var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
+        var roleName = TenantRoleName.Create("access_acme");
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
         await provisioner.MigrateSchemaAsync(DatabaseName, TestContext.Current.CancellationToken);
-        await provisioner.GrantTenantAccessAsync(DatabaseName, TestContext.Current.CancellationToken);
 
         // Act
-        await provisioner.GrantTenantAccessAsync(DatabaseName, TestContext.Current.CancellationToken);
+        var password = await provisioner.GrantTenantAccessAsync(
+            DatabaseName, roleName, TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.False(string.IsNullOrWhiteSpace(password));
         var tenantConnection = new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
         {
             Database = DatabaseName.Value,
-            Username = "resolver",
-            Password = "test"
+            Username = roleName.Value,
+            Password = password
+        }.ConnectionString;
+        await using var connection = new NpgsqlConnection(tenantConnection);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM users", connection);
+        Assert.Equal(0L, await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task GrantTenantAccessAsync_RunTwice_RotatesThePasswordAndStillGrantsAccess()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
+        var roleName = TenantRoleName.Create("access_acme");
+        await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
+        await provisioner.MigrateSchemaAsync(DatabaseName, TestContext.Current.CancellationToken);
+        var firstPassword = await provisioner.GrantTenantAccessAsync(
+            DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Act
+        var secondPassword = await provisioner.GrantTenantAccessAsync(
+            DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.NotEqual(firstPassword, secondPassword);
+        var tenantConnection = new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
+        {
+            Database = DatabaseName.Value,
+            Username = roleName.Value,
+            Password = secondPassword
         }.ConnectionString;
         await using var connection = new NpgsqlConnection(tenantConnection);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
@@ -107,13 +139,5 @@ public sealed class TenantProvisionerTests
         await using var command = new NpgsqlCommand("SELECT to_regclass('public.users')::text", connection);
 
         return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken) is "users";
-    }
-
-    private static async Task ExecuteAsync(string connectionString, string sql)
-    {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 }

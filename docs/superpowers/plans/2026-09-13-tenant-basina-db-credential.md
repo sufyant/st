@@ -461,7 +461,7 @@ git commit -m "feat(persistence): add tenant_credentials table"
 - Consumes: `TenantRoleName` (Task 2).
 - Produces: `TenantProvisioner.GrantTenantAccessAsync(TenantDatabaseName, TenantRoleName, CancellationToken) -> Task<string>` (döndürülen değer düz metin parola). İmza değişti — eski `GrantTenantAccessAsync(TenantDatabaseName, CancellationToken)` kaldırıldı. Task 7 bu yeni imzayı kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `TenantProvisionerTests.cs`'deki `GrantTenantAccessAsync_RunTwice_LetsTheTenantRoleReadTheTables` testini değiştir (artık sabit `st_tenant`/`resolver` role'ü yaratmaya gerek yok, metod kendi rolünü yaratıyor):
 
@@ -531,12 +531,12 @@ Bu iki test eskisinin (`GrantTenantAccessAsync_RunTwice_LetsTheTenantRoleReadThe
 
 Test dosyasının başına `using Domain.ControlPlane.Tenants;` zaten var (kontrol et, `DatabaseName` zaten oradan geliyor).
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisionerTests"`
 Expected: FAIL (derleme hatası — imza uyuşmuyor)
 
-- [ ] **Step 3: `GrantTenantAccessAsync`'i yeniden yaz**
+- [x] **Step 3: `GrantTenantAccessAsync`'i yeniden yaz**
 
 `TenantProvisioner.cs`'de `TenantRole` sabitini kaldır, `GrantTenantAccessAsync`'i değiştir:
 
@@ -595,12 +595,12 @@ private static string GeneratePassword() =>
 
 `using Domain.ControlPlane.Tenants;` zaten dosyanın başında var (`TenantDatabaseName` için) — `TenantRoleName` aynı namespace'te, ek using gerekmez.
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisionerTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Provisioning/TenantProvisioner.cs apps/api/tests/IntegrationTests/TenantProvisionerTests.cs
