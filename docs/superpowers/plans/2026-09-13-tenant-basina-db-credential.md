@@ -222,7 +222,7 @@ git commit -m "feat(domain): add TenantRoleName value object"
 - Consumes: `TenantId` ([Domain/ControlPlane/Tenants/Tenant.cs](../../src/Domain/ControlPlane/Tenants/Tenant.cs)), `TenantRoleName` (Task 2), `Entity<TId>`/`IAuditable` ([Domain/Shared](../../src/Domain/Shared)).
 - Produces: `TenantCredential.Create(TenantId, TenantRoleName, string encryptedPassword) -> TenantCredential`, `.Rotate(string encryptedPassword)`, `.TenantId`, `.RoleName`, `.EncryptedPassword`. Task 4 (EF config), Task 7 (handler) bunu kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 ```csharp
 using Domain.ControlPlane.Tenants;
@@ -273,12 +273,12 @@ public sealed class TenantCredentialTests
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantCredentialTests"`
 Expected: FAIL (derleme hatası)
 
-- [ ] **Step 3: `TenantCredential` yaz**
+- [x] **Step 3: `TenantCredential` yaz**
 
 ```csharp
 using Domain.Shared;
@@ -335,12 +335,12 @@ public sealed class TenantCredential : Entity<TenantCredentialId>, IAuditable
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantCredentialTests"`
 Expected: PASS (3 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Domain/ControlPlane/Tenants/TenantCredential.cs apps/api/tests/UnitTests/ControlPlaneTenants/TenantCredentialTests.cs
