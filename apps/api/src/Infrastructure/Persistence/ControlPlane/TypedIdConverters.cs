@@ -10,6 +10,10 @@ public sealed class TenantIdConverter() : ValueConverter<TenantId, Guid>(
     id => id.Value,
     value => new TenantId(value));
 
+public sealed class TenantCredentialIdConverter() : ValueConverter<TenantCredentialId, Guid>(
+    id => id.Value,
+    value => new TenantCredentialId(value));
+
 public sealed class MembershipIdConverter() : ValueConverter<MembershipId, Guid>(
     id => id.Value,
     value => new MembershipId(value));

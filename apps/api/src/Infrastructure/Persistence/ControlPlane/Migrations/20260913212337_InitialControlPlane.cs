@@ -82,8 +82,8 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    accepted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    accepted_by_external_user_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true)
+                    accepted_by_external_user_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    accepted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -118,6 +118,30 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         principalTable: "tenants",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "tenant_credentials",
+                schema: "control",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    tenant_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    role_name = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
+                    encrypted_password = table.Column<string>(type: "text", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_tenant_credentials", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_tenant_credentials_tenants_tenant_id",
+                        column: x => x.tenant_id,
+                        principalSchema: "control",
+                        principalTable: "tenants",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
@@ -156,6 +180,13 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_tenant_credentials_tenant_id",
+                schema: "control",
+                table: "tenant_credentials",
+                column: "tenant_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_tenants_alias",
                 schema: "control",
                 table: "tenants",
@@ -187,6 +218,10 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
 
             migrationBuilder.DropTable(
                 name: "platform_admins",
+                schema: "control");
+
+            migrationBuilder.DropTable(
+                name: "tenant_credentials",
                 schema: "control");
 
             migrationBuilder.DropTable(

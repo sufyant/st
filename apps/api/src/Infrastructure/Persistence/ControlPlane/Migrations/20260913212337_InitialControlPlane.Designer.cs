@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.ControlPlane.Migrations
 {
     [DbContext(typeof(ControlPlaneDbContext))]
-    [Migration("20260911162912_InitialControlPlane")]
+    [Migration("20260913212337_InitialControlPlane")]
     partial class InitialControlPlane
     {
         /// <inheritdoc />
@@ -59,15 +59,6 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<DateTimeOffset?>("AcceptedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("accepted_at");
-
-                    b.Property<string>("AcceptedByExternalUserId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("accepted_by_external_user_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -211,6 +202,43 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                     b.ToTable("tenants", "control");
                 });
 
+            modelBuilder.Entity("Domain.ControlPlane.Tenants.TenantCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EncryptedPassword")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_password");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("role_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("tenant_credentials", "control");
+                });
+
             modelBuilder.Entity("Infrastructure.Messaging.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -262,6 +290,31 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.OwnsOne("Domain.ControlPlane.Invitations.InvitationAcceptance", "Acceptance", b1 =>
+                        {
+                            b1.Property<Guid>("InvitationId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTimeOffset>("At")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("accepted_at");
+
+                            b1.Property<string>("By")
+                                .IsRequired()
+                                .HasMaxLength(255)
+                                .HasColumnType("character varying(255)")
+                                .HasColumnName("accepted_by_external_user_id");
+
+                            b1.HasKey("InvitationId");
+
+                            b1.ToTable("invitations", "control");
+
+                            b1.WithOwner()
+                                .HasForeignKey("InvitationId");
+                        });
+
+                    b.Navigation("Acceptance");
                 });
 
             modelBuilder.Entity("Domain.ControlPlane.Memberships.Membership", b =>
@@ -270,6 +323,15 @@ namespace Infrastructure.Persistence.ControlPlane.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.ControlPlane.Tenants.TenantCredential", b =>
+                {
+                    b.HasOne("Domain.ControlPlane.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

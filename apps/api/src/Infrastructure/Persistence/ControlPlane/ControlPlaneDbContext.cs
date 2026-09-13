@@ -12,6 +12,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
+    public DbSet<TenantCredential> TenantCredentials => Set<TenantCredential>();
+
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
@@ -31,6 +33,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
         builder.Properties<TenantId>().HaveConversion<TenantIdConverter>();
+        builder.Properties<TenantCredentialId>().HaveConversion<TenantCredentialIdConverter>();
         builder.Properties<MembershipId>().HaveConversion<MembershipIdConverter>();
         builder.Properties<InvitationId>().HaveConversion<InvitationIdConverter>();
         builder.Properties<PlatformAdminId>().HaveConversion<PlatformAdminIdConverter>();

@@ -41,6 +41,10 @@ public sealed class ControlPlaneSchemaMigrationTests
         await using var membershipCommand = new NpgsqlCommand("SELECT to_regclass('control.memberships')::text", connection);
         var membershipResult = await membershipCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken);
         var membershipTableName = membershipResult is DBNull ? null : (string)membershipResult!;
+        await using var credentialsCommand = new NpgsqlCommand(
+            "SELECT to_regclass('control.tenant_credentials')::text", connection);
+        var credentialsResult = await credentialsCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+        var credentialsTableName = credentialsResult is DBNull ? null : (string)credentialsResult!;
         await using var columnsCommand = new NpgsqlCommand(
             "SELECT column_name FROM information_schema.columns WHERE table_schema = 'control' AND table_name = 'memberships'",
             connection);
@@ -55,6 +59,7 @@ public sealed class ControlPlaneSchemaMigrationTests
         // Assert
         Assert.Equal("control.tenants", tableName);
         Assert.Equal("control.memberships", membershipTableName);
+        Assert.Equal("control.tenant_credentials", credentialsTableName);
         Assert.Contains("external_user_id", membershipColumns);
     }
 }
