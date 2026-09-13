@@ -7,7 +7,7 @@ namespace Infrastructure.Provisioning;
 
 public sealed class TenantProvisioner(string connectionString, AuditInterceptor auditInterceptor)
 {
-    private const string TenantRole = "st_tenant";
+    private const string TenantRole = "resolver";
 
     public async Task CreateDatabaseAsync(TenantDatabaseName databaseName, CancellationToken cancellationToken)
     {

@@ -94,14 +94,14 @@ public sealed class CredentialBoundaryTests
             .Replace(":'migrator_password'", "'test'", StringComparison.Ordinal)
             .Replace(":'provisioner_password'", "'test'", StringComparison.Ordinal)
             .Replace(":'control_password'", "'test'", StringComparison.Ordinal)
-            .Replace(":'tenant_password'", "'test'", StringComparison.Ordinal);
+            .Replace(":'resolver_password'", "'test'", StringComparison.Ordinal);
     }
 
     private static string TenantConnectionString(PostgreSqlContainer postgres) =>
         new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
         {
             Database = "control_plane",
-            Username = "st_tenant",
+            Username = "resolver",
             Password = "test"
         }.ConnectionString;
 

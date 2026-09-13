@@ -31,7 +31,7 @@
 **Interfaces:**
 - Produces: SQL script'lerdeki rol adları (`migrator`, `provisioner`, `control`, `resolver`) — sonraki tüm görevler bunları kullanır.
 
-- [ ] **Step 1: Script'leri güncelle**
+- [x] **Step 1: Script'leri güncelle**
 
 `apps/api/scripts/bootstrap-roles.sql`:
 ```sql
@@ -65,7 +65,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA control
 GRANT SELECT ON control.tenants, control.memberships TO resolver;
 ```
 
-- [ ] **Step 2: Testlerdeki eski isimleri güncelle**
+- [x] **Step 2: Testlerdeki eski isimleri güncelle**
 
 `CredentialBoundaryTests.cs`: `ReadScriptAsync`'teki dört `.Replace` çağrısını yeni placeholder adlarına çevir (`:'migrator_password'` vb. aynı kalır, sadece rol adları script içinde değişti — dosya zaten script'i okuyup şifreleri enjekte ediyor, ekstra değişiklik gerekmez). `TenantConnectionString`'de `Username = "st_tenant"` → `Username = "resolver"`.
 
@@ -73,12 +73,12 @@ GRANT SELECT ON control.tenants, control.memberships TO resolver;
 
 `ProvisioningFixture.cs`: `"CREATE ROLE st_tenant LOGIN PASSWORD 'test'"` → `"CREATE ROLE resolver LOGIN PASSWORD 'test'"`.
 
-- [ ] **Step 3: Testleri çalıştır**
+- [x] **Step 3: Testleri çalıştır**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~CredentialBoundaryTests|FullyQualifiedName~TenantProvisionerTests"`
 Expected: PASS (henüz tenant-başına-rol yok, bu testler hâlâ paylaşılan `resolver`/eski davranışı doğruluyor)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/api/scripts/bootstrap-roles.sql apps/api/scripts/grant-control-plane.sql apps/api/tests/TenantIsolationTests/CredentialBoundaryTests.cs apps/api/tests/IntegrationTests/TenantProvisionerTests.cs apps/api/tests/IntegrationTests/ProvisioningFixture.cs

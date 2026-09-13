@@ -66,7 +66,7 @@ public sealed class TenantProvisionerTests
         // Arrange
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
-        await ExecuteAsync(postgres.GetConnectionString(), "CREATE ROLE st_tenant LOGIN PASSWORD 'test'");
+        await ExecuteAsync(postgres.GetConnectionString(), "CREATE ROLE resolver LOGIN PASSWORD 'test'");
         var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
         await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
         await provisioner.MigrateSchemaAsync(DatabaseName, TestContext.Current.CancellationToken);
@@ -79,7 +79,7 @@ public sealed class TenantProvisionerTests
         var tenantConnection = new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
         {
             Database = DatabaseName.Value,
-            Username = "st_tenant",
+            Username = "resolver",
             Password = "test"
         }.ConnectionString;
         await using var connection = new NpgsqlConnection(tenantConnection);

@@ -34,7 +34,7 @@ public sealed class ProvisioningFixture : IAsyncDisposable
         var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         var connectionString = postgres.GetConnectionString();
-        await ExecuteAsync(connectionString, "CREATE ROLE st_tenant LOGIN PASSWORD 'test'");
+        await ExecuteAsync(connectionString, "CREATE ROLE resolver LOGIN PASSWORD 'test'");
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlane = WithDatabase(connectionString, "control_plane");
 
