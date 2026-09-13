@@ -120,6 +120,46 @@ public sealed class TenantProvisionerTests
         Assert.Equal(0L, await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task DropTenantAsync_RemovesTheDatabaseAndTheRole()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
+        var roleName = TenantRoleName.Create("access_acme");
+        await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
+        await provisioner.MigrateSchemaAsync(DatabaseName, TestContext.Current.CancellationToken);
+        await provisioner.GrantTenantAccessAsync(DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Act
+        await provisioner.DropTenantAsync(DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.False(await DatabaseExistsAsync(postgres.GetConnectionString(), DatabaseName.Value));
+        Assert.False(await RoleExistsAsync(postgres.GetConnectionString(), roleName.Value));
+    }
+
+    [Fact]
+    public async Task DropTenantAsync_RunTwice_Succeeds()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var provisioner = new TenantProvisioner(postgres.GetConnectionString(), AuditInterceptor);
+        var roleName = TenantRoleName.Create("access_acme");
+        await provisioner.CreateDatabaseAsync(DatabaseName, TestContext.Current.CancellationToken);
+        await provisioner.GrantTenantAccessAsync(DatabaseName, roleName, TestContext.Current.CancellationToken);
+        await provisioner.DropTenantAsync(DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Act
+        var act = async () =>
+            await provisioner.DropTenantAsync(DatabaseName, roleName, TestContext.Current.CancellationToken);
+
+        // Assert
+        await act();
+    }
+
     private static async Task<bool> DatabaseExistsAsync(string connectionString, string databaseName)
     {
         await using var connection = new NpgsqlConnection(connectionString);
@@ -127,6 +167,17 @@ public sealed class TenantProvisionerTests
         await using var command = new NpgsqlCommand(
             "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = @name)", connection);
         command.Parameters.AddWithValue("name", databaseName);
+
+        return (bool)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+    }
+
+    private static async Task<bool> RoleExistsAsync(string connectionString, string roleName)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = @name)", connection);
+        command.Parameters.AddWithValue("name", roleName);
 
         return (bool)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
     }

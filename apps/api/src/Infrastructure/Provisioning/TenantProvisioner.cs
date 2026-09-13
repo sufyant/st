@@ -83,6 +83,27 @@ public sealed class TenantProvisioner(string connectionString, AuditInterceptor 
         return password;
     }
 
+    public async Task DropTenantAsync(
+        TenantDatabaseName databaseName,
+        TenantRoleName roleName,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(databaseName);
+        ArgumentNullException.ThrowIfNull(roleName);
+
+        await using var maintenance = new NpgsqlConnection(MaintenanceConnectionString());
+        await maintenance.OpenAsync(cancellationToken);
+        await using var dropDatabaseCommand = new NpgsqlCommand(
+            $"DROP DATABASE IF EXISTS \"{databaseName.Value}\" WITH (FORCE)",
+            maintenance);
+        await dropDatabaseCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        await using var dropRoleCommand = new NpgsqlCommand(
+            $"DROP ROLE IF EXISTS \"{roleName.Value}\"",
+            maintenance);
+        await dropRoleCommand.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static string GeneratePassword() =>
         Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
             .Replace('+', '-')
