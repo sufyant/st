@@ -96,7 +96,7 @@ git commit -m "refactor(security): drop the st_ prefix from bootstrap role names
 **Interfaces:**
 - Produces: `TenantRoleName.ForTenant(TenantId) -> TenantRoleName`, `TenantRoleName.Create(string) -> TenantRoleName`, `TenantRoleName.Value -> string`. Task 3, 5, 6, 7'nin hepsi bunu kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 ```csharp
 using Domain.ControlPlane.Tenants;
@@ -151,12 +151,12 @@ public sealed class TenantRoleNameTests
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantRoleNameTests"`
 Expected: FAIL (derleme hatası — `TenantRoleName` yok)
 
-- [ ] **Step 3: `TenantRoleName` yaz**
+- [x] **Step 3: `TenantRoleName` yaz**
 
 ```csharp
 using System.Text;
@@ -198,12 +198,12 @@ public sealed record TenantRoleName
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantRoleNameTests"`
 Expected: PASS (4 test)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Domain/ControlPlane/Tenants/TenantRoleName.cs apps/api/tests/UnitTests/ControlPlaneTenants/TenantRoleNameTests.cs
