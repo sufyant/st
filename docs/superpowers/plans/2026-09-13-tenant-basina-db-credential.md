@@ -362,7 +362,7 @@ git commit -m "feat(domain): add TenantCredential entity"
 - Consumes: `TenantCredential`/`TenantCredentialId` (Task 3).
 - Produces: `ControlPlaneDbContext.TenantCredentials -> DbSet<TenantCredential>`. Task 7, 9 bunu kullanır. `control.tenant_credentials` tablosu.
 
-- [ ] **Step 1: EF konfigürasyonunu yaz**
+- [x] **Step 1: EF konfigürasyonunu yaz**
 
 ```csharp
 using Domain.ControlPlane.Tenants;
@@ -393,7 +393,7 @@ public sealed class TenantCredentialConfiguration : IEntityTypeConfiguration<Ten
 }
 ```
 
-- [ ] **Step 2: Typed id converter'ı ekle**
+- [x] **Step 2: Typed id converter'ı ekle**
 
 `TypedIdConverters.cs`'e ekle:
 ```csharp
@@ -402,7 +402,7 @@ public sealed class TenantCredentialIdConverter() : ValueConverter<TenantCredent
     value => new TenantCredentialId(value));
 ```
 
-- [ ] **Step 3: `ControlPlaneDbContext`'e bağla**
+- [x] **Step 3: `ControlPlaneDbContext`'e bağla**
 
 `ControlPlaneDbContext.cs`'e ekle:
 ```csharp
@@ -413,7 +413,7 @@ ve `ConfigureConventions`'a:
 builder.Properties<TenantCredentialId>().HaveConversion<TenantCredentialIdConverter>();
 ```
 
-- [ ] **Step 4: Migration'ı yeniden üret**
+- [x] **Step 4: Migration'ı yeniden üret**
 
 ```bash
 rm -rf src/Infrastructure/Persistence/ControlPlane/Migrations
@@ -423,7 +423,7 @@ dotnet ef migrations add InitialControlPlane \
   --output-dir Persistence/ControlPlane/Migrations
 ```
 
-- [ ] **Step 5: Şema testini güncelle**
+- [x] **Step 5: Şema testini güncelle**
 
 `ControlPlaneSchemaMigrationTests.cs`'e `tenant_credentials` tablosunun varlığını doğrulayan bir assertion ekle (mevcut `membershipCommand` desenini tekrarla):
 ```csharp
@@ -437,12 +437,12 @@ ve assert bölümüne:
 Assert.Equal("control.tenant_credentials", credentialsTableName);
 ```
 
-- [ ] **Step 6: Testleri çalıştır**
+- [x] **Step 6: Testleri çalıştır**
 
 Run: `dotnet test --solution Api.slnx`
 Expected: PASS (tüm testler, migration regenerasyonu control plane'e dokunan her testi etkiler)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Persistence/ControlPlane apps/api/tests/IntegrationTests/ControlPlaneSchemaMigrationTests.cs
@@ -618,7 +618,7 @@ git commit -m "feat(provisioning): grant tenant access through a dedicated per-t
 **Interfaces:**
 - Produces: `TenantProvisioner.DropTenantAsync(TenantDatabaseName, TenantRoleName, CancellationToken) -> Task`. Task 10 (hard-delete handler) bunu kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `TenantProvisionerTests.cs`'e ekle:
 ```csharp
@@ -677,12 +677,12 @@ private static async Task<bool> RoleExistsAsync(string connectionString, string 
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisionerTests"`
 Expected: FAIL (derleme hatası — `DropTenantAsync` yok)
 
-- [ ] **Step 3: `DropTenantAsync`'i yaz**
+- [x] **Step 3: `DropTenantAsync`'i yaz**
 
 `TenantProvisioner.cs`'e ekle:
 ```csharp
@@ -708,12 +708,12 @@ public async Task DropTenantAsync(
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisionerTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Provisioning/TenantProvisioner.cs apps/api/tests/IntegrationTests/TenantProvisionerTests.cs
@@ -734,7 +734,7 @@ git commit -m "feat(provisioning): add DropTenantAsync for hard-delete"
 - Consumes: `TenantCredential` (Task 3), `TenantProvisioner.GrantTenantAccessAsync` yeni imza (Task 5).
 - Produces: `TenantProvisioningHandler` artık `IDataProtectionProvider` alıyor; `Purpose` sabiti (`TenantCredential.ProtectionPurpose`) — Task 9'daki `TenantCredentialResolver` AYNI purpose string'i kullanmak zorunda.
 
-- [ ] **Step 1: Mevcut handler testini oku ve fixture'a DataProtection ekle**
+- [x] **Step 1: Mevcut handler testini oku ve fixture'a DataProtection ekle**
 
 Önce mevcut `TenantProvisioningHandlerTests.cs` dosyasını oku (bu görev sırasında Read ile aç), handler'ın nasıl construct edildiğini gör. `ProvisioningFixture.cs`'e bir `IDataProtectionProvider` alanı ekle:
 
@@ -745,7 +745,7 @@ public IDataProtectionProvider DataProtectionProvider { get; } =
 
 (Using: `Microsoft.AspNetCore.DataProtection` — `Infrastructure.csproj`'ün zaten `FrameworkReference Include="Microsoft.AspNetCore.App"` referansı var, `IntegrationTests.csproj` da `Api.csproj` üzerinden bunu miras alır; derlenmezse `IntegrationTests.csproj`'e `<FrameworkReference Include="Microsoft.AspNetCore.App" />` ekle.)
 
-- [ ] **Step 2: Başarısız testi yaz**
+- [x] **Step 2: Başarısız testi yaz**
 
 `TenantProvisioningHandlerTests.cs`'e (mevcut testlerin yanına, aynı dosyada) ekle:
 ```csharp
@@ -777,19 +777,19 @@ public async Task HandleAsync_StoresAnEncryptedCredentialForTheTenant()
 
 `using Domain.ControlPlane.Tenants;` zaten dosyada olmalı, yoksa ekle.
 
-- [ ] **Step 3: Testin başarısız olduğunu gör**
+- [x] **Step 3: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisioningHandlerTests"`
 Expected: FAIL (derleme hatası — `TenantProvisioningHandler` constructor'ı henüz üç parametre almıyor)
 
-- [ ] **Step 4: `AddDataProtection` kaydı ekle**
+- [x] **Step 4: `AddDataProtection` kaydı ekle**
 
 `PostgresServiceCollectionExtensions.cs`'in `AddTenantPersistence` metoduna ekle (metodun başına, `services.AddSingleton<AuditInterceptor>();` satırından önce):
 ```csharp
 services.AddDataProtection();
 ```
 
-- [ ] **Step 5: `TenantProvisioningHandler`'ı güncelle**
+- [x] **Step 5: `TenantProvisioningHandler`'ı güncelle**
 
 ```csharp
 using System.Text.Json;
@@ -938,16 +938,16 @@ public sealed class TenantProvisioningHandler(
 }
 ```
 
-- [ ] **Step 6: Handler'ı çağıran diğer testleri düzelt**
+- [x] **Step 6: Handler'ı çağıran diğer testleri düzelt**
 
 `OutboxDrainerTests.cs`'teki `CreateDrainer` yardımcı metodu `new TenantProvisioningHandler(fixture.CreateControlPlane(), fixture.Provisioner)` çağırıyor — üçüncü parametreyi ekle: `new TenantProvisioningHandler(fixture.CreateControlPlane(), fixture.Provisioner, fixture.DataProtectionProvider)`.
 
-- [ ] **Step 7: Testleri çalıştır**
+- [x] **Step 7: Testleri çalıştır**
 
 Run: `dotnet test --solution Api.slnx`
 Expected: PASS (tüm testler)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Persistence/PostgresServiceCollectionExtensions.cs apps/api/src/Application/Features/Provisioning/TenantProvisioningHandler.cs apps/api/tests/IntegrationTests/TenantProvisioningHandlerTests.cs apps/api/tests/IntegrationTests/ProvisioningFixture.cs apps/api/tests/IntegrationTests/OutboxDrainerTests.cs
