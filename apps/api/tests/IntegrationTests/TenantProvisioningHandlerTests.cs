@@ -4,6 +4,7 @@ using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence;
 using Infrastructure.Provisioning;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
