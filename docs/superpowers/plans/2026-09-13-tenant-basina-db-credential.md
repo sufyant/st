@@ -1444,7 +1444,7 @@ git commit -m "feat(deprovisioning): drop the tenant database, role, and credent
 - Consumes: `Tenant.BeginDeprovisioning()` (mevcut), `OutboxMessage.CreateDelayed` (Task 8), `TenantHardDeleteRequested` (Task 10).
 - Produces: `DELETE /admin/api/v1/tenants/{id}` uç noktası.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `TenantProvisioningEndpointTests.cs` gerçek fixture'ı `ControlPlaneFixture` (`fixture.Client`, `fixture.CreateControlPlaneDbContext()`) kullanıyor. Aynı dosyaya ekle (dosyanın başına `using Domain.ControlPlane.Tenants;` ve `using Infrastructure.Messaging;` ekle):
 
@@ -1513,12 +1513,12 @@ public async Task DeleteTenant_ForAnUnknownIdentifier_ReturnsNotFound()
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisioningEndpointTests"`
 Expected: FAIL (404 — uç nokta yok)
 
-- [ ] **Step 3: Uç noktayı ekle**
+- [x] **Step 3: Uç noktayı ekle**
 
 `TenantEndpoints.cs`'e ekle:
 
@@ -1563,12 +1563,12 @@ private static async Task<IResult> DeleteAsync(
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantProvisioningEndpointTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/ControlPlane/TenantEndpoints.cs apps/api/tests/IntegrationTests/TenantProvisioningEndpointTests.cs
