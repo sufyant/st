@@ -1671,7 +1671,7 @@ git commit -m "feat(persistence): add a credential-aware TenantDbContextFactory 
 
 **Önemli — kapsamı genişleten bir bulgu:** `TenantSurfaceFixture` (7 test dosyası tarafından paylaşılıyor: `AuditStampTests`, `InvitationAcceptanceTests`, `InvitationEndpointTests`, `MemberEndpointTests`, `ProblemDetailsTests`, `RoleEndpointTests`, `UnitOfWorkBehaviorTests`) bugün tenant DB'sini ve kullanıcıyı doğrudan EF ile yazıyor, `TenantProvisioner.GrantTenantAccessAsync`'i hiç çağırmıyor — yani hiçbir `tenant_credentials` satırı yok. Middleware artık credential çözümlemesini zorunlu kılınca, bu fixture düzeltilmeden yukarıdaki 7 dosyanın TÜMÜ 503 almaya başlar. Bu yüzden Step 1 önce fixture'ı düzeltiyor.
 
-- [ ] **Step 1: `TenantSurfaceFixture.StartAsync`'i credential seed edecek şekilde düzelt**
+- [x] **Step 1: `TenantSurfaceFixture.StartAsync`'i credential seed edecek şekilde düzelt**
 
 `TenantSurfaceFixture.cs`'de `StartAsync(string, string?, string?)` metodunu değiştir — `factory`'yi tenant DB kurulumundan hemen sonra, dönüş ifadesinden önce oluştur, sonra factory'nin KENDİ DI konteynerinden `TenantProvisioner` ve `IDataProtectionProvider`'ı çözüp credential'ı gerçek akışla üret (fixture'ın kendi ayrı bir `DataProtectionProvider` yaratmaması önemli — key ring uyuşmazsa `Unprotect` patlar):
 
@@ -1751,7 +1751,7 @@ public static async Task<TenantSurfaceFixture> StartAsync(
 
 `using Domain.ControlPlane.Tenants;` zaten dosyada var (`TenantCredential`, `TenantRoleName` aynı namespace). `using Microsoft.Extensions.DependencyInjection;` zaten var (`CreateScope`/`GetRequiredService` için).
 
-- [ ] **Step 2: Başarısız testi yaz — credential yoksa 503**
+- [x] **Step 2: Başarısız testi yaz — credential yoksa 503**
 
 `TenantAccessEndpointTests.cs`'e ekle (mevcut testlerin yanına):
 ```csharp
@@ -1779,12 +1779,12 @@ public async Task Request_WhenTheTenantHasNoStoredCredential_ReturnsServiceUnava
 
 Bu tek test, hem yeni 503 dalını hem de (dosyadaki mevcut, credential-seed'li fixture'a karşı çalışan diğer bütün testlerin geçmeye devam etmesiyle) mutlu yolu kanıtlıyor — ayrıca "current_user doğru role mu" diye `pg_stat_activity` gibi kırılgan bir kontrole gerek yok: Task 12'nin testi zaten `TenantDbContextFactory.Create(databaseName, username, password)`'ın doğru role ile gerçekten bağlanıp sorgu çalıştırdığını kanıtlamıştı.
 
-- [ ] **Step 3: Testin başarısız olduğunu gör**
+- [x] **Step 3: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantAccessEndpointTests"`
 Expected: FAIL (derleme hatası — `TenantContext.Set` henüz 5 parametre almıyor, `TenantCredentialResolver` middleware'de yok)
 
-- [ ] **Step 4: `TenantContext`'i genişlet**
+- [x] **Step 4: `TenantContext`'i genişlet**
 
 ```csharp
 using Domain.ControlPlane.Tenants;
@@ -1830,7 +1830,7 @@ public sealed class TenantContext
 }
 ```
 
-- [ ] **Step 5: `TenantAccessMiddleware`'i güncelle**
+- [x] **Step 5: `TenantAccessMiddleware`'i güncelle**
 
 `TenantAccessMiddleware.cs`'de, `tenantContext.Set(...)` çağrısından önce credential çöz:
 
@@ -1849,7 +1849,7 @@ tenantContext.Set(TenantId.From(tenant.Id), tenant.Alias, tenant.DatabaseName, c
 
 (`var hasMembership = ...` satırından SONRA, mevcut `tenantContext.Set(...)` satırının yerine geçer — sıralamayı koru: membership kontrolü hâlâ credential çözmeden önce, gereksiz bir DB round-trip'i erken 403 ile engellemek için.)
 
-- [ ] **Step 6: `Program.cs`'i güncelle**
+- [x] **Step 6: `Program.cs`'i güncelle**
 
 ```csharp
 builder.Services.AddScoped<TenantCredentialResolver>();
@@ -1864,12 +1864,12 @@ builder.Services.AddScoped(provider =>
 
 (`using Infrastructure.Tenants;` zaten `Program.cs`'de var — `TenantResolver` için.)
 
-- [ ] **Step 7: Testin geçtiğini gör**
+- [x] **Step 7: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx`
 Expected: PASS (tüm testler — özellikle `TenantSurfaceFixture`'ı kullanan 7 dosyanın hepsi, Step 1'deki fixture düzeltmesi sayesinde hâlâ yeşil)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/api/src/Application/Abstractions/TenantContext.cs apps/api/src/Api/Tenants/TenantAccessMiddleware.cs apps/api/src/Api/Program.cs apps/api/tests/IntegrationTests/TenantAccessEndpointTests.cs apps/api/tests/IntegrationTests/TenantSurfaceFixture.cs
@@ -1880,8 +1880,8 @@ git commit -m "feat(api): connect to each tenant database with its dedicated rol
 
 ## Definition of Done
 
-- [ ] `git log --oneline` on üç görev commit'ini gösteriyor.
-- [ ] `grep -rn --include='*.cs' --include='*.sql' "st_tenant\|st_migrator\|st_provisioner\|st_control\b" apps/api` sonuç döndürmüyor.
-- [ ] `dotnet test --solution Api.slnx` yeşil.
+- [x] `git log --oneline` on üç görev commit'ini gösteriyor.
+- [x] `grep -rn --include='*.cs' --include='*.sql' "st_tenant\|st_migrator\|st_provisioner\|st_control\b" apps/api` sonuç döndürmüyor.
+- [x] `dotnet test --solution Api.slnx` yeşil.
 - [ ] `TenantIsolationTests` projesindeki testler, tenant-özel role'ün control plane'e hiç erişemediğini ve başka bir tenant'ın DB'sine bağlanamadığını kanıtlıyor (mevcut `CredentialBoundaryTests` zaten `resolver`'ı test ediyor; tenant-özel role için benzer bir test eklemek isteğe bağlı bir sonraki adım — bu plan kapsamında zorunlu değil, spec'in "yapılmadıklarımız" tablosuna düşülebilir).
-- [ ] Bootstrap script'leri (`bootstrap-roles.sql`, `grant-control-plane.sql`) yeni isimlerle tutarlı.
+- [x] Bootstrap script'leri (`bootstrap-roles.sql`, `grant-control-plane.sql`) yeni isimlerle tutarlı.
