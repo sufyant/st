@@ -80,7 +80,16 @@ public sealed class TenantAccessMiddleware(RequestDelegate next)
             return;
         }
 
-        tenantContext.Set(TenantId.From(tenant.Id), tenant.Alias, tenant.DatabaseName);
+        var credentialResolver = services.GetRequiredService<TenantCredentialResolver>();
+        var credential = await credentialResolver.ResolveAsync(tenant.Id, context.RequestAborted);
+
+        if (credential is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return;
+        }
+
+        tenantContext.Set(TenantId.From(tenant.Id), tenant.Alias, tenant.DatabaseName, credential.RoleName, credential.Password);
 
         var userId = ExternalUserId.Create(externalUserId);
         var tenantDbContext = services.GetRequiredService<TenantDbContext>();

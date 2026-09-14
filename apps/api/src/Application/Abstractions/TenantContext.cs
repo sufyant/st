@@ -7,6 +7,8 @@ public sealed class TenantContext
     private TenantId? tenantId;
     private string? alias;
     private string? databaseName;
+    private string? username;
+    private string? password;
 
     public bool IsResolved => tenantId is not null;
 
@@ -16,11 +18,22 @@ public sealed class TenantContext
 
     public string DatabaseName => databaseName ?? throw NotResolved();
 
-    public void Set(TenantId resolvedTenantId, string resolvedAlias, string resolvedDatabaseName)
+    public string Username => username ?? throw NotResolved();
+
+    public string Password => password ?? throw NotResolved();
+
+    public void Set(
+        TenantId resolvedTenantId,
+        string resolvedAlias,
+        string resolvedDatabaseName,
+        string resolvedUsername,
+        string resolvedPassword)
     {
         tenantId = resolvedTenantId;
         alias = resolvedAlias;
         databaseName = resolvedDatabaseName;
+        username = resolvedUsername;
+        password = resolvedPassword;
     }
 
     private static InvalidOperationException NotResolved() =>

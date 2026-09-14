@@ -8,6 +8,7 @@ using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -104,9 +105,28 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             }
         }
 
+        var factory = BuildFactory(controlPlane, connectionString, externalUserId, email);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var provisioner = scope.ServiceProvider.GetRequiredService<Infrastructure.Provisioning.TenantProvisioner>();
+            var dataProtectionProvider = scope.ServiceProvider
+                .GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+            var roleName = TenantRoleName.ForTenant(tenant.Id);
+            var password = await provisioner.GrantTenantAccessAsync(
+                tenant.DatabaseName, roleName, TestContext.Current.CancellationToken);
+            var protector = dataProtectionProvider.CreateProtector(
+                TenantCredential.ProtectionPurpose);
+
+            await using var controlPlaneContext = CreateControlPlaneDbContext(controlPlane);
+            controlPlaneContext.TenantCredentials.Add(
+                TenantCredential.Create(tenant.Id, roleName, protector.Protect(password)));
+            await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
         return new TenantSurfaceFixture(
             postgres,
-            BuildFactory(controlPlane, connectionString, externalUserId, email),
+            factory,
             tenant,
             controlPlane,
             ownsContainer: true);

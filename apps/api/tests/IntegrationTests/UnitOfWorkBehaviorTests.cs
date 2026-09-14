@@ -166,7 +166,9 @@ public sealed class UnitOfWorkBehaviorTests
         tenantContext.Set(
             fixture.Tenant.Id,
             fixture.Tenant.Alias.Value,
-            fixture.Tenant.DatabaseName.Value);
+            fixture.Tenant.DatabaseName.Value,
+            "tenant_user",
+            "tenant_password");
         var provider = new ServiceCollection()
             .AddSingleton(controlPlane)
             .AddSingleton(tenant)

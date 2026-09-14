@@ -122,7 +122,7 @@ public sealed class CachingBehaviorTests
         where TRequest : IRequest<TResponse>
     {
         var tenantContext = new TenantContext();
-        tenantContext.Set(TenantId.From(tenantId), "acme", $"tenant_{tenantId:N}");
+        tenantContext.Set(TenantId.From(tenantId), "acme", $"tenant_{tenantId:N}", "tenant_user", "tenant_password");
 
         return new CachingBehavior<TRequest, TResponse>(cache, tenantContext);
     }

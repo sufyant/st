@@ -33,12 +33,13 @@ builder.Services.AddApplication();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<TenantResolver>();
+builder.Services.AddScoped<TenantCredentialResolver>();
 builder.Services.AddScoped(provider =>
 {
     var tenantContext = provider.GetRequiredService<TenantContext>();
     var factory = provider.GetRequiredService<TenantDbContextFactory>();
 
-    return factory.Create(tenantContext.DatabaseName);
+    return factory.Create(tenantContext.DatabaseName, tenantContext.Username, tenantContext.Password);
 });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<OutboxProcessor>();

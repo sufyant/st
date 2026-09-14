@@ -9,6 +9,7 @@ using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -50,8 +51,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Active, ActiveUser, hasMembership: false);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Active, ActiveUser, hasMembership: false);
         using var client = factory.CreateClient();
 
         // Act
@@ -66,8 +67,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Active, DisabledUser);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Active, DisabledUser);
         using var client = factory.CreateClient();
 
         // Act
@@ -82,8 +83,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Provisioning, ActiveUser);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Provisioning, ActiveUser);
         using var client = factory.CreateClient();
 
         // Act
@@ -98,8 +99,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Suspended, ActiveUser);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Suspended, ActiveUser);
         using var client = factory.CreateClient();
 
         // Act
@@ -114,8 +115,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Deleted, ActiveUser);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Deleted, ActiveUser);
         using var client = factory.CreateClient();
 
         // Act
@@ -130,8 +131,8 @@ public sealed class TenantAccessEndpointTests
     {
         // Arrange
         await using var postgres = await StartPostgresAsync();
-        await SeedAsync(postgres, TenantStatus.Active, ActiveUser);
         await using var factory = CreateFactory(postgres.GetConnectionString());
+        await SeedAsync(factory, postgres, TenantStatus.Active, ActiveUser);
         using var client = factory.CreateClient();
 
         // Act
@@ -139,6 +140,27 @@ public sealed class TenantAccessEndpointTests
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Request_WhenTheTenantHasNoStoredCredential_ReturnsServiceUnavailable()
+    {
+        // Arrange
+        await using var fixture = await TenantSurfaceFixture.StartAsync();
+        await using (var context = fixture.CreateControlPlane())
+        {
+            var credential = await context.TenantCredentials.SingleAsync(
+                c => c.TenantId == fixture.Tenant.Id, TestContext.Current.CancellationToken);
+            context.TenantCredentials.Remove(credential);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // Act
+        using var response = await fixture.Client.GetAsync(
+            "/acme/api/v1/whoami", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 
     private static async Task<PostgreSqlContainer> StartPostgresAsync()
@@ -150,6 +172,7 @@ public sealed class TenantAccessEndpointTests
     }
 
     private static async Task SeedAsync(
+        WebApplicationFactory<Program> factory,
         PostgreSqlContainer postgres,
         TenantStatus tenantStatus,
         string tenantUserStatus,
@@ -188,6 +211,24 @@ public sealed class TenantAccessEndpointTests
             VALUES ({Guid.NewGuid()}, {ExternalUser}, {ExternalUserEmail}, {tenantUserStatus}, {AccessCatalog.MemberRole.Id.Value}, {now}, {now})
             """,
             TestContext.Current.CancellationToken);
+
+        if (tenantStatus != TenantStatus.Active)
+        {
+            return;
+        }
+
+        using var scope = factory.Services.CreateScope();
+        var provisioner = scope.ServiceProvider.GetRequiredService<Infrastructure.Provisioning.TenantProvisioner>();
+        var dataProtectionProvider = scope.ServiceProvider
+            .GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+        var roleName = TenantRoleName.ForTenant(tenant.Id);
+        var password = await provisioner.GrantTenantAccessAsync(
+            tenant.DatabaseName, roleName, TestContext.Current.CancellationToken);
+        var protector = dataProtectionProvider.CreateProtector(TenantCredential.ProtectionPurpose);
+
+        controlPlaneContext.TenantCredentials.Add(
+            TenantCredential.Create(tenant.Id, roleName, protector.Protect(password)));
+        await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private static void MoveToStatus(Tenant tenant, TenantStatus status)
