@@ -1586,7 +1586,7 @@ git commit -m "feat(admin): add tenant delete endpoint with a 30-day grace perio
 **Interfaces:**
 - Produces: `TenantDbContextFactory.Create(string databaseName, string username, string password) -> TenantDbContext`. Mevcut `Create(string databaseName)` değişmez. Task 13 bunu kullanır.
 
-- [ ] **Step 1: Mevcut `TenantDbContextScopeTests.cs`'i oku, sonra başarısız testi ekle**
+- [x] **Step 1: Mevcut `TenantDbContextScopeTests.cs`'i oku, sonra başarısız testi ekle**
 
 ```csharp
 [Fact]
@@ -1613,12 +1613,12 @@ public async Task Create_WithCredentials_ConnectsAsTheGivenRole()
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantDbContextScopeTests"`
 Expected: FAIL (derleme hatası — overload yok)
 
-- [ ] **Step 3: Overload'u ekle**
+- [x] **Step 3: Overload'u ekle**
 
 `TenantDbContextFactory.cs`'e ekle:
 ```csharp
@@ -1643,12 +1643,12 @@ public TenantDbContext Create(string databaseName, string username, string passw
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantDbContextScopeTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Persistence/Tenants/TenantDbContextFactory.cs apps/api/tests/IntegrationTests/TenantDbContextScopeTests.cs
