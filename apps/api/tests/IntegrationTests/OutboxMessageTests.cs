@@ -63,4 +63,18 @@ public sealed class OutboxMessageTests
         // Assert
         Assert.Equal(Now.AddSeconds(5), message.ProcessedAt);
     }
+
+    [Fact]
+    public void CreateDelayed_IsNotDueUntilTheGivenTime()
+    {
+        // Arrange & Act
+        var message = OutboxMessage.CreateDelayed(
+            Guid.NewGuid(), "Type", "{}", Now, Now.AddDays(30));
+
+        // Assert
+        Assert.Null(message.ProcessedAt);
+        Assert.Equal(0, message.AttemptCount);
+        Assert.Equal(Now.AddDays(30), message.NextAttemptAt);
+        Assert.Equal(Now, message.CreatedAt);
+    }
 }

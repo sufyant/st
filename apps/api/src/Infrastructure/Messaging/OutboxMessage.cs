@@ -26,7 +26,11 @@ public sealed class OutboxMessage
     {
     }
 
-    public static OutboxMessage Create(Guid id, string type, string payload, DateTimeOffset createdAt)
+    public static OutboxMessage Create(Guid id, string type, string payload, DateTimeOffset createdAt) =>
+        CreateDelayed(id, type, payload, createdAt, createdAt);
+
+    public static OutboxMessage CreateDelayed(
+        Guid id, string type, string payload, DateTimeOffset createdAt, DateTimeOffset executeAt)
     {
         if (id == Guid.Empty)
         {
@@ -42,7 +46,7 @@ public sealed class OutboxMessage
             Type = type,
             Payload = payload,
             CreatedAt = createdAt,
-            NextAttemptAt = createdAt
+            NextAttemptAt = executeAt
         };
     }
 
