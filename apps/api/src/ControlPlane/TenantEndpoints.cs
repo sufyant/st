@@ -29,6 +29,7 @@ public static class TenantEndpoints
         group.MapPost("/tenants", CreateAsync);
         group.MapGet("/tenants/{id:guid}", GetAsync).WithName(GetTenantRouteName);
         group.MapPost("/tenants/{id:guid}/retry-provisioning", RetryAsync);
+        group.MapDelete("/tenants/{id:guid}", DeleteAsync);
     }
 
     private static async Task<IResult> CreateAsync(
@@ -117,6 +118,41 @@ public static class TenantEndpoints
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Results.AcceptedAtRoute(GetTenantRouteName, new { id = tenant.Id.Value }, ToDetail(tenant));
+    }
+
+    private static readonly TimeSpan HardDeleteGracePeriod = TimeSpan.FromDays(30);
+
+    private static async Task<IResult> DeleteAsync(
+        Guid id,
+        ControlPlaneDbContext dbContext,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var tenantId = new TenantId(id);
+        var tenant = await dbContext.Tenants.SingleOrDefaultAsync(
+            candidate => candidate.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (tenant.Status is not (TenantStatus.Active or TenantStatus.Suspended))
+        {
+            return Results.Conflict(new { error = $"Tenant is {tenant.Status}, cannot be deleted." });
+        }
+
+        var now = timeProvider.GetUtcNow();
+        tenant.BeginDeprovisioning();
+        dbContext.OutboxMessages.Add(OutboxMessage.CreateDelayed(
+            Guid.CreateVersion7(),
+            TenantHardDeleteRequested.MessageType,
+            JsonSerializer.Serialize(new TenantHardDeleteRequested(tenant.Id.Value)),
+            now,
+            now + HardDeleteGracePeriod));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Accepted(value: ToDetail(tenant));
     }
 
     private static void Enqueue(

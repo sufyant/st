@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Domain.ControlPlane.Tenants;
+using Infrastructure.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace IntegrationTests;
@@ -217,5 +220,68 @@ public sealed class TenantProvisioningEndpointTests
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTenant_BeginsDeprovisioningAndSchedulesTheHardDeleteThirtyDaysOut()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+        Guid tenantId;
+
+        await using (var context = fixture.CreateControlPlaneDbContext())
+        {
+            var tenant = Tenant.Create(TenantAlias.Create("acme"));
+            tenant.CompleteProvisioning();
+            context.Tenants.Add(tenant);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+            tenantId = tenant.Id.Value;
+        }
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"/admin/api/v1/tenants/{tenantId}", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await using var assertions = fixture.CreateControlPlaneDbContext();
+        var reloaded = await assertions.Tenants.SingleAsync(
+            t => t.Id == new TenantId(tenantId), TestContext.Current.CancellationToken);
+        Assert.Equal(TenantStatus.Deprovisioning, reloaded.Status);
+        var message = await assertions.OutboxMessages.SingleAsync(
+            m => m.Type == TenantHardDeleteRequested.MessageType, TestContext.Current.CancellationToken);
+        Assert.True(message.NextAttemptAt > DateTimeOffset.UtcNow.AddDays(29));
+    }
+
+    [Fact]
+    public async Task DeleteTenant_ForAProvisioningTenant_ReturnsConflict()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+        using var created = await fixture.Client.PostAsJsonAsync(
+            "/admin/api/v1/tenants", new { alias = "acme" }, TestContext.Current.CancellationToken);
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var tenantId = body.GetProperty("id").GetGuid();
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"/admin/api/v1/tenants/{tenantId}", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTenant_ForAnUnknownIdentifier_ReturnsNotFound()
+    {
+        // Arrange
+        await using var fixture = await ControlPlaneFixture.StartAsync(isPlatformAdmin: true);
+
+        // Act
+        using var response = await fixture.Client.DeleteAsync(
+            $"/admin/api/v1/tenants/{Guid.CreateVersion7()}", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }
