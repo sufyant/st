@@ -2,6 +2,7 @@ using Domain.ControlPlane.Tenants;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -26,6 +27,9 @@ public sealed class ProvisioningFixture : IAsyncDisposable
     public string ControlPlaneConnectionString { get; }
 
     public TenantProvisioner Provisioner { get; }
+
+    public IDataProtectionProvider DataProtectionProvider { get; } =
+        Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("tests");
 
     public string ServerConnectionString => postgres.GetConnectionString();
 

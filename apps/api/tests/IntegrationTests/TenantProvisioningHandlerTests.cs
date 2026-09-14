@@ -20,7 +20,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, fixture.DataProtectionProvider);
 
         // Act
         await handler.HandleAsync(
@@ -46,7 +46,7 @@ public sealed class TenantProvisioningHandlerTests
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, fixture.DataProtectionProvider);
 
         // Act
         await handler.HandleAsync(
@@ -62,13 +62,38 @@ public sealed class TenantProvisioningHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_StoresAnEncryptedCredentialForTheTenant()
+    {
+        // Arrange
+        await using var fixture = await ProvisioningFixture.StartAsync();
+        var tenant = await fixture.AddProvisioningTenantAsync("acme");
+        var handler = new TenantProvisioningHandler(
+            fixture.CreateControlPlane(), fixture.Provisioner, fixture.DataProtectionProvider);
+        var message = new TenantProvisioningRequested(
+            tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail);
+
+        // Act
+        await handler.HandleAsync(message, TestContext.Current.CancellationToken);
+
+        // Assert
+        await using var context = fixture.CreateControlPlane();
+        var credential = await context.TenantCredentials.SingleAsync(
+            c => c.TenantId == tenant.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(TenantRoleName.ForTenant(tenant.Id).Value, credential.RoleName.Value);
+        var protector = fixture.DataProtectionProvider.CreateProtector(
+            TenantCredential.ProtectionPurpose);
+        var plainTextPassword = protector.Unprotect(credential.EncryptedPassword);
+        Assert.False(string.IsNullOrWhiteSpace(plainTextPassword));
+    }
+
+    [Fact]
     public async Task HandleAsync_RunTwice_LeavesTheSameResult()
     {
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         var tenant = await fixture.AddProvisioningTenantAsync("acme");
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, fixture.DataProtectionProvider);
         var message = new TenantProvisioningRequested(tenant.Id.Value, ProvisioningFixture.OwnerExternalUserId, ProvisioningFixture.OwnerEmail);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
@@ -91,7 +116,7 @@ public sealed class TenantProvisioningHandlerTests
         // Arrange
         await using var fixture = await ProvisioningFixture.StartAsync();
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, fixture.DataProtectionProvider);
 
         // Act
         var act = async () => await handler.HandleAsync(
@@ -111,7 +136,8 @@ public sealed class TenantProvisioningHandlerTests
         await using var context = fixture.CreateControlPlane();
         var handler = new TenantProvisioningHandler(
             context,
-            new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
+            new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)),
+            fixture.DataProtectionProvider);
 
         // Act
         var act = async () => await handler.HandleAsync(
@@ -138,14 +164,15 @@ public sealed class TenantProvisioningHandlerTests
         {
             var failingHandler = new TenantProvisioningHandler(
                 failingContext,
-                new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)));
+                new TenantProvisioner(Unreachable, new AuditInterceptor(TimeProvider.System)),
+                fixture.DataProtectionProvider);
             await Assert.ThrowsAnyAsync<Exception>(async () =>
                 await failingHandler.HandleAsync(message, TestContext.Current.CancellationToken));
         }
 
         // Act
         await using var context = fixture.CreateControlPlane();
-        var handler = new TenantProvisioningHandler(context, fixture.Provisioner);
+        var handler = new TenantProvisioningHandler(context, fixture.Provisioner, fixture.DataProtectionProvider);
         await handler.HandleAsync(message, TestContext.Current.CancellationToken);
 
         // Assert

@@ -15,6 +15,7 @@ public static class PostgresServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddDataProtection();
         services.AddSingleton<AuditInterceptor>();
         services.AddDbContext<ControlPlaneDbContext>((provider, options) =>
             options

@@ -6,14 +6,19 @@ using Domain.ControlPlane.Tenants;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Provisioning;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.Provisioning;
 
 public sealed class TenantProvisioningHandler(
     ControlPlaneDbContext controlPlaneDbContext,
-    TenantProvisioner provisioner) : IOutboxMessageHandler
+    TenantProvisioner provisioner,
+    IDataProtectionProvider dataProtectionProvider) : IOutboxMessageHandler
 {
+    private readonly IDataProtector protector =
+        dataProtectionProvider.CreateProtector(TenantCredential.ProtectionPurpose);
+
     public string MessageType => TenantProvisioningRequested.MessageType;
 
     public Task HandleAsync(string payload, CancellationToken cancellationToken) =>
@@ -48,8 +53,7 @@ public sealed class TenantProvisioningHandler(
 
             step = TenantProvisioningStep.GrantingAccess;
             await RecordAsync(tenant, step, cancellationToken);
-            await provisioner.GrantTenantAccessAsync(
-                tenant.DatabaseName, TenantRoleName.ForTenant(tenant.Id), cancellationToken);
+            await GrantAccessAsync(tenant, cancellationToken);
 
             step = TenantProvisioningStep.SeedingOwner;
             await RecordAsync(tenant, step, cancellationToken);
@@ -70,6 +74,28 @@ public sealed class TenantProvisioningHandler(
     private async Task RecordAsync(Tenant tenant, TenantProvisioningStep step, CancellationToken cancellationToken)
     {
         tenant.RecordProvisioningProgress(step);
+        await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task GrantAccessAsync(Tenant tenant, CancellationToken cancellationToken)
+    {
+        var roleName = TenantRoleName.ForTenant(tenant.Id);
+        var password = await provisioner.GrantTenantAccessAsync(tenant.DatabaseName, roleName, cancellationToken);
+        var encryptedPassword = protector.Protect(password);
+
+        var credential = await controlPlaneDbContext.TenantCredentials.SingleOrDefaultAsync(
+            candidate => candidate.TenantId == tenant.Id, cancellationToken);
+
+        if (credential is null)
+        {
+            controlPlaneDbContext.TenantCredentials.Add(
+                TenantCredential.Create(tenant.Id, roleName, encryptedPassword));
+        }
+        else
+        {
+            credential.Rotate(encryptedPassword);
+        }
+
         await controlPlaneDbContext.SaveChangesAsync(cancellationToken);
     }
 
