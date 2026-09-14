@@ -6,6 +6,7 @@ using Application.Features.Me;
 using Application.Features.Members;
 using Application.Features.Roles;
 using FluentValidation;
+using Application.Features.Deprovisioning;
 using Application.Features.Provisioning;
 using Application.Mediation;
 using Infrastructure.Messaging;
@@ -55,6 +56,9 @@ public static class DependencyInjection
         services.AddScoped<TenantProvisioningHandler>();
         services.AddScoped<IOutboxMessageHandler>(provider =>
             provider.GetRequiredService<TenantProvisioningHandler>());
+        services.AddScoped<TenantHardDeleteHandler>();
+        services.AddScoped<IOutboxMessageHandler>(provider =>
+            provider.GetRequiredService<TenantHardDeleteHandler>());
 
         return services;
     }
