@@ -965,7 +965,7 @@ git commit -m "feat(provisioning): encrypt and persist the per-tenant credential
 **Interfaces:**
 - Produces: `OutboxMessage.CreateDelayed(Guid id, string type, string payload, DateTimeOffset createdAt, DateTimeOffset executeAt) -> OutboxMessage`. Task 11 (deprovision endpoint) bunu kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `OutboxMessageTests.cs`'e ekle:
 ```csharp
@@ -984,12 +984,12 @@ public void CreateDelayed_IsNotDueUntilTheGivenTime()
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~OutboxMessageTests"`
 Expected: FAIL (derleme hatası — `CreateDelayed` yok)
 
-- [ ] **Step 3: `CreateDelayed`'i yaz, `Create`'i ona devret**
+- [x] **Step 3: `CreateDelayed`'i yaz, `Create`'i ona devret**
 
 `OutboxMessage.cs`'de `Create` metodunu değiştir:
 ```csharp
@@ -1018,12 +1018,12 @@ public static OutboxMessage CreateDelayed(
 }
 ```
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~OutboxMessageTests"`
 Expected: PASS (5 test — 4 eski + 1 yeni)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Messaging/OutboxMessage.cs apps/api/tests/IntegrationTests/OutboxMessageTests.cs
