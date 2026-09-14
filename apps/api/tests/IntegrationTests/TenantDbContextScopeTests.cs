@@ -19,14 +19,14 @@ public sealed class TenantDbContextScopeTests
         var services = new ServiceCollection();
         services.AddScoped<TenantContext>();
         services.AddScoped(_ => new TenantDbContextFactory(
-            "Host=localhost;Username=st_tenant",
+            "Host=localhost;Username=tenant_user",
             new AuditInterceptor(TimeProvider.System)));
         services.AddScoped(provider =>
         {
             var tenantContext = provider.GetRequiredService<TenantContext>();
 
             return provider.GetRequiredService<TenantDbContextFactory>()
-                .Create(tenantContext.DatabaseName);
+                .Create(tenantContext.DatabaseName, tenantContext.Username, tenantContext.Password);
         });
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
