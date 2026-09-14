@@ -29,11 +29,22 @@ public static class MeEndpoints
                 new AcceptInvitationCommand(request.Token),
                 cancellationToken);
 
-            // Gone is the one status this surface needs that no ErrorKind carries, so it is refined
-            // here from the not-found default rather than widening the shared classification.
-            return !result.IsSuccess && result.Error.Code == MeErrors.ExpiredCode
-                ? Results.StatusCode(StatusCodes.Status410Gone)
-                : result.ToOk();
+            // Gone and Service Unavailable are the statuses this surface needs that no ErrorKind
+            // carries, so they are refined here rather than widening the shared classification.
+            if (!result.IsSuccess)
+            {
+                if (result.Error.Code == MeErrors.ExpiredCode)
+                {
+                    return Results.StatusCode(StatusCodes.Status410Gone);
+                }
+
+                if (result.Error.Code == MeErrors.CredentialUnavailableCode)
+                {
+                    return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+                }
+            }
+
+            return result.ToOk();
         });
 
         return endpoints;

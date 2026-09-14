@@ -7,6 +7,7 @@ using Domain.ControlPlane.Tenants;
 using Infrastructure.Access;
 using Infrastructure.Persistence.ControlPlane;
 using Infrastructure.Persistence.Tenants;
+using Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.Me;
@@ -16,6 +17,7 @@ public sealed record AcceptInvitationCommand(string Token) : ICommand<MyMembersh
 public sealed class AcceptInvitationHandler(
     ControlPlaneDbContext dbContext,
     TenantDbContextFactory tenantDbContextFactory,
+    TenantCredentialResolver credentialResolver,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IRequestHandler<AcceptInvitationCommand, MyMembership>
 {
@@ -67,8 +69,20 @@ public sealed class AcceptInvitationHandler(
                 $"Tenant is {tenant.Status}, not Active.");
         }
 
+        // This surface carries no tenant in scope, so the tenant's own credential is resolved here
+        // rather than taken from the request context.
+        var credential = await credentialResolver.ResolveAsync(tenant.Id.Value, cancellationToken);
+
+        if (credential is null)
+        {
+            return MeErrors.CredentialUnavailable;
+        }
+
         var externalUserId = currentUser.Id;
-        await using var tenantDbContext = tenantDbContextFactory.Create(tenant.DatabaseName.Value);
+        await using var tenantDbContext = tenantDbContextFactory.Create(
+            tenant.DatabaseName.Value,
+            credential.RoleName,
+            credential.Password);
         var role = await tenantDbContext.Roles.SingleOrDefaultAsync(
             candidate => candidate.Code == invitation.RoleCode,
             cancellationToken);

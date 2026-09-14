@@ -18,15 +18,21 @@ public sealed class TenantProvisioner(string connectionString, AuditInterceptor 
             connection);
         existsCommand.Parameters.AddWithValue("name", databaseName.Value);
 
-        if ((bool)(await existsCommand.ExecuteScalarAsync(cancellationToken))!)
+        if (!(bool)(await existsCommand.ExecuteScalarAsync(cancellationToken))!)
         {
-            return;
+            await using var createCommand = new NpgsqlCommand(
+                $"CREATE DATABASE \"{databaseName.Value}\"",
+                connection);
+            await createCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await using var createCommand = new NpgsqlCommand(
-            $"CREATE DATABASE \"{databaseName.Value}\"",
+        // PostgreSQL grants CONNECT to PUBLIC on every new database, which would let any tenant's
+        // dynamic role open a session against every other tenant's database. The revoke runs on
+        // every call so that a database created before this step was introduced is repaired too.
+        await using var revokeCommand = new NpgsqlCommand(
+            $"REVOKE CONNECT ON DATABASE \"{databaseName.Value}\" FROM PUBLIC",
             connection);
-        await createCommand.ExecuteNonQueryAsync(cancellationToken);
+        await revokeCommand.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public Task MigrateSchemaAsync(TenantDatabaseName databaseName, CancellationToken cancellationToken)

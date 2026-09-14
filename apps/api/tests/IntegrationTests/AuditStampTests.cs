@@ -76,7 +76,10 @@ public sealed class AuditStampTests
         await using var owner = await TenantSurfaceFixture.StartAsync();
         using var scope = owner.CreateScope();
         var tenantDbContextFactory = scope.ServiceProvider.GetRequiredService<TenantDbContextFactory>();
-        await using var tenantDbContext = tenantDbContextFactory.Create(owner.Tenant.DatabaseName.Value);
+        await using var tenantDbContext = tenantDbContextFactory.Create(
+            owner.Tenant.DatabaseName.Value,
+            owner.TenantRoleName,
+            owner.TenantPassword);
         var role = await tenantDbContext.Roles.SingleAsync(
             candidate => candidate.Code == "member",
             TestContext.Current.CancellationToken);

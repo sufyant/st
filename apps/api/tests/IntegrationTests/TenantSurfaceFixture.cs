@@ -39,6 +39,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         WebApplicationFactory<Program> factory,
         Tenant tenant,
         string controlPlaneConnectionString,
+        string tenantRoleName,
+        string tenantPassword,
         bool ownsContainer)
     {
         this.postgres = postgres;
@@ -46,6 +48,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         this.ownsContainer = ownsContainer;
         Tenant = tenant;
         ControlPlaneConnectionString = controlPlaneConnectionString;
+        TenantRoleName = tenantRoleName;
+        TenantPassword = tenantPassword;
         Client = factory.CreateClient();
     }
 
@@ -55,7 +59,21 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
 
     public string ControlPlaneConnectionString { get; }
 
+    public string TenantRoleName { get; }
+
+    public string TenantPassword { get; }
+
     public string ServerConnectionString => postgres.GetConnectionString();
+
+    // The API's `TenantData` entry only supplies the host and port: every tenant connection takes
+    // its user and password from the tenant's own credential. Pointing it at a role with no
+    // privileges on any tenant database keeps a shared-credential regression visible here.
+    private static string TenantDataFrom(string connectionString) =>
+        new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Username = "resolver",
+            Password = "test"
+        }.ConnectionString;
 
     public static Task<TenantSurfaceFixture> StartAsync() =>
         StartAsync(OwnerUserId, OwnerEmail, "owner");
@@ -68,6 +86,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync(TestContext.Current.CancellationToken);
         var connectionString = postgres.GetConnectionString();
+        await ExecuteAsync(connectionString, "CREATE ROLE resolver LOGIN PASSWORD 'test'");
         await ExecuteAsync(connectionString, "CREATE DATABASE control_plane");
         var controlPlane = WithDatabase(connectionString, "control_plane");
         var tenant = Tenant.Create(TenantAlias.Create(Alias));
@@ -106,21 +125,22 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         }
 
         var factory = BuildFactory(controlPlane, connectionString, externalUserId, email);
+        var tenantRoleName = Domain.ControlPlane.Tenants.TenantRoleName.ForTenant(tenant.Id);
+        string tenantPassword;
 
         using (var scope = factory.Services.CreateScope())
         {
             var provisioner = scope.ServiceProvider.GetRequiredService<Infrastructure.Provisioning.TenantProvisioner>();
             var dataProtectionProvider = scope.ServiceProvider
                 .GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
-            var roleName = TenantRoleName.ForTenant(tenant.Id);
-            var password = await provisioner.GrantTenantAccessAsync(
-                tenant.DatabaseName, roleName, TestContext.Current.CancellationToken);
+            tenantPassword = await provisioner.GrantTenantAccessAsync(
+                tenant.DatabaseName, tenantRoleName, TestContext.Current.CancellationToken);
             var protector = dataProtectionProvider.CreateProtector(
                 TenantCredential.ProtectionPurpose);
 
             await using var controlPlaneContext = CreateControlPlaneDbContext(controlPlane);
             controlPlaneContext.TenantCredentials.Add(
-                TenantCredential.Create(tenant.Id, roleName, protector.Protect(password)));
+                TenantCredential.Create(tenant.Id, tenantRoleName, protector.Protect(tenantPassword)));
             await controlPlaneContext.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
@@ -129,6 +149,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             factory,
             tenant,
             controlPlane,
+            tenantRoleName.Value,
+            tenantPassword,
             ownsContainer: true);
     }
 
@@ -138,6 +160,8 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
             BuildFactory(ControlPlaneConnectionString, ServerConnectionString, externalUserId, email),
             Tenant,
             ControlPlaneConnectionString,
+            TenantRoleName,
+            TenantPassword,
             ownsContainer: false);
 
     public Task<TenantSurfaceFixture> WithPrincipalAsync(string externalUserId, string? email) =>
@@ -171,7 +195,7 @@ public sealed class TenantSurfaceFixture : IAsyncDisposable
         {
             builder.UseSetting("ConnectionStrings:ControlPlane", controlPlane);
             builder.UseSetting("ConnectionStrings:ControlPlaneRead", controlPlane);
-            builder.UseSetting("ConnectionStrings:TenantData", connectionString);
+            builder.UseSetting("ConnectionStrings:TenantData", TenantDataFrom(connectionString));
             builder.UseSetting("ConnectionStrings:Provisioner", connectionString);
             builder.ConfigureTestServices(services =>
             {

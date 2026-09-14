@@ -48,7 +48,7 @@ Run from `apps/api`:
 - Start PostgreSQL: `docker compose up -d`
 - Stop PostgreSQL: `docker compose down`
 - Reset PostgreSQL (drops all local data): `docker compose down -v && docker compose up -d`
-- Create database roles (once per environment, superuser): `docker exec -i st-postgres psql -U postgres -v migrator_password=dev_migrator -v provisioner_password=dev_provisioner -v control_password=dev_control -v tenant_password=dev_tenant -f - < scripts/bootstrap-roles.sql`
+- Create database roles (once per environment, superuser): `docker exec -i st-postgres psql -U postgres -v migrator_password=dev_migrator -v provisioner_password=dev_provisioner -v control_password=dev_control -v resolver_password=dev_resolver -f - < scripts/bootstrap-roles.sql`
 - Grant control plane access (after the control plane migration): `docker exec -i st-postgres psql -U postgres -d control_plane -f - < scripts/grant-control-plane.sql`
 - Build: `dotnet build Api.slnx`
 - Test: `dotnet test --solution Api.slnx`

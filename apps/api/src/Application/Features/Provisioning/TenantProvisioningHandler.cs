@@ -79,12 +79,13 @@ public sealed class TenantProvisioningHandler(
 
     private async Task GrantAccessAsync(Tenant tenant, CancellationToken cancellationToken)
     {
-        var roleName = TenantRoleName.ForTenant(tenant.Id);
-        var password = await provisioner.GrantTenantAccessAsync(tenant.DatabaseName, roleName, cancellationToken);
-        var encryptedPassword = protector.Protect(password);
-
         var credential = await controlPlaneDbContext.TenantCredentials.SingleOrDefaultAsync(
             candidate => candidate.TenantId == tenant.Id, cancellationToken);
+        // Rotating reuses the stored name so that a change to the naming format never orphans the
+        // role a tenant already connects with; only a first grant derives one.
+        var roleName = credential?.RoleName ?? TenantRoleName.ForTenant(tenant.Id);
+        var password = await provisioner.GrantTenantAccessAsync(tenant.DatabaseName, roleName, cancellationToken);
+        var encryptedPassword = protector.Protect(password);
 
         if (credential is null)
         {

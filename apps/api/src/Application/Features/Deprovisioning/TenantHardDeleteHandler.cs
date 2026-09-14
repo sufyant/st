@@ -32,11 +32,12 @@ public sealed class TenantHardDeleteHandler(
             return;
         }
 
-        var roleName = TenantRoleName.ForTenant(tenant.Id);
-        await provisioner.DropTenantAsync(tenant.DatabaseName, roleName, cancellationToken);
-
         var credential = await controlPlaneDbContext.TenantCredentials.SingleOrDefaultAsync(
             candidate => candidate.TenantId == tenant.Id, cancellationToken);
+        // The stored name is authoritative; deriving it would strand roles created under an
+        // earlier naming format. A tenant that failed before its credential was written has none.
+        var roleName = credential?.RoleName ?? TenantRoleName.ForTenant(tenant.Id);
+        await provisioner.DropTenantAsync(tenant.DatabaseName, roleName, cancellationToken);
 
         if (credential is not null)
         {

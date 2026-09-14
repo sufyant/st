@@ -1,4 +1,7 @@
+using Domain.ControlPlane.Tenants;
+using Infrastructure.Persistence;
 using Infrastructure.Persistence.ControlPlane;
+using Infrastructure.Provisioning;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -59,6 +62,54 @@ public sealed class CredentialBoundaryTests
 
         // Assert
         Assert.Equal(0L, count);
+    }
+
+    [Fact]
+    public async Task TenantRole_CanReadTheCredentialItResolvesWith()
+    {
+        // Arrange
+        await using var postgres = await StartControlPlaneAsync();
+        await using var connection = new NpgsqlConnection(TenantConnectionString(postgres));
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM control.tenant_credentials", connection);
+
+        // Act
+        var count = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0L, count);
+    }
+
+    [Fact]
+    public async Task TenantRole_CannotConnectToAnotherTenantsDatabase()
+    {
+        // Arrange
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync(TestContext.Current.CancellationToken);
+        var provisioner = new TenantProvisioner(
+            postgres.GetConnectionString(),
+            new AuditInterceptor(TimeProvider.System));
+        var acme = TenantDatabaseName.Create("tenant_acme");
+        var globex = TenantDatabaseName.Create("tenant_globex");
+        await provisioner.CreateDatabaseAsync(acme, TestContext.Current.CancellationToken);
+        await provisioner.CreateDatabaseAsync(globex, TestContext.Current.CancellationToken);
+        var roleName = TenantRoleName.Create("access_acme");
+        var password = await provisioner.GrantTenantAccessAsync(
+            acme, roleName, TestContext.Current.CancellationToken);
+        await using var connection = new NpgsqlConnection(
+            new NpgsqlConnectionStringBuilder(postgres.GetConnectionString())
+            {
+                Database = globex.Value,
+                Username = roleName.Value,
+                Password = password
+            }.ConnectionString);
+
+        // Act
+        var act = async () => await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<PostgresException>(act);
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, exception.SqlState);
     }
 
     private static async Task<PostgreSqlContainer> StartControlPlaneAsync()
