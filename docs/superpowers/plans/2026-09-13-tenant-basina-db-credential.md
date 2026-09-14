@@ -1042,7 +1042,7 @@ git commit -m "feat(messaging): add OutboxMessage.CreateDelayed for scheduled ex
 - Consumes: `[FromKeyedServices("control-plane-read")] NpgsqlDataSource` (zaten kayıtlı, [PostgresServiceCollectionExtensions.cs](../../src/Infrastructure/Persistence/PostgresServiceCollectionExtensions.cs)), `IDataProtectionProvider`, `IMemoryCache`, `TenantCredential.ProtectionPurpose` (Task 3) — Task 7'deki handler'la **aynı string olmak zorunda**, aksi halde `Unprotect` patlar.
 - Produces: `TenantCredentialResolver.ResolveAsync(Guid tenantId, CancellationToken) -> Task<ResolvedTenantCredential?>`, `.Evict(Guid tenantId)`. `ResolvedTenantCredential(string RoleName, string Password)`. Task 13 (`TenantAccessMiddleware`) bunu kullanır.
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 ```csharp
 using Domain.ControlPlane.Tenants;
@@ -1162,12 +1162,12 @@ public sealed class TenantCredentialResolverTests
 }
 ```
 
-- [ ] **Step 2: Testin başarısız olduğunu gör**
+- [x] **Step 2: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantCredentialResolverTests"`
 Expected: FAIL (derleme hatası — `TenantCredentialResolver` yok)
 
-- [ ] **Step 3: `TenantCredentialResolver`'ı yaz**
+- [x] **Step 3: `TenantCredentialResolver`'ı yaz**
 
 ```csharp
 using Dapper;
@@ -1233,12 +1233,12 @@ public sealed class TenantCredentialResolver
 
 `TenantCredential.ProtectionPurpose` (Task 3'te tanımlandı) hem burada hem `TenantProvisioningHandler`'da (Task 7) aynı string'i verir — `Domain` projesine hem `Application` hem `Infrastructure` referans verdiği için (bkz. Global Constraints) ikisi de sorunsuz erişir, key ring uyuşmazlığı riski yok.
 
-- [ ] **Step 4: Testin geçtiğini gör**
+- [x] **Step 4: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantCredentialResolverTests|FullyQualifiedName~TenantProvisioningHandlerTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Tenants/TenantCredentialResolver.cs apps/api/tests/IntegrationTests/TenantCredentialResolverTests.cs apps/api/src/Application/Features/Provisioning/TenantProvisioningHandler.cs apps/api/tests/IntegrationTests/TenantProvisioningHandlerTests.cs
