@@ -1259,7 +1259,7 @@ git commit -m "feat(tenants): add TenantCredentialResolver for the request path"
 - Consumes: `TenantProvisioner.DropTenantAsync` (Task 6), `TenantRoleName.ForTenant` (Task 2), `Tenant.MarkDeleted()` (mevcut).
 - Produces: `TenantHardDeleteRequested(Guid TenantId)`, `TenantHardDeleteHandler : IOutboxMessageHandler`. Task 11 (endpoint) bunu enqueue eder.
 
-- [ ] **Step 1: Mesaj tipini yaz**
+- [x] **Step 1: Mesaj tipini yaz**
 
 ```csharp
 namespace Infrastructure.Messaging;
@@ -1270,7 +1270,7 @@ public sealed record TenantHardDeleteRequested(Guid TenantId)
 }
 ```
 
-- [ ] **Step 2: Başarısız testi yaz**
+- [x] **Step 2: Başarısız testi yaz**
 
 ```csharp
 using System.Text.Json;
@@ -1351,12 +1351,12 @@ public sealed class TenantHardDeleteHandlerTests
 }
 ```
 
-- [ ] **Step 3: Testin başarısız olduğunu gör**
+- [x] **Step 3: Testin başarısız olduğunu gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantHardDeleteHandlerTests"`
 Expected: FAIL (derleme hatası — `TenantHardDeleteHandler` yok)
 
-- [ ] **Step 4: `TenantHardDeleteHandler`'ı yaz**
+- [x] **Step 4: `TenantHardDeleteHandler`'ı yaz**
 
 ```csharp
 using System.Text.Json;
@@ -1410,7 +1410,7 @@ public sealed class TenantHardDeleteHandler(
 }
 ```
 
-- [ ] **Step 5: DI'a kaydet**
+- [x] **Step 5: DI'a kaydet**
 
 `Application/DependencyInjection.cs`'e ekle (`TenantProvisioningHandler` kaydının hemen altına):
 ```csharp
@@ -1420,12 +1420,12 @@ services.AddScoped<IOutboxMessageHandler>(provider =>
 ```
 (Dosyanın başına `using Application.Features.Deprovisioning;` ekleyip tam nitelikli adları kısaltabilirsin.)
 
-- [ ] **Step 6: Testin geçtiğini gör**
+- [x] **Step 6: Testin geçtiğini gör**
 
 Run: `dotnet test --solution Api.slnx --filter "FullyQualifiedName~TenantHardDeleteHandlerTests"`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/api/src/Infrastructure/Messaging/TenantHardDeleteRequested.cs apps/api/src/Application/Features/Deprovisioning apps/api/src/Application/DependencyInjection.cs apps/api/tests/IntegrationTests/TenantHardDeleteHandlerTests.cs
