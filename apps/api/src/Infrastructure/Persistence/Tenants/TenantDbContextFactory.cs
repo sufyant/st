@@ -23,6 +23,26 @@ public sealed class TenantDbContextFactory(string connectionString, AuditInterce
         return new TenantDbContext(options);
     }
 
+    public TenantDbContext Create(string databaseName, string username, string password)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databaseName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Database = databaseName,
+            Username = username,
+            Password = password
+        };
+        var options = new DbContextOptionsBuilder<TenantDbContext>()
+            .UseNpgsql(builder.ConnectionString)
+            .AddInterceptors(auditInterceptor)
+            .Options;
+
+        return new TenantDbContext(options);
+    }
+
     public async Task<bool> DatabaseExistsAsync(string databaseName, CancellationToken cancellationToken)
     {
         var builder = new NpgsqlConnectionStringBuilder(connectionString) { Database = "postgres" };
