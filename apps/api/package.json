@@ -1,0 +1,9 @@
+{
+  "name": "@st/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "dotnet build Api.slnx",
+    "test": "dotnet test --solution Api.slnx"
+  }
+}

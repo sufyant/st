@@ -121,12 +121,12 @@ Her modül, içi ince olsa da beş projeyle kurulur; böylece mimari kurallar he
 
 | Proje | Referans verebileceği |
 | --- | --- |
-| `X.Domain` | SharedKernel |
-| `X.Contracts` | .NET temel kütüphanesi ve SharedKernel; diğer modüllere geçişli bağımlılık taşımaz |
+| `X.Domain` | .NET temel kütüphanesi ve SharedKernel; üçüncü parti paket yok |
+| `X.Contracts` | .NET temel kütüphanesi ve SharedKernel; üçüncü parti paket yok; diğer modüllere geçişli bağımlılık taşımaz |
 | `X.Application` | `X.Domain`, `X.Contracts`, diğer modüllerin `*.Contracts`'ı, SharedKernel |
 | `X.Infrastructure` | `X.Application`, `X.Domain`, `X.Contracts`, SharedKernel |
 | `X.Api` | `X.Application`, `X.Contracts`, `X.Infrastructure` (sadece `AddXModule()` kaydı için), SharedKernel |
-| `Api` host | Her modülün sadece `X.Api` projesi |
+| `Api` host | Her modülün `X.Api` projesi ve Result'ları Problem Details'e çevirmek için SharedKernel |
 
 - Bir modül başka bir modüle sadece `*.Contracts` üzerinden ulaşır.
 - Contracts SharedKernel'e referans verebilir; SharedKernel bağımlılıksız olduğu için geçişli bağımlılık kaygısı doğmaz. Böylece senkron sözleşmeler SharedKernel'deki Result tiplerini dönebilir.

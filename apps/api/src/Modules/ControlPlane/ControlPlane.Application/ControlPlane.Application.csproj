@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
+    <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

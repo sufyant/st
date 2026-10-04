@@ -13,18 +13,18 @@ Projects may reference only the following:
 
 | Project | May reference |
 | --- | --- |
-| `X.Domain` | SharedKernel |
-| `X.Contracts` | The .NET base library and SharedKernel; carries no transitive dependency to other modules |
+| `X.Domain` | The .NET base library and SharedKernel; no third-party packages |
+| `X.Contracts` | The .NET base library and SharedKernel; no third-party packages; carries no transitive dependency to other modules |
 | `X.Application` | `X.Domain`, `X.Contracts`, other modules' `*.Contracts`, SharedKernel |
 | `X.Infrastructure` | `X.Application`, `X.Domain`, `X.Contracts`, SharedKernel |
 | `X.Api` | `X.Application`, `X.Contracts`, `X.Infrastructure` (only to register `AddXModule()`), SharedKernel |
-| `Api` host | Each module's `X.Api` project only |
+| `Api` host | Each module's `X.Api` project, and SharedKernel to map results to Problem Details (0032) |
 
 - A module reaches another module only through that module's `*.Contracts`.
 - Contracts may reference SharedKernel because SharedKernel has no dependencies (0022), so a synchronous contract can return SharedKernel's Result and error types without pulling anything else into its callers.
-- `X.Api` references `X.Infrastructure` only to register the module. A type-level rule enforces this: inside `X.Api`, only the module registration class (the one that provides `AddXModule()`) may use types from `X.Infrastructure`.
+- `X.Api` references `X.Infrastructure` only to register the module. A type-level rule enforces this: inside `X.Api`, only the module registration class, named `XModule` and providing `AddXModule()`, may use types from `X.Infrastructure`.
 - `InternalsVisibleTo` is allowed only between a module's own projects and its test projects, never between modules (0007).
-- The rules are encoded as NetArchTest tests in `Architecture.Tests`; a violation breaks the build. A rule is never weakened to make code compile.
+- The rules are encoded as tests in `Architecture.Tests`; a violation breaks the build. A rule is never weakened to make code compile. Type dependencies are checked with NetArchTest; the base-library-only rules (SharedKernel, `X.Contracts`, `X.Domain`) are checked against each assembly's references, because a namespace cannot tell a framework type from a third-party one.
 
 ## Alternatives considered
 

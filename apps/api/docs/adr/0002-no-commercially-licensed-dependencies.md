@@ -25,5 +25,5 @@ Every product built on the template inherits its dependencies. MediatR, AutoMapp
 
 ## To verify
 
-- The maintained NetArchTest fork: licence and .NET 10 compatibility (Phase 1, record in 0044).
+- The maintained NetArchTest fork: licence and .NET 10 compatibility. Verified in Phase 1, recorded in 0044.
 - The Hangfire PostgreSQL storage package: licence and .NET 10 compatibility (Phase 6, record in 0027).

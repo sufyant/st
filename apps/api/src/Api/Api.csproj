@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modules\Audit\Audit.Api\Audit.Api.csproj" />
+    <ProjectReference Include="..\Modules\ControlPlane\ControlPlane.Api\ControlPlane.Api.csproj" />
+    <ProjectReference Include="..\Modules\Notifications\Notifications.Api\Notifications.Api.csproj" />
+  </ItemGroup>
+
+</Project>

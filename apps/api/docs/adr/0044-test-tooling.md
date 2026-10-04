@@ -23,7 +23,8 @@ The testing strategy (0042) needs a test framework, assertions, real PostgreSQL 
 ## Consequences
 
 - No licensed test dependencies.
+- xUnit v3 runs on Microsoft Testing Platform. The .NET 10 SDK no longer runs it through VSTest, so `apps/api/global.json` opts `dotnet test` into Microsoft Testing Platform and the solution is tested with `dotnet test --solution Api.slnx`.
 
-## To verify
+## Verified
 
-- Licence and .NET 10 compatibility of the maintained NetArchTest fork (Phase 1).
+- The maintained NetArchTest fork is `NetArchTest.eNhancedEdition` (1.4.5): MIT licence, targets .NET Standard 2.0 and depends only on Mono.Cecil (MIT). It runs on .NET 10; the architecture tests were shown to fail on deliberate violations in Phase 1. Its latest release is from June 2025, so its maintenance pace is worth watching.
