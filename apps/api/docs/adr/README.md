@@ -19,7 +19,7 @@ See [0001](0001-record-architecture-decisions.md) for how records are written. T
 | 0013 | [Shared database multi-tenancy with Row Level Security](0013-shared-database-multi-tenancy.md) | Proposed |
 | 0014 | [Two-layer tenant isolation derived from ITenantEntity](0014-two-layer-tenant-isolation.md) | Proposed |
 | 0015 | [Tenant resolution from the path slug and verified membership](0015-tenant-resolution.md) | Proposed |
-| 0016 | [One transaction per tenant-scoped request and message](0016-tenant-scoped-transaction.md) | Proposed |
+| 0016 | [One transaction per tenant-scoped message](0016-tenant-scoped-transaction.md) | Proposed |
 | 0017 | [Tenant context in background work](0017-tenant-context-in-background-work.md) | Proposed |
 | 0018 | [Database roles and bootstrap script](0018-database-roles.md) | Proposed |
 | 0019 | [Pooled and direct database connections](0019-pooled-and-direct-connections.md) | Proposed |
@@ -51,3 +51,4 @@ See [0001](0001-record-architecture-decisions.md) for how records are written. T
 | 0045 | [Template scope and deferred topics](0045-template-scope.md) | Proposed |
 | 0046 | [API build and tests run as Turborepo tasks](0046-api-build-through-turborepo.md) | Proposed |
 | 0047 | [Types Wolverine discovers are public](0047-wolverine-visible-types-are-public.md) | Proposed |
+| 0048 | [A shared Tenancy project for tenant isolation plumbing](0048-shared-tenancy-project.md) | Proposed |

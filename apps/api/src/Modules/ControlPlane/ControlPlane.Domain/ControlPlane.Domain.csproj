@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ControlPlane.Infrastructure" />
+    <InternalsVisibleTo Include="ControlPlane.UnitTests" />
+    <InternalsVisibleTo Include="ControlPlane.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
   </ItemGroup>
 

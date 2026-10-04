@@ -18,3 +18,7 @@ csharp_prefer_braces = true:warning
 # Test names describe behaviour in words separated by underscores.
 [tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
+
+# Migrations are written by `dotnet ef migrations add`; analyzers treat them as generated code.
+[src/Modules/*/*.Infrastructure/Migrations/*.cs]
+generated_code = true

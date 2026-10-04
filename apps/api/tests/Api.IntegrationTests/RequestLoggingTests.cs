@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging.Testing;
 
 namespace Api.IntegrationTests;
 
-public sealed class RequestLoggingTests : IAsyncLifetime
+public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
 {
     private const string RequestLogCategory = "Serilog.AspNetCore.RequestLoggingMiddleware";
 
@@ -24,6 +24,18 @@ public sealed class RequestLoggingTests : IAsyncLifetime
         await _client.GetAsync("/v1/ping", TestContext.Current.CancellationToken);
 
         RequestLogs().ShouldHaveSingleItem().Message.ShouldContain("/v1/ping");
+    }
+
+    [Fact]
+    public async Task A_tenant_request_is_logged_with_its_tenant()
+    {
+        var catalog = new Catalog(database);
+        var tenant = await catalog.AddTenantAsync();
+        var member = await catalog.AddMemberAsync(tenant.Id);
+
+        await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+
+        RequestLogs().ShouldHaveSingleItem().StructuredState.ShouldNotBeNull().ShouldContain(new KeyValuePair<string, string?>("TenantId", tenant.Id.ToString()));
     }
 
     [Theory]

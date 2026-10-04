@@ -26,10 +26,14 @@
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />
+    <Project Path="src/Shared/Tenancy/Tenancy.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
     <Project Path="tests/Api.IntegrationTests/Api.IntegrationTests.csproj" />
+    <Project Path="tests/ControlPlane.IntegrationTests/ControlPlane.IntegrationTests.csproj" />
+    <Project Path="tests/ControlPlane.UnitTests/ControlPlane.UnitTests.csproj" />
     <Project Path="tests/SharedKernel.UnitTests/SharedKernel.UnitTests.csproj" />
+    <Project Path="tests/Tenancy.IntegrationTests/Tenancy.IntegrationTests.csproj" />
   </Folder>
 </Solution>

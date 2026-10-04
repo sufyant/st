@@ -33,6 +33,7 @@
     <ProjectReference Include="..\Modules\ControlPlane\ControlPlane.Api\ControlPlane.Api.csproj" />
     <ProjectReference Include="..\Modules\Notifications\Notifications.Api\Notifications.Api.csproj" />
     <ProjectReference Include="..\Shared\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\Shared\Tenancy\Tenancy.csproj" />
   </ItemGroup>
 
 </Project>

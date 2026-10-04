@@ -33,8 +33,19 @@ apps/api/tests/
 
 - The weight is on module integration tests: handlers are tested against a real database.
 - Host behaviour that needs endpoints of its own (result mapping, validation, rate limiting) is tested in `Api.IntegrationTests` on a test server that composes the host's real pipeline with test endpoints and handlers. Behaviour of the composed application uses WebApplicationFactory (0044).
-- Tenant isolation suite: every `ITenantEntity` automatically gets a "cannot read or write another tenant's data" test. The tenant-scoped catalog access point (0021) is tested the same way.
+- Tenant isolation suite, in three parts:
+  - **Behaviour.** `Tenancy.IntegrationTests` proves the mechanism of 0014 on a fixture tenant entity against real PostgreSQL:
+    - A tenant cannot read, update, delete or write another tenant's rows.
+    - Row level security alone and the query filter alone each hide them.
+    - Without a tenant, nothing is read and nothing written.
+    - Uncommitted work is discarded.
+    - The tenant setting ends with its transaction.
+    - The `SECURITY DEFINER` lookup (0017) returns only `(tenant_id, id)`.
+  - **Coverage.** `Api.IntegrationTests` finds every `ITenantEntity` in every module DbContext the host registers, with no list to keep up to date. It checks, after the real migrations, that each has its query filter, row level security, exactly one policy limiting reads and writes to the active tenant, and the tenant column default. A tenant entity added anywhere is covered without anyone writing a test, and one that lacks isolation fails the build.
+  - **Catalog.** `ControlPlane.IntegrationTests` proves that the tenant-scoped catalog access point (0021) shows and stamps only the active tenant.
 - Architecture tests and tenant isolation tests break the build.
+- **Test databases.** Each test project that needs PostgreSQL starts one container for its assembly and sets it up the way a deployment is: the bootstrap script, then the migrations as the owner (0018, 0020). Tests connect as the application role. Tests share the database, so each works with tenants, users and slugs of its own rather than resetting data.
+- **Pipeline tests.** The host's pipeline tests drive the tenant pipeline through stand-in handlers and a stand-in tenant entity of their own, so they do not depend on any module's features. Until Clerk authentication exists (0028), they name the signed-in user in a test-only header.
 
 ## Alternatives considered
 

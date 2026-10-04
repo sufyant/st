@@ -16,6 +16,14 @@ public class ReferenceRuleTests
         violations.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Tenancy_depends_only_on_SharedKernel()
+    {
+        var violations = TypesDependingOnProjectsOtherThan(Solution.Tenancy, [Solution.SharedKernel]);
+
+        violations.ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(Modules))]
     public void Contracts_reference_only_the_base_library_and_SharedKernel(string module)
@@ -47,11 +55,11 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Infrastructure_depends_only_on_its_Application_Domain_Contracts_and_SharedKernel(string module)
+    public void Infrastructure_depends_only_on_its_Application_Domain_Contracts_SharedKernel_and_Tenancy(string module)
     {
         var violations = TypesDependingOnProjectsOtherThan(
             $"{module}.Infrastructure",
-            [$"{module}.Application", $"{module}.Domain", $"{module}.Contracts", Solution.SharedKernel]);
+            [$"{module}.Application", $"{module}.Domain", $"{module}.Contracts", Solution.SharedKernel, Solution.Tenancy]);
 
         violations.ShouldBeEmpty();
     }
@@ -80,11 +88,11 @@ public class ReferenceRuleTests
     }
 
     [Fact]
-    public void Host_depends_only_on_module_Api_projects_and_SharedKernel()
+    public void Host_depends_only_on_module_Api_projects_SharedKernel_and_Tenancy()
     {
         var violations = TypesDependingOnProjectsOtherThan(
             Solution.Host,
-            [.. Solution.LayerOfEveryModule("Api"), Solution.SharedKernel]);
+            [.. Solution.LayerOfEveryModule("Api"), Solution.SharedKernel, Solution.Tenancy]);
 
         violations.ShouldBeEmpty();
     }

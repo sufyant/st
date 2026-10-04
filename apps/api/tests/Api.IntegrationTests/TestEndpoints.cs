@@ -28,8 +28,23 @@ internal static class TestEndpoints
             bus.InvokeAsync<Result>(command, cancellationToken));
 
         v1.MapGet("/ping", () => Results.Ok());
+    }
 
-        v1.MapGet("/{tenantSlug}/ping", (string tenantSlug) => Results.Ok());
+    public static void MapTenant(RouteGroupBuilder tenant)
+    {
+        tenant.MapGet("/ping", () => Results.Ok());
+
+        tenant.MapPost("/probes", (WriteProbe command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(command, cancellationToken));
+
+        tenant.MapPost("/failing-probes", (WriteProbeThenFail command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync(command, cancellationToken));
+
+        tenant.MapPost("/rejected-probes", (WriteProbeThenReject command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(command, cancellationToken));
+
+        tenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
     }
 }
 

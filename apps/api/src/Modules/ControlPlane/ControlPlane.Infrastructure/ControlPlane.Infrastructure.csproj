@@ -1,10 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ControlPlane.Api" />
+    <InternalsVisibleTo Include="ControlPlane.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ControlPlane.Application\ControlPlane.Application.csproj" />
     <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
     <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Tenancy\Tenancy.csproj" />
   </ItemGroup>
 
 </Project>

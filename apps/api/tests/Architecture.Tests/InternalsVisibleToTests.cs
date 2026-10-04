@@ -26,6 +26,14 @@ public class InternalsVisibleToTests
     }
 
     [Fact]
+    public void Tenancy_exposes_internals_only_to_its_own_tests()
+    {
+        var friends = FriendAssembliesOf(Solution.Tenancy);
+
+        friends.ShouldAllBe(friend => friend.StartsWith($"{Solution.Tenancy}.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Host_exposes_internals_only_to_its_own_tests()
     {
         var friends = FriendAssembliesOf(Solution.Host);

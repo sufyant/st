@@ -28,3 +28,4 @@ The testing strategy (0042) needs a test framework, assertions, real PostgreSQL 
 ## Verified
 
 - The maintained NetArchTest fork is `NetArchTest.eNhancedEdition` (1.4.5): MIT licence, targets .NET Standard 2.0 and depends only on Mono.Cecil (MIT). It runs on .NET 10; the architecture tests were shown to fail on deliberate violations in Phase 1. Its latest release is from June 2025, so its maintenance pace is worth watching.
+- `Testcontainers.PostgreSql` 4.15.0: MIT licence, runs the `postgres:18` image, the Neon project's major version (0011). Its containers are xUnit v3 assembly fixtures, one per test project. A test project with database tests needs Docker (0046).

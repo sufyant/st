@@ -4,7 +4,10 @@ using Api.ErrorHandling;
 using Api.Messaging;
 using Api.Networking;
 using Api.Observability;
+using Api.Persistence;
 using Api.RateLimiting;
+using Api.Tenants;
+using JasperFx.CodeGeneration.Model;
 using Scalar.AspNetCore;
 using Serilog;
 using Wolverine;
@@ -25,6 +28,7 @@ internal static class ApiPipeline
         builder.Services.AddSingleton(TimeProvider.System);
 
         builder.AddObservability();
+        builder.AddPersistence();
 
         builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
             context.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
@@ -41,8 +45,13 @@ internal static class ApiPipeline
                 options.Discovery.IncludeAssembly(assembly);
             }
 
+            // Module DbContexts are built by factories on the scope's tenant connection (0016), which Wolverine can only resolve
+            // from the message's scope.
+            options.ServiceLocationPolicy = ServiceLocationPolicy.AlwaysAllowed;
+
             options.UseFluentValidation();
             options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));
+            options.Policies.Add<TenantTransactionPolicy>();
         });
 
         builder.Services.AddTenantRateLimiting();
@@ -65,8 +74,9 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so the rate limiter can partition by the tenant in the route.
+        // Routing runs first so tenant resolution sees the slug, and the rate limiter the resolved tenant.
         app.UseRouting();
+        app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseRateLimiter();
 
         app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false });

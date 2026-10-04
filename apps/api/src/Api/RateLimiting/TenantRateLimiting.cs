@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Tenancy;
 
 namespace Api.RateLimiting;
 
@@ -10,10 +11,6 @@ namespace Api.RateLimiting;
 internal static class TenantRateLimiting
 {
     public const string Policy = "per-tenant";
-
-    // Until tenant resolution exists, the tenant is the slug from the route. Afterwards only a verified membership puts a request
-    // in its tenant's bucket, keyed by the resolved tenant id; the slug alone is never trusted (0035).
-    private const string TenantRouteParameter = "tenantSlug";
 
     public static IServiceCollection AddTenantRateLimiting(this IServiceCollection services)
     {
@@ -40,8 +37,10 @@ internal static class TenantRateLimiting
         });
     }
 
+    // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the slug in the route is
+    // never a key (0035).
     private static string PartitionKey(HttpContext context) =>
-        context.GetRouteValue(TenantRouteParameter) is string tenant ? $"tenant:{tenant}"
+        context.RequestServices.GetRequiredService<TenantContext>().TenantId is { } tenant ? $"tenant:{tenant}"
         : context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } userId ? $"user:{userId}"
         : $"ip:{context.Connection.RemoteIpAddress}";
 

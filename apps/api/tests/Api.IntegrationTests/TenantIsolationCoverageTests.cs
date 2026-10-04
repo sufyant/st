@@ -1,0 +1,35 @@
+namespace Api.IntegrationTests;
+
+// How isolation behaves is proven in Tenancy.IntegrationTests; this proves every tenant table gets it (0014, 0042).
+public sealed class TenantIsolationCoverageTests(Database database)
+{
+    [Fact]
+    public async Task Every_tenant_entity_of_the_application_is_isolated()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString);
+
+        var gaps = await new TenantIsolationCheck(database).GapsAsync(api.Services);
+
+        gaps.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_check_covers_the_tenant_entities_of_every_module_database()
+    {
+        await using var host = await PipelineHost.StartAsync();
+
+        var entities = TenantIsolationCheck.TenantEntities(host.Services).Select(entity => entity.ClrType);
+        var gaps = await new TenantIsolationCheck(database).GapsAsync(host.Services);
+
+        entities.ShouldContain(typeof(Probe));
+        gaps.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_application_role_owns_no_table()
+    {
+        var owned = await database.ScalarAsync<long>("SELECT count(*) FROM pg_tables WHERE tableowner = 'api_application'");
+
+        owned.ShouldBe(0);
+    }
+}

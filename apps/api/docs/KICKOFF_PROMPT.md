@@ -2,7 +2,16 @@ You are building the initial skeleton of a multi-tenant SaaS starter template. T
 
 Before anything else, read `apps/api/AGENTS.md` and `apps/api/docs/ARCHITECTURE.md` in full. They are your instructions for the API. The `AGENTS.md` at the repository root holds general working guidelines and also applies. `ARCHITECTURE.md` is written in Turkish; ADRs and code are written in English.
 
-Work in the phases below. At the end of every phase: run the full build and test suite, then stop and report what you built, which tests prove it, any decision you had to make that the architecture document does not cover, and anything you are unsure about. Do not start the next phase until I approve.
+Work in the phases below. At the end of every phase:
+
+1. Run the full build and test suite.
+2. Bring `apps/api/docs/ARCHITECTURE.md` in line with the ADRs as they stand at the end of the phase. The ADRs are authoritative; the overview follows them.
+3. Stop and report:
+   - What you built and which tests prove it.
+   - Any decision you had to make that the architecture document does not cover.
+   - Anything you are unsure about.
+
+Do not start the next phase until I approve.
 
 Throughout: work test-first, keep each phase in scope, and never weaken a boundary, isolation or licensing rule to make something pass. If the architecture document is ambiguous or contradicts itself, ask instead of guessing. The "Kurulumda doğrulanacaklar" list at the end of the document names things you must verify in the phase they come up, then record in the relevant ADR.
 
@@ -30,7 +39,7 @@ Throughout: work test-first, keep each phase in scope, and never weaken a bounda
 
 - Database bootstrap script for the owner, application and read-only reporting roles; migrations run as a separate step after it, never on application start. Pooled and direct connection strings.
 - ControlPlane module with the `catalog` schema: tenants (slug, status), users, memberships.
-- Tenant resolution middleware: slug from `/v1/{tenant-slug}/...`, resolved to the tenant id, membership verified, tenant set on the transaction. One transaction per tenant-scoped request.
+- Tenant resolution middleware: slug from `/v1/tenants/{slug}/...`, resolved to the tenant id, membership verified, tenant passed on to the message that carries the request's work. One transaction per tenant-scoped message (0016).
 - Transaction middleware in the host's Wolverine pipeline: every tenant-scoped command runs in one transaction with the tenant set at its start.
 - `ITenantEntity` automation: shadow tenant column with a database default from the tenant setting, global query filter, RLS policies with `USING` and `WITH CHECK` generated into migrations.
 - Tenant context for background work: message envelopes carry the tenant id and handlers set it; a narrow `SECURITY DEFINER` lookup for cross-tenant scanners. No role gets `BYPASSRLS`.
