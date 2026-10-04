@@ -1,13 +1,13 @@
 # AGENTS.md
 
-This repository is a multi-tenant SaaS starter template: a .NET modular monolith API on PostgreSQL. Every future product is built on it, so correctness, clear boundaries and tenant isolation matter more than speed.
+This repository is a multi-tenant SaaS starter template. Its core is a .NET modular monolith API on PostgreSQL in `apps/api/`. Every future product is built on it, so correctness, clear boundaries and tenant isolation matter more than speed.
 
 This file tells you how to think and work here. It does not tell you what to type. The decisions themselves live elsewhere.
 
 ## Sources of truth
 
-1. `docs/adr/` holds the architecture decision records. They are authoritative.
-2. `docs/ARCHITECTURE.md` is the overview the ADRs were split from.
+1. `apps/api/docs/adr/` holds the architecture decision records. They are authoritative.
+2. `apps/api/docs/ARCHITECTURE.md` is the overview the ADRs were split from.
 3. This file holds working principles only. If it ever conflicts with an ADR, the ADR wins.
 
 Read the relevant ADRs before changing anything in their area. If a task needs a decision no ADR covers, or contradicts one, stop and propose a new ADR instead of deciding silently. Do not copy ADR rules into code comments or other instruction files; reference the ADR.
@@ -55,7 +55,7 @@ Reason from these principles. When unsure, ask what the listed sources would say
 
 ## Recording decisions
 
-New or changed architectural decisions are written as ADRs in `docs/adr/` (context, decision, alternatives considered, consequences). Propose them; do not mark them accepted yourself. (Harmel-Law)
+New or changed architectural decisions are written as ADRs in `apps/api/docs/adr/` (context, decision, alternatives considered, consequences). Propose them; do not mark them accepted yourself. (Harmel-Law)
 
 ## Definition of done
 
