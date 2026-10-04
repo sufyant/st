@@ -1,0 +1,34 @@
+# 0006. Module and layer reference rules enforced by tests
+
+- Status: Proposed
+- Date: 2026-10-04
+
+## Context
+
+In a monolith nothing physical stops one module from using another's internals. Rules kept only in documents erode. Ford, Parsons and Kua (*Building Evolutionary Architectures*) call automated checks of such rules fitness functions.
+
+## Decision
+
+Projects may reference only the following:
+
+| Project | May reference |
+| --- | --- |
+| `X.Domain` | SharedKernel |
+| `X.Contracts` | The .NET base library only; carries no transitive dependency to other modules |
+| `X.Application` | `X.Domain`, `X.Contracts`, other modules' `*.Contracts`, SharedKernel |
+| `X.Infrastructure` | `X.Application`, `X.Domain`, `X.Contracts`, SharedKernel |
+| `X.Api` | `X.Application`, `X.Contracts`, `X.Infrastructure` (only to register `AddXModule()`), SharedKernel |
+| `Api` host | Each module's `X.Api` project only |
+
+- A module reaches another module only through that module's `*.Contracts`.
+- The rules are encoded as NetArchTest tests in `Architecture.Tests`; a violation breaks the build. A rule is never weakened to make code compile.
+
+## Alternatives considered
+
+- **Rules by convention and review.** Erodes under deadline pressure; violations surface late.
+- **Separate repositories or packages per module.** Hard boundaries at the cost of versioning and release overhead the template does not need.
+
+## Consequences
+
+- Boundary violations fail fast and visibly.
+- The architecture tests must stay green at all times.
