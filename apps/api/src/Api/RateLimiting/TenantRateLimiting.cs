@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Api.Authorization;
 using Microsoft.Extensions.Options;
-using Tenancy;
 
 namespace Api.RateLimiting;
 
@@ -38,9 +38,9 @@ internal static class TenantRateLimiting
     }
 
     // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the slug in the route is
-    // never a key (0035).
+    // never a key (0035). A system admin inside a tenant is not its member and spends their own limit.
     private static string PartitionKey(HttpContext context) =>
-        context.RequestServices.GetRequiredService<TenantContext>().TenantId is { } tenant ? $"tenant:{tenant}"
+        context.RequestServices.GetRequiredService<RequestAccess>().Membership is { } membership ? $"tenant:{membership.TenantId}"
         : context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } userId ? $"user:{userId}"
         : $"ip:{context.Connection.RemoteIpAddress}";
 

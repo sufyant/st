@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -10,7 +11,17 @@ namespace Api.IntegrationTests;
 
 internal static class TestEndpoints
 {
+    // Stand-ins for host behaviour that is not about who the caller is, so they let anyone in.
     public static void Map(RouteGroupBuilder v1)
+    {
+        var open = v1.MapGroup("").AllowAnonymous();
+        MapOpen(open);
+
+        // Every other endpoint of the version group needs a signed-in user.
+        v1.MapGet("/whoami", (ClaimsPrincipal user) => Results.Ok(user.FindFirstValue(ClaimTypes.NameIdentifier)));
+    }
+
+    private static void MapOpen(RouteGroupBuilder v1)
     {
         v1.MapPost("/greetings", (Greet command, IMessageBus bus, CancellationToken cancellationToken) =>
             bus.InvokeAsync<Result<Greeting>>(command, cancellationToken));
@@ -45,6 +56,19 @@ internal static class TestEndpoints
 
         tenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
             bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
+
+        tenant.MapPost("/guarded", () => Results.Ok()).RequireAuthorization(Permissions.MembersInvite);
+    }
+
+    public static void MapAdmin(RouteGroupBuilder admin) => admin.MapGet("/ping", () => Results.Ok());
+
+    public static void MapAdminTenant(RouteGroupBuilder adminTenant)
+    {
+        adminTenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
+
+        adminTenant.MapGet("/tenant-setting", (IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<string?>(new ReadTenantSetting(), cancellationToken));
     }
 }
 

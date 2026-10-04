@@ -1,6 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ControlPlane.Infrastructure" />
+    <InternalsVisibleTo Include="ControlPlane.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
     <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />

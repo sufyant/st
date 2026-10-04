@@ -14,6 +14,7 @@ Logging, validation, transactions and timing written in every handler are repeat
 - Performance measurement records a duration histogram per command and logs a warning when a command exceeds a threshold from configuration (`Pipeline:SlowCommandThreshold`). The histogram is Wolverine's own `wolverine-execution-time`, recorded for every handled message including `InvokeAsync`, tagged with `message.type`. The warning is a Wolverine middleware in the host.
 - Logging of commands uses Wolverine's built-in message logging; HTTP requests are logged once each by Serilog's request logging, apart from health checks, whose frequent polling would drown the log.
 - Tenant resolution (0015) is HTTP middleware in the host. The transaction step is a Wolverine handler policy in the host, `TenantTransactionPolicy`: it opens one transaction for every message that carries a tenant and commits only when the handler succeeds (0016).
+- Authentication (0028) and authorization (0030) are ASP.NET Core's own middleware in the host. Authorization data reaches the host through abstractions in Tenancy (0048), so the host does not know the module that owns it.
 - Handlers contain no try/catch (0032).
 - SharedKernel therefore does not depend on Wolverine, EF Core or FluentValidation.
 

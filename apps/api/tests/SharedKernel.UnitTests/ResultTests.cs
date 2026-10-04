@@ -46,4 +46,24 @@ public class ResultTests
         result.IsSuccess.ShouldBeFalse();
         result.Error.ShouldBe(TenantNotFound);
     }
+
+    [Fact]
+    public void Mapping_a_successful_result_maps_its_value()
+    {
+        Result<int> result = 42;
+
+        var mapped = result.Map(value => $"#{value}");
+
+        mapped.Value.ShouldBe("#42");
+    }
+
+    [Fact]
+    public void Mapping_a_failed_result_keeps_its_error()
+    {
+        Result<int> result = TenantNotFound;
+
+        var mapped = result.Map(value => $"#{value}");
+
+        mapped.Error.ShouldBe(TenantNotFound);
+    }
 }

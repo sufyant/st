@@ -36,10 +36,15 @@ public class ModuleStructureTests
         strays.ShouldBeEmpty();
     }
 
+    // The compiler places types it synthesizes, such as those behind collection expressions, in the global namespace. Only it can
+    // give a type a name starting with '<', so those are left out; every type written in source is still checked.
     private static IEnumerable<string?> TypesOutsideTheNamespaceOf(string project) =>
         Solution.Load(project).GetTypes()
             .Where(type => !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            .Where(type => !OutermostType(type).Name.StartsWith('<'))
             .Where(type => type.Namespace != project
                 && type.Namespace?.StartsWith($"{project}.", StringComparison.Ordinal) != true)
             .Select(type => type.FullName);
+
+    private static Type OutermostType(Type type) => type.DeclaringType is null ? type : OutermostType(type.DeclaringType);
 }

@@ -1,16 +1,67 @@
+using ControlPlane.Application.Ports;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Api.IntegrationTests;
 
-// The composed application, as Program builds it, in development and against the given database.
-internal sealed class ApiFactory(string pooledConnectionString, string? migrationsConnectionString = null) : WebApplicationFactory<Program>
+// The composed application, as Program builds it, in development unless a test names another environment, and against the
+// given database. Clerk and the invitation email are systems we do not own, so they are fakes unless a test exercises the
+// application's own sender; the session tokens are signed with the test key.
+internal sealed class ApiFactory(
+    string pooledConnectionString,
+    string? migrationsConnectionString = null,
+    string? reportingConnectionString = null,
+    TimeProvider? time = null,
+    string? environment = null,
+    IReadOnlyList<string>? authorizedParties = null,
+    bool fakeInvitationSender = true,
+    Action<IServiceCollection>? configureServices = null) : WebApplicationFactory<Program>
 {
+    public const string AcceptUrl = "https://app.test/invitations/accept";
+
+    public FakeIdentityProvider Identity { get; } = new();
+
+    public FakeInvitationSender Sender { get; } = new();
+
+    public HttpClient CreateClient(string userId, bool secondFactor = false)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", TestTokens.For(userId, secondFactor));
+        return client;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment(Environments.Development);
+        builder.UseEnvironment(environment ?? Environments.Development);
         builder.UseSetting("ConnectionStrings:Pooled", pooledConnectionString);
         builder.UseSetting("ConnectionStrings:Migrations", migrationsConnectionString);
+        builder.UseSetting("ConnectionStrings:Reporting", reportingConnectionString);
+        builder.UseSetting("Invitations:AcceptUrl", AcceptUrl);
+        builder.UseSetting("Clerk:Issuer", TestTokens.Issuer);
+        foreach (var (party, index) in (authorizedParties ?? [TestTokens.AuthorizedParty]).Select((party, index) => (party, index)))
+        {
+            builder.UseSetting($"Clerk:AuthorizedParties:{index}", party);
+        }
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.TrustTestKey();
+            services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));
+            if (fakeInvitationSender)
+            {
+                services.Replace(ServiceDescriptor.Singleton<IInvitationSender>(Sender));
+            }
+
+            if (time is not null)
+            {
+                services.Replace(ServiceDescriptor.Singleton(time));
+            }
+
+            configureServices?.Invoke(services);
+        });
     }
 }

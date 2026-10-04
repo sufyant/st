@@ -27,3 +27,4 @@ An audit trail is business data kept for years, unlike operational logs (Fowler'
 
 - Audit records are not lost with the business transaction and do not cross module boundaries.
 - Denials before tenant resolution are only in the security log (0039), not in the audit table.
+- Until this module exists (Phase 6), a system admin's entry into a tenant is recorded only as a security event in the log (0031); the audit record is added at the same point.

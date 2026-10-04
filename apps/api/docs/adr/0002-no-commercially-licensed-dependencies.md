@@ -27,3 +27,10 @@ Every product built on the template inherits its dependencies. MediatR, AutoMapp
 
 - The maintained NetArchTest fork: licence and .NET 10 compatibility. Verified in Phase 1, recorded in 0044.
 - The Hangfire PostgreSQL storage package: licence and .NET 10 compatibility (Phase 6, record in 0027).
+
+## Checked when added
+
+- Phase 4:
+  - `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.Extensions.Http`, `Microsoft.Extensions.Hosting.Abstractions` and `Microsoft.Extensions.Options.ConfigurationExtensions` (10.0.12): MIT, part of .NET.
+  - `FluentValidation` 12.0.0: Apache 2.0, the version WolverineFx.FluentValidation already brings, now referenced by `ControlPlane.Application` for its validators.
+  - No Clerk SDK: the adapter calls Clerk's Backend API over HTTP.

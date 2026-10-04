@@ -23,6 +23,178 @@ namespace ControlPlane.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ControlPlane.Domain.Invitations.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid?>("AcceptedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepted_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("InvitedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invited_by");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invitations");
+
+                    b.HasIndex("AcceptedBy")
+                        .HasDatabaseName("ix_invitations_accepted_by");
+
+                    b.HasIndex("InvitedBy")
+                        .HasDatabaseName("ix_invitations_invited_by");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_invitations_role_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_invitations_tenant_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_invitations_token_hash");
+
+                    b.ToTable("invitations", "catalog");
+                });
+
+            modelBuilder.Entity("ControlPlane.Domain.Roles.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BuiltIn")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("built_in");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.PrimitiveCollection<string[]>("_permissions")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("permissions");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roles");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roles_tenant_id_name");
+
+                    b.ToTable("roles", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_roles_built_in_xor_tenant", "(built_in IS NULL) <> (tenant_id IS NULL)");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000001"),
+                            BuiltIn = "Owner",
+                            Name = "Owner",
+                            _permissions = new string[0]
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000002"),
+                            BuiltIn = "Admin",
+                            Name = "Admin",
+                            _permissions = new string[0]
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000003"),
+                            BuiltIn = "Member",
+                            Name = "Member",
+                            _permissions = new string[0]
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000004"),
+                            BuiltIn = "Viewer",
+                            Name = "Viewer",
+                            _permissions = new string[0]
+                        });
+                });
+
+            modelBuilder.Entity("ControlPlane.Domain.SystemAdmins.SystemAdmin", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<Guid?>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_system_admins");
+
+                    b.HasIndex("GrantedBy")
+                        .HasDatabaseName("ix_system_admins_granted_by");
+
+                    b.ToTable("system_admins", "catalog");
+                });
+
             modelBuilder.Entity("ControlPlane.Domain.Tenants.Membership", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -33,8 +205,15 @@ namespace ControlPlane.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
                     b.HasKey("TenantId", "UserId")
                         .HasName("pk_memberships");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_memberships_role_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_memberships_user_id");
@@ -92,8 +271,70 @@ namespace ControlPlane.Infrastructure.Migrations
                     b.ToTable("users", "catalog");
                 });
 
+            modelBuilder.Entity("ControlPlane.Domain.Invitations.Invitation", b =>
+                {
+                    b.HasOne("ControlPlane.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_invitations_users_accepted_by");
+
+                    b.HasOne("ControlPlane.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("InvitedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invitations_users_invited_by");
+
+                    b.HasOne("ControlPlane.Domain.Roles.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_invitations_roles_role_id");
+
+                    b.HasOne("ControlPlane.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_invitations_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("ControlPlane.Domain.Roles.Role", b =>
+                {
+                    b.HasOne("ControlPlane.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_roles_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("ControlPlane.Domain.SystemAdmins.SystemAdmin", b =>
+                {
+                    b.HasOne("ControlPlane.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_system_admins_users_granted_by");
+
+                    b.HasOne("ControlPlane.Domain.Users.User", null)
+                        .WithOne()
+                        .HasForeignKey("ControlPlane.Domain.SystemAdmins.SystemAdmin", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_system_admins_users_user_id");
+                });
+
             modelBuilder.Entity("ControlPlane.Domain.Tenants.Membership", b =>
                 {
+                    b.HasOne("ControlPlane.Domain.Roles.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_memberships_roles_role_id");
+
                     b.HasOne("ControlPlane.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")

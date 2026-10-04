@@ -1,0 +1,18 @@
+using Tenancy;
+
+namespace Api.Authorization;
+
+// What the caller of this request may do, resolved once per request with the tenant (0015, 0030, 0031): their membership on a
+// tenant route, their system permissions on an admin route.
+internal sealed class RequestAccess
+{
+    public TenantMembership? Membership { get; set; }
+
+    public IReadOnlySet<string>? SystemPermissions { get; set; }
+
+    public Guid? AdminTenantId { get; set; }
+
+    // The tenant and system pools never share a permission, so one set never satisfies the other's checks.
+    public bool Has(string permission) =>
+        Membership?.Permissions.Contains(permission) == true || SystemPermissions?.Contains(permission) == true;
+}

@@ -17,8 +17,9 @@ With many pods, direct connections would exceed PostgreSQL's connection limit. P
 | --- | --- | --- | --- |
 | `ConnectionStrings:Pooled` | Application | Pooler | Requests and message handlers |
 | `ConnectionStrings:Migrations` | Owner | Direct | The migration step only (0020) |
+| `ConnectionStrings:Reporting` | Reporting | Pooler | System admin reports across tenants (0031) |
 
-- **Settings added when first used.** A direct connection for the application role comes with the first background component that needs one, Wolverine's durability agent (Phase 5). The reporting role's connection comes with the first report endpoint (Phase 4). Neither is configured before something uses it.
+- **Settings added when first used.** A direct connection for the application role comes with the first background component that needs one, Wolverine's durability agent (Phase 5). The reporting role's connection came with the first report endpoint, the tenant list of the admin API (Phase 4). It is checked on first use, like `Pooled`.
 - **Safety on the pooler.** The tenant setting is local to its transaction (0016), so it is gone before the pooler hands the connection to another client.
 - **When `Pooled` is checked.** A missing `Pooled` setting is reported on first use, not at start. The build starts the host to write the OpenAPI document (0036), and it has no database. Until the setting is there, the readiness check fails and the pod receives no traffic.
 
@@ -30,7 +31,7 @@ With many pods, direct connections would exceed PostgreSQL's connection limit. P
 
 ## Consequences
 
-- Two connection strings per environment today, more as background components arrive.
+- Three connection strings per environment today, more as background components arrive.
 - Each background component must be placed on the right connection (see To verify).
 
 ## To verify

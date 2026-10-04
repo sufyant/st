@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
+using Api.Authentication;
+using Api.Authorization;
 using Api.ErrorHandling;
 using Api.Messaging;
 using Api.Networking;
@@ -29,6 +31,8 @@ internal static class ApiPipeline
 
         builder.AddObservability();
         builder.AddPersistence();
+        builder.AddClerkAuthentication();
+        builder.Services.AddAccessAuthorization();
 
         builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
             context.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
@@ -74,10 +78,13 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so tenant resolution sees the slug, and the rate limiter the resolved tenant.
+        // Routing runs first so tenant resolution sees the slug, and the rate limiter the resolved tenant. Authorization comes
+        // last, so callers it turns away have been rate limited too (0015, 0035).
         app.UseRouting();
+        app.UseAuthentication();
         app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseRateLimiter();
+        app.UseAuthorization();
 
         app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false });
         app.MapHealthChecks($"{HealthPath}/ready", new() { Predicate = check => check.Tags.Contains("ready") });
@@ -92,8 +99,11 @@ internal static class ApiPipeline
     }
 
     // Every API route lives under a version segment (0033); expected failures returned as results become Problem Details here.
+    // Every endpoint in it needs a signed-in user unless it says otherwise (0028).
     public static RouteGroupBuilder MapV1(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()
-            .RequireRateLimiting(TenantRateLimiting.Policy);
+            .DescribeResults()
+            .RequireRateLimiting(TenantRateLimiting.Policy)
+            .RequireAuthorization();
 }

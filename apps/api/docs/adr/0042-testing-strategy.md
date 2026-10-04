@@ -45,7 +45,11 @@ apps/api/tests/
   - **Catalog.** `ControlPlane.IntegrationTests` proves that the tenant-scoped catalog access point (0021) shows and stamps only the active tenant.
 - Architecture tests and tenant isolation tests break the build.
 - **Test databases.** Each test project that needs PostgreSQL starts one container for its assembly and sets it up the way a deployment is: the bootstrap script, then the migrations as the owner (0018, 0020). Tests connect as the application role. Tests share the database, so each works with tenants, users and slugs of its own rather than resetting data.
-- **Pipeline tests.** The host's pipeline tests drive the tenant pipeline through stand-in handlers and a stand-in tenant entity of their own, so they do not depend on any module's features. Until Clerk authentication exists (0028), they name the signed-in user in a test-only header.
+- **Pipeline tests.** The host's pipeline tests drive the tenant pipeline through stand-in handlers and a stand-in tenant entity of their own, so they do not depend on any module's features.
+- **Signed-in users in tests.** Tests sign session tokens shaped like Clerk's with a key of their own. The host is configured to trust that key instead of fetching Clerk's, so the rest of token validation (issuer, lifetime, authorized party, second factor) is the production code (0028).
+- **External systems are fakes at their port.** Clerk's Backend API and the invitation email are replaced by fakes of their ports (`IIdentityProvider`, `IInvitationSender`) in module and host tests. The real Clerk adapter is tested on its own against a stubbed HTTP handler that records its requests.
+- **Module handlers without the host.** Module integration tests call handlers directly in a tenant transaction they open the way the host's transaction policy does, because module test projects cannot reference the host (0006).
+- **Concurrency.** A test of a lock waits, through `pg_blocking_pids`, until the second transaction is blocked before the first commits, with a timeout instead of a sleep. Without the lock the wait times out and the test fails.
 
 ## Alternatives considered
 

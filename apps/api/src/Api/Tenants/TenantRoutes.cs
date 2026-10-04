@@ -1,3 +1,5 @@
+using Api.Authorization;
+
 namespace Api.Tenants;
 
 internal static class TenantRoutes
@@ -9,7 +11,7 @@ internal static class TenantRoutes
     public static RouteGroupBuilder MapTenant(this RouteGroupBuilder v1) =>
         v1.MapGroup($"/tenants/{{{SlugParameter}}}")
             .WithMetadata(new TenantScopedEndpoint())
-            .AddEndpointFilter<TenantRequirementFilter>();
+            .RequireAuthorization(AccessPolicies.TenantMember);
 }
 
 internal sealed class TenantScopedEndpoint;

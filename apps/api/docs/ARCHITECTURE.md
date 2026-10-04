@@ -22,7 +22,7 @@ Backend .NET 10 üzerinde modüler monolit, veritabanı Neon üzerinde tek Postg
 | Mediator, outbox, mesajlaşma, saga | Wolverine (MIT) | Katman katman benimsenir |
 | Tekrar eden işler | Hangfire | Kendi `hangfire` şeması; dashboard şimdilik sadece yerel geliştirmede açık |
 | Gerçek zamanlı | SignalR | Redis backplane config ile açılır |
-| Kimlik doğrulama | Clerk (Restricted mod) | Sadece authentication; dışarıdan kayıt kapalı |
+| Kimlik doğrulama | Clerk (Invite-only mod, eski adıyla Restricted) | Sadece authentication; dışarıdan kayıt kapalı; token'ı ASP.NET Core'un JWT bearer handler'ı doğrular |
 | E-posta | Resend | Kanal arayüzünün arkasında; geliştirmede sahte kanal |
 | Doğrulama | FluentValidation | Pipeline'da |
 | Loglama, gözlem | Serilog + OpenTelemetry | OTLP ile dışa aktarım, hedef ortamdan |
@@ -30,7 +30,7 @@ Backend .NET 10 üzerinde modüler monolit, veritabanı Neon üzerinde tek Postg
 | Dış çağrı dayanıklılığı | Microsoft.Extensions.Http.Resilience | Timeout, retry, circuit breaker |
 | Test | xUnit, Shouldly, Testcontainers, WebApplicationFactory, NetArchTest | FluentAssertions ticari olduğu için yok |
 
-Lisans notu: MediatR, AutoMapper, MassTransit v9 ve FluentAssertions ticari lisansa geçtiği için kullanılmaz. NetArchTest'in bakımı süren fork'u (`NetArchTest.eNhancedEdition`) ve Testcontainers doğrulandı (0044). Hangfire'ın PostgreSQL depolama paketi Faz 6'da lisans ve .NET 10 uyumu açısından doğrulanır.
+Lisans notu: MediatR, AutoMapper, MassTransit v9 ve FluentAssertions ticari lisansa geçtiği için kullanılmaz. NetArchTest'in bakımı süren fork'u (`NetArchTest.eNhancedEdition`) ve Testcontainers doğrulandı (0044). Faz 4'te eklenen JWT bearer, `Microsoft.Extensions.Http` ve FluentValidation paketleri kontrol edildi (0002); Clerk SDK'sı kullanılmaz. Hangfire'ın PostgreSQL depolama paketi Faz 6'da lisans ve .NET 10 uyumu açısından doğrulanır.
 
 ## Çok kiracılık
 
@@ -56,8 +56,8 @@ Kod filtreyi unutsa da Postgres yanlış satırı döndürmez ve yanlış tenant
 **Tenant çözümleme akışı** (0015):
 
 1. İstek gelir, Clerk token'ı doğrulanır.
-2. Middleware tenant slug'ını path'ten alır (`/v1/tenants/{slug}/...`), iç tenant id'sine çevirir ve kullanıcının o tenant'a üyeliğini catalog'dan doğrular.
-   - Kullanıcı `NameIdentifier` claim'iyle, yani Clerk kullanıcı id'siyle tanınır.
+2. Middleware tenant slug'ını path'ten alır (`/v1/tenants/{slug}/...`), iç tenant id'sine çevirir ve kullanıcının o tenant'a üyeliğini catalog'dan doğrular. Aynı sorgu üyenin rolündeki izinleri de getirir (0030); çözümleme ve yetkilendirme tek sorgudur.
+   - Kullanıcı `NameIdentifier` claim'iyle, yani Clerk kullanıcı id'siyle (token'daki `sub`) tanınır.
    - Yalnızca aktif tenant çözülür.
    - Sorgu Tenancy'deki `ITenantDirectory` arkasındadır; host ControlPlane'i tanımaz.
    - Tenant hiçbir zaman istemcinin beyanına güvenilerek seçilmez. İçeride her yerde id dolaşır.
@@ -65,10 +65,12 @@ Kod filtreyi unutsa da Postgres yanlış satırı döndürmez ve yanlış tenant
 4. Transaction mesaja aittir (0016). Tenant taşıyan her mesaj (istekten, zincirden ya da kuyruktan gelsin) tek bir transaction içinde çalışır. Transaction başında aktif tenant transaction'a yerel olarak set edilir; RLS bu değere göre filtreler. Okumalar da bu kurala dahildir.
    - Tenant endpoint'i modüle tek bir `InvokeAsync` ile gider; böylece isteğin transaction'ı o komutun transaction'ıdır.
    - Transaction'ı host'taki bir Wolverine handler policy'si açar. Handler başarıyla biterse commit eder; istisna ya da başarısız Result dönerse geri alır.
-5. Pipeline sırası: routing → tenant çözümleme (kimseyi reddetmez) → rate limit → reddetme.
+5. Pipeline sırası: routing → kimlik doğrulama → tenant çözümleme (kimseyi reddetmez) → rate limit → yetkilendirme.
    - Kimlik yoksa 401.
-   - Bilinmeyen slug, üye olmayan kullanıcı ve aktif olmayan tenant 404 döner; tenant'ın varlığı açığa çıkmaz.
+   - Bilinmeyen slug, üye olmayan kullanıcı ve aktif olmayan tenant 404 döner; tenant'ın varlığı açığa çıkmaz. Bu 404'ü yetkilendirme verir: çözülmemiş bir tenant rotasındaki ret "yok" olarak cevaplanır.
+   - Üyenin endpoint'in istediği izni yoksa 403.
    - Üye olmayanlar da rate limit'ten geçer.
+   - Üye olmayan bir system admin de tenant rotalarında 404 alır; tenant'a admin rotalarından girer.
 6. Tenant rotalarının kendi segmenti (`tenants`) vardır. Bu yüzden hiçbir slug tenant dışı rotalarla (`/v1/me` gibi) çakışmaz ve yasaklı slug listesi gerekmez (0033).
 7. Slug şimdilik değiştirilemez. Yeniden adlandırma ve eski URL yönlendirmesi ihtiyaç çıkınca eklenir. Subdomain'e geçiş çözümleme katmanı değiştirilerek yapılır.
 
@@ -102,9 +104,16 @@ Tenant verisi üzerinden rapor ihtiyacı çıkarsa ayrı bir ADR ile eklenir.
 
 Migration'lar ve oturum seviyesi kilit veya `LISTEN/NOTIFY` gerektiren arka plan bileşenleri (Wolverine dayanıklılık ajanı, Hangfire kilitleri; kurulumda doğrulanır) doğrudan (direct) bağlantıyı kullanır. Migration adımı owner rolüyle `ConnectionStrings:Migrations`'ı kullanır.
 
-Uygulama rolünün doğrudan bağlantısı (Faz 5) ve rapor bağlantısı (Faz 4) ilk kullanıldıklarında eklenir.
+Rapor rolünün bağlantısı (`ConnectionStrings:Reporting`) ilk rapor endpoint'iyle Faz 4'te eklendi; `Pooled` gibi ilk kullanımda kontrol edilir. Uygulama rolünün doğrudan bağlantısı Faz 5'te, ilk kullanıldığında eklenir.
 
-**Catalog şeması:** ControlPlane modülünün sahibi olduğu, tenant üstü tek şema. İçinde tenant'lar (slug, durum), kullanıcılar (tek kimlik, Clerk kimliğiyle eşleşir, birden çok tenant'a üye olabilir), tenant-kullanıcı üyelikleri, roller, davetler ve system adminleri durur. RLS yoktur: Golding'e göre kontrol düzleminin kendisi çok kiracılı değildir. Tenant'a ait catalog satırlarına (roller, üyelikler, davetler) erişim tek bir tenant kapsamlı giriş noktasından (`TenantCatalog`) geçer ve izolasyon testleriyle korunur. Tenant henüz bilinmeden üyelik okuyan tek okuyucu, tenant çözümlemenin `TenantDirectory`'sidir. Catalog ile tenant şemaları arasında foreign key kurulmaz; tutarlılık uygulama katmanındadır, böylece bir tenant'ı ileride ayrı veritabanına taşımak engellenmez.
+**Catalog şeması:** ControlPlane modülünün sahibi olduğu, tenant üstü tek şema. İçinde tenant'lar (slug, durum), kullanıcılar (tek kimlik, Clerk kimliğiyle eşleşir, birden çok tenant'a üye olabilir), tenant-kullanıcı üyelikleri (her biri bir rolle), roller, davetler ve system adminleri durur. RLS yoktur: Golding'e göre kontrol düzleminin kendisi çok kiracılı değildir.
+
+- Tenant'a ait catalog satırlarına (roller, üyelikler, davetler) erişim tek bir tenant kapsamlı giriş noktasından (`TenantCatalog`) geçer ve izolasyon testleriyle korunur. Yalnızca aktif tenant'ın satırlarını (ve hiçbir tenant'a ait olmayan yerleşik rolleri) okur, eklediği üyeliklere aktif tenant'ı basar, başka tenant'ın rolünü ya da davetini eklemeyi reddeder.
+- Tenant henüz bilinmeden okuyan okuyucular bilinçli olarak dar tutulur:
+  - `TenantDirectory`: tenant çözümlemesi için üyelikleri izinleriyle okur; system admin girişinde tenant'ı slug'ından bulur.
+  - `InvitationDirectory`: davet token'ından davetin tenant'ını bulur; yalnızca tenant id'sini verir.
+  - `SystemAdminDirectory`: kullanıcının system izinlerini okur.
+- Catalog ile tenant şemaları arasında foreign key kurulmaz; tutarlılık uygulama katmanındadır, böylece bir tenant'ı ileride ayrı veritabanına taşımak engellenmez. Catalog içindeki foreign key'ler serbesttir.
 
 ## Modüler monolit
 
@@ -178,6 +187,8 @@ Her modül, içi ince olsa da beş projeyle kurulur; böylece mimari kurallar he
   - Wolverine'in çağırdığı host middleware'leri.
 
   Gerisi internal kalır. Mimari testler handler ve validator'ların public olmasını zorlar.
+
+  Handler'lar kalıcılığa ve dış sistemlere `X.Application`'daki port arayüzleriyle ulaşır; uygulamaları `X.Infrastructure`'dadır. Port handler imzasında geçtiği için public'tir. Üyeleri domain tiplerini konuşuyorsa üyeler `internal`'dır: domain internal kalır, Wolverine'in ürettiği kod port'u sadece geçirir. Faz 4'te doğrulandı.
 - Ortak boru hattı host'ta: auth, tenant çözümleme, hata yönetimi, loglama, validation, transaction, OpenAPI. SharedKernel bu yüzden Wolverine, EF Core veya FluentValidation'a bağımlı değildir.
 - Kurallar testte iki yoldan zorlanır, ihlal build'i kırar:
   - Tip bağımlılıkları NetArchTest ile.
@@ -221,7 +232,9 @@ Her iki tür de sunucuda tetiklenir; çok pod'da Hangfire'ın dağıtık kilidi 
 
 ## Kimlik, rol ve izinler
 
-Clerk sadece kimliği doğrular ve **Restricted** modda çalışır: dışarıdan kayıt kapalıdır, hesap sadece davetle açılır. Kullanıcının hangi tenant'ta olduğu, rolü ve izinleri bizim catalog şemamızdadır; böylece auth sağlayıcı değiştirilebilir kalır. Clerk Organizations kullanılmaz. Kimlik token merkezlidir; bütün istemciler aynı kapıdan girer.
+Clerk sadece kimliği doğrular ve **Invite-only** (eski adıyla Restricted) modda çalışır: dışarıdan kayıt kapalıdır, hesap sadece davetle açılır. Kullanıcının hangi tenant'ta olduğu, rolü ve izinleri bizim catalog şemamızdadır; böylece auth sağlayıcı değiştirilebilir kalır. Clerk Organizations kullanılmaz. Kimlik token merkezlidir; bütün istemciler aynı kapıdan girer.
+
+Token'ı host doğrular (0028): issuer, imza, süre ve `azp`. `Clerk:AuthorizedParties` API'yi kullanabilecek istemcilerin origin'lerini listeler; Development dışında liste boşsa `/health/ready` unhealthy döner ve pod trafik almaz.
 
 **Davet ve kullanıcı oluşturma (invite-only):**
 
@@ -230,7 +243,16 @@ Clerk sadece kimliği doğrular ve **Restricted** modda çalışır: dışarıda
 3. Kişi linkle kaydolur ya da giriş yapar ve daveti kabul eder.
 4. API daveti doğrular: token geçerli olmalı ve Clerk'teki doğrulanmış e-posta davetteki e-postayla eşleşmelidir. Token tek başına yetmez; iletilen bir link başkasını içeri almaz. Kişi catalog'da yoksa kullanıcı kaydını oluşturur ve üyeliği aynı transaction'da ekler.
 
-Catalog'daki kullanıcı kaydı sadece davet kabulünde oluşur; Clerk webhook'u gerekmez. Kaydın olması tek başına yetki vermez, yetki üyelikten gelir. Davet e-postasının Clerk tarafından mı, Resend ile bizim tarafımızdan mı gönderileceği kurulumda doğrulanır; tek tip görünüm için tercih Resend'dir.
+Catalog'daki kullanıcı kaydı sadece davet kabulünde oluşur; Clerk webhook'u gerekmez. Kaydın olması tek başına yetki vermez, yetki üyelikten gelir.
+
+**Davet e-postasını biz göndeririz** (Faz 4'te doğrulandı, 0029). Clerk davetleri `notify: false` ile Clerk'e e-posta göndertmeden açılır ve dönen `url` bizim e-postamıza konur.
+
+- Clerk hesabı olmayan kişi için Clerk daveti açılır: davet id'miz `public_metadata`'da, kabul linkimiz (`Invitations:AcceptUrl?token=...`) `redirect_url`'de. Kişi bu linkle kaydolur ve kabul sayfasına iner. Hesabı olan kişiye doğrudan kabul linki gider. Hesabın varlığı e-posta adresinin birebir eşleşmesiyle anlaşılır; Clerk'in bazı e-posta filtreleri kısmi eşleşir.
+- Token 256 bit rastgeledir, SHA-256 hash'i saklanır; ömrü `Invitations:Lifetime` (varsayılan yedi gün).
+- Kabul (`POST /v1/invitations/accept`) tenant dışı rotadır: token davetin tenant'ını bulur, kabul o tenant'ın transaction'ında tek komut olarak çalışır, davet satırı kilitlenir. Doğrulanmış e-postalar Clerk Backend API'sinden okunur; session token e-posta taşımaz.
+- Hatalar: bilinmeyen token 404, kullanılmış 409, süresi dolmuş 409, e-posta uyuşmuyor 403, zaten üye 409.
+- E-posta, Notifications modülü Resend ile göndermeye başlayana kadar (Faz 6) bir port arkasındadır: Development'ta link loga yazılır, diğer ortamlarda gönderim açık bir hatayla başarısız olur ve davet geri alınır.
+- Bizim token'ımız Clerk'te saklanan redirect URL'inde düz metin durur; tek başına erişim vermez, çünkü kabul doğrulanmış e-postayı da ister.
 
 **Üç katman:**
 
@@ -239,6 +261,17 @@ Catalog'daki kullanıcı kaydı sadece davet kabulünde oluşur; Clerk webhook'u
 3. **Üyelik:** Rol kullanıcıya değil, kullanıcı + tenant ikilisine bağlıdır. Aynı kişi bir tenant'ta admin, ötekinde görüntüleyici olabilir.
 
 **Kod rolü değil izni kontrol eder.** "Admin mi?" yerine "Bu izni var mı?" sorulur; custom roller koda dokunmadan çalışır.
+
+**Kimse sahip olmadığını veremez.** Bir rolü vermek, değiştirmek ya da geri almak, ve bir custom rolü şekillendirmek, işe karışan rollerin bütün izinleri yapan kişide de varsa mümkündür. Böylece admin owner yapamaz ve bir owner'ı düşüremez.
+
+**Nasıl çalışır** (0030):
+
+- İzin kataloğu SharedKernel'deki `Permissions`'tadır: tenant havuzu ve system havuzu. Her modülün her katmanı ve host bunu görebilir; endpoint izni buradan adlandırır. Faz 4'te tenant izinleri: `members.invite`, `members.manage`, `owners.manage`, `roles.manage`.
+- Yerleşik roller: owner tüm tenant havuzunu, admin `owners.manage` dışındakileri tutar; member ve viewer'ın izni şimdilik yoktur, modüller onlar için yetenek ekledikçe gelir. Yerleşik roller `catalog.roles`'ta hiçbir tenant'a ait olmayan, sabit id'li satırlardır; izinleri koddan gelir. Custom roller tenant'ın satırlarıdır, izinleri metin dizisi olarak durur.
+- Kullanımdaki rol silinemez (üyelikler rolü `RESTRICT` ile gösterir; bekleyen daveti olan rolün silinmesi reddedilir).
+- Son sahip kuralını `Membership` aggregate'i korur. Üyelik ve rol değiştiren komutlar transaction'larının başında tenant'ın catalog satırını kilitler (`FOR UPDATE`); aynı anda birbirini düşüren iki owner birlikte geçemez.
+- Host'ta endpoint gerektirdiği izni policy adı olarak verir: `RequireAuthorization(Permissions.MembersInvite)`. Kayıtlı olmayan her policy adı izin sayılır; yanlış yazılmış bir ad kimseye izin vermez.
+- Faz 4 endpoint'leri (`/v1/tenants/{slug}` altında): `POST/PUT/DELETE /roles[/{id}]`, `PUT /members/{userId}/role`, `DELETE /members/{userId}`, `POST /invitations`. Rol, üye ve davet listeleri bir istemci ihtiyaç duyunca eklenir.
 
 Güvenlik karşılığı (OWASP API Top 10): nesne seviyesi yetkilendirmeyi RLS, fonksiyon seviyesini izin sistemi, alan seviyesini ayrı response DTO'ları kapatır. Yetkilendirme davranışı testle doğrulanır.
 
@@ -252,7 +285,16 @@ System adminleri (Golding'in terimi; SaaS sağlayıcısının kendi personeli) a
 - **Tenant verisine erişim, tenant bağlamına girerek:** Admin bir tenant seçer, o tenant transaction'a set edilir, RLS normal çalışır. Her giriş audit'e yazılır.
 - **Tenant'lar arası rapor:** Sadece admin endpoint'lerinin kullandığı salt okunur rapor rolü (bkz. Veritabanı rolleri). Bu rol yalnızca catalog'u okur.
 - **Admin API:** Aynı host içinde ayrı route grubu ve ayrı yetkilendirme politikası. Hangfire dashboard şimdilik sadece yerel geliştirmede açıktır, canlıda kapalıdır; system admin konsolu yapıldığında oradan, system admin iznine bağlı olarak açılır.
-- **MFA zorunlu** ve API'de zorlanır: admin route grubu token'da ikinci faktör doğrulamasını arar.
+- **MFA zorunlu** ve API'de zorlanır: admin route grubu token'da ikinci faktör doğrulamasını arar. Clerk bunu session token'daki `fva` claim'iyle bildirir (Faz 4'te doğrulandı): ilk ve ikinci faktörün doğrulanmasından bu yana geçen dakikalar; ikinci değer `-1` ise ikinci faktör yoktur. Host bunu kendi claim'ine çevirir; token'ın kendisinde aynı adla gelen claim silinir, ikinci faktöre yalnızca `fva` kefil olur.
+
+**Nasıl çalışır** (0031):
+
+- Tek system rolü `Administrator`'dır ve system havuzunun tamamını tutar: `system.tenants.read`, `system.tenants.enter`, `system.members.invite`.
+- Seed script'i `apps/api/db/seed-system-admin.sql`'dir (`psql -v external_id=<Clerk kullanıcı id'si>`). Migration'lardan sonra çalışır, tekrar çalıştırılabilir.
+- `/v1/admin` system admin ve ikinci faktör ister. `/v1/admin/tenants/{slug}` ayrıca `system.tenants.enter` ister; tenant'ı üyelik aramadan ve durumu ne olursa olsun çözer, tenant'ı istek ve mesaj yoluna normal tenant çözümlemesi gibi koyar.
+- Her giriş yetkilendirmeden sonra `Api.Security` log kategorisinde `SystemAdminTenantEntry` güvenlik olayı olarak kaydedilir. Audit kaydı Audit modülüyle (Faz 6) aynı noktaya eklenir.
+- Tenant içindeki admin üye değildir; tenant'ın değil kendi rate limit'ini harcar.
+- Faz 4 endpoint'leri: `GET /v1/admin/tenants` (tenant'lar durum ve üye sayısıyla, sayfalı, rapor rolüyle) ve `POST /v1/admin/tenants/{slug}/invitations` (her rolle davet; bir tenant'ın ilk sahibi böyle davet edilir).
 
 ## API tasarımı
 
@@ -261,10 +303,11 @@ Bütün hatalar tek formatta döner: Problem Details (RFC 9457). İstemciler hat
 - **Beklenen hatalar** ("email zaten kayıtlı", "bulunamadı", "yetki yok") exception değildir; handler bir Result döner, host onu doğru HTTP koduna ve Problem Details'e çevirir.
 - **Beklenmeyen hatalar** tek bir global exception handler'da yakalanır; kullanıcıya güvenli genel mesaj, loglara tam detay. Stack trace asla dışarı çıkmaz.
 - **Handler'larda try/catch yok.** Loglama, validation, transaction ve performans ölçümü pipeline'da bir kez yazılır, her komut otomatik geçer. Performans ölçümü: komut başına süre histogramı ve config'den gelen eşiği aşınca uyarı logu.
-- **Versiyonlama ilk günden, URL segmentiyle.** Tenant kapsamlı rotalar `/v1/tenants/{slug}/...`, tenant dışı rotalar `/v1/me`, `/v1/invitations/...` gibi. İstemciler eski sürümde kalabileceği için API eski istemciyi kırmaz.
-- **Verimli cevaplar:** sayfalama varsayılan, gereksiz büyük cevap yok.
-- **Tenant başına rate limit:** Pod içi, bellek tabanlı limit; değerler config'den gelir, plana bağlı değildir. Tenant kovasını yalnızca üyeliği doğrulanmış istek kullanır, anahtar çözümlenmiş tenant id'sidir; route'taki slug asla anahtar olmaz (0035). Diğer isteklerde anahtar, girişli kullanıcıda kullanıcı id'si, girişsiz istekte IP adresidir. Gerçek limit pod sayısıyla çarpılır; bu başlangıç için kabul edilir. Global limit Redis'le ölçeklenince gelir.
-- **OpenAPI tek kaynak:** Minimal API'den şema üretilir, XML yorumları açıklamaya girer. Arayüz Scalar. OpenAPI dokümanı `apps/api` altında commit'lenir ki API değişikliği review'da görünsün; istemci tip üretimi istemcinin işidir.
+- **Versiyonlama ilk günden, URL segmentiyle.** Tenant kapsamlı rotalar `/v1/tenants/{slug}/...`, tenant dışı rotalar `/v1/me`, `/v1/invitations/...` gibi, admin rotaları `/v1/admin/...`. İstemciler eski sürümde kalabileceği için API eski istemciyi kırmaz.
+- **`/v1` altında her endpoint girişli kullanıcı ister;** herkese açık bir endpoint bunu açıkça belirtir. Health check'ler, OpenAPI dokümanı ve Scalar grubun dışındadır.
+- **Verimli cevaplar:** sayfalama varsayılan, gereksiz büyük cevap yok. Sayfalama offset'iyle yapılır: `?page=1&pageSize=50`, en büyük sayfa 100; cevap `{ items, page, pageSize, totalCount }` (SharedKernel'deki `PagedList<T>`).
+- **Tenant başına rate limit:** Pod içi, bellek tabanlı limit; değerler config'den gelir, plana bağlı değildir. Tenant kovasını yalnızca üyeliği doğrulanmış istek kullanır, anahtar çözümlenmiş tenant id'sidir; route'taki slug asla anahtar olmaz (0035). Tenant'a giren system admin üye değildir, kendi limitini harcar. Diğer isteklerde anahtar, girişli kullanıcıda kullanıcı id'si, girişsiz istekte IP adresidir. Gerçek limit pod sayısıyla çarpılır; bu başlangıç için kabul edilir. Global limit Redis'le ölçeklenince gelir.
+- **OpenAPI tek kaynak:** Minimal API'den şema üretilir, XML yorumları açıklamaya girer. Arayüz Scalar. OpenAPI dokümanı `apps/api` altında commit'lenir ki API değişikliği review'da görünsün; istemci tip üretimi istemcinin işidir. `Result` dönen endpoint'lerde dokümana `Result` tipi değil gerçek cevap girer: `Result<T>` için 200 ile `T`, `Result` için 204, hatalar için Problem Details (400, 403, 404, 409). Bunu versiyon grubundaki bir convention sağlar ve test doğrular (0036).
 
 ## Bildirimler ve gerçek zamanlı
 
@@ -286,12 +329,12 @@ Uygulama Kubernetes'te çok pod'da yatay ölçeklenecek şekilde tasarlanır; hi
 | Durum | Pod durumsuz: dosyalar nesne deposuna, oturum token'da, önbellek Redis'te |
 | Bağlantılar | Havuzlu ve doğrudan iki bağlantı (bkz. Çok kiracılık); pod sayısı Postgres limitini patlatmaz |
 | Migration | Uygulama başlangıcından ayrı, tek seferlik adım: önce bootstrap script'i, sonra `dotnet Api.dll migrate` (her modülün migration'ları owner rolüyle, 0020) |
-| Kapanma | Sağlık kontrolleri (`/health/live`, `/health/ready`: veritabanına erişim ve rol kontrolü) ve zarif kapanma; pod ölmeden elindeki işi bitirir |
+| Kapanma | Sağlık kontrolleri (`/health/live`, `/health/ready`: veritabanına erişim, rol kontrolü ve Development dışında Clerk'in izinli istemci listesinin boş olmaması) ve zarif kapanma; pod ölmeden elindeki işi bitirir |
 | Gerçek zamanlı | SignalR Redis backplane, config ile açılır |
 | Gözlemlenebilirlik | OpenTelemetry (log, metrik, trace) + Serilog; her sinyal tenant id taşır; OTLP ile dışa aktarım hedefi ortamdan, yerelde konsol |
 | Dış çağrılar | Timeout, retry, circuit breaker (Microsoft.Extensions.Http.Resilience) |
 
-**Audit log:** Normal logdan ayrıdır; iş verisidir, yıllarca saklanır. Kendi Audit modülünde tek tablo, tenant kolonlu ve RLS korumalı. Komutun modülü audit event'ini kendi transaction'ında outbox'a yazar, Audit modülü tüketip kaydeder; böylece kayıt kaybolmaz ve modül sınırı korunur. Kayda geçenler: başarılı durum değiştiren komutlar, reddedilen yetki denemeleri ve system admin'in tenant'a girişi. Yetki reddinin iş transaction'ı olmadığı için pipeline onu kendi küçük transaction'ında outbox'a yazar. Tenant bağlamı çözülemediyse (üye olmayan biri) red audit tablosuna değil güvenlik loguna düşer, çünkü audit tablosu tenant kapsamlıdır. Kayıt içeriği: kim, ne zaman, hangi tenant, hangi işlem, hangi kayıt, gerekirse önce ve sonra. Sorgular audit'lenmez. Hacim büyürse tarihe göre bölümlenir.
+**Audit log:** Normal logdan ayrıdır; iş verisidir, yıllarca saklanır. Kendi Audit modülünde tek tablo, tenant kolonlu ve RLS korumalı. Komutun modülü audit event'ini kendi transaction'ında outbox'a yazar, Audit modülü tüketip kaydeder; böylece kayıt kaybolmaz ve modül sınırı korunur. Kayda geçenler: başarılı durum değiştiren komutlar, reddedilen yetki denemeleri ve system admin'in tenant'a girişi. Audit modülü gelene kadar (Faz 6) admin girişi yalnızca güvenlik loguna yazılır. Yetki reddinin iş transaction'ı olmadığı için pipeline onu kendi küçük transaction'ında outbox'a yazar. Tenant bağlamı çözülemediyse (üye olmayan biri) red audit tablosuna değil güvenlik loguna düşer, çünkü audit tablosu tenant kapsamlıdır. Kayıt içeriği: kim, ne zaman, hangi tenant, hangi işlem, hangi kayıt, gerekirse önce ve sonra. Sorgular audit'lenmez. Hacim büyürse tarihe göre bölümlenir.
 
 ## Test stratejisi ve TDD
 
@@ -328,6 +371,9 @@ apps/api/tests/
   - **Kapsama.** `Api.IntegrationTests`, host'un kaydettiği her modül DbContext'indeki her `ITenantEntity`'yi liste tutmadan bulur. Gerçek migration'lardan sonra her birinin query filter'ını, RLS'ini, tek policy'sini ve tenant kolonu varsayılanını kontrol eder.
   - **Catalog.** Catalog'daki tenant'a ait satırların giriş noktası `ControlPlane.IntegrationTests`'te test edilir.
 - Veritabanı gerektiren her test projesi assembly başına bir PostgreSQL 18 container'ı açar; dağıtımdaki gibi önce bootstrap, sonra migration'lar çalışır.
+- Testlerde girişli kullanıcı, Clerk'inkine benzeyen ve testin kendi anahtarıyla imzalanmış session token'larıyla gelir; host Clerk'in anahtarları yerine bu anahtara güvenir, doğrulamanın geri kalanı üretim kodudur.
+- Dış sistemler (Clerk Backend API, davet e-postası) port'larında sahte uygulamalarla değiştirilir. Gerçek Clerk adapter'ı, isteklerini kaydeden sahte bir HTTP handler'ına karşı ayrıca test edilir.
+- Modül entegrasyon testleri handler'ları, host'un transaction policy'si gibi açtıkları bir tenant transaction'ında doğrudan çağırır; modül test projeleri host'u göremez.
 - Mimari testler ve tenant izolasyon testleri build'i kırar.
 
 **Yazım kuralları** (şirket ADR-0006'dan uyarlanan):
@@ -398,9 +444,15 @@ Aşağıdakiler kod iskeletini değiştirmediği için sonraya bırakıldı:
 - E-posta şablonları
 - Arama
 
-Kurulumda ilgili fazda doğrulanır, sonuç ADR'ye işlenir. Wolverine'in `internal` tiplerle çalışmadığı (0047) ve NetArchTest fork'u ile Testcontainers'ın lisans ve .NET 10 uyumu (0044) doğrulandı. Kalanlar:
+Kurulumda ilgili fazda doğrulanır, sonuç ADR'ye işlenir. Doğrulananlar:
+
+- Wolverine'in `internal` tiplerle çalışmadığı ve internal üyeli public port'larla çalıştığı (0047).
+- NetArchTest fork'u ile Testcontainers'ın lisans ve .NET 10 uyumu (0044).
+- Davet e-postasını Resend ile bizim göndereceğimiz; Clerk davetinin `notify: false` ile e-postasız açılabildiği (0029).
+- Clerk'in ikinci faktör doğrulamasını `fva` claim'iyle bildirdiği (0031).
+- `Result` dönen endpoint'lerin OpenAPI dokümanında doğru tarif edildiği (0036).
+
+Kalanlar:
 
 - Wolverine ve Hangfire'ın havuzlu bağlantıyla mı, doğrudan bağlantıyla mı çalışması gerektiği.
 - Hangfire PostgreSQL paketinin lisansı ve .NET 10 uyumu.
-- Davet e-postasının Clerk'ten mi, Resend ile mi gönderileceği.
-- Clerk'in ikinci faktör doğrulamasını token'da hangi claim ile bildirdiği.

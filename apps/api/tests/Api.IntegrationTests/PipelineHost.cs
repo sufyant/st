@@ -1,4 +1,5 @@
-using System.Security.Claims;
+using System.Net.Http.Headers;
+using Api.Admin;
 using Api.Tenants;
 using ControlPlane.Api;
 using Microsoft.AspNetCore.Builder;
@@ -16,9 +17,6 @@ namespace Api.IntegrationTests;
 // where module endpoints go.
 internal sealed class PipelineHost : IAsyncDisposable
 {
-    // Authentication arrives with Clerk in a later phase; until then a test names the signed-in user in this header.
-    public const string UserHeader = "X-Test-User";
-
     private static readonly Dictionary<string, string?> DefaultSettings = new()
     {
         ["RateLimiting:PermitLimit"] = "1000",
@@ -46,20 +44,24 @@ internal sealed class PipelineHost : IAsyncDisposable
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = Environments.Development });
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(DefaultSettings);
+        builder.Configuration.AddInMemoryCollection(TestTokens.Settings);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Pooled"] = database.ApplicationConnectionString });
         builder.Configuration.AddInMemoryCollection(settings ?? new Dictionary<string, string?>());
 
         builder.AddApiPipeline(typeof(PipelineHost).Assembly);
         builder.Services.AddControlPlaneModule();
         builder.Services.AddModuleDbContext<ProbeDbContext>(ProbeDbContext.Schema);
+        builder.Services.TrustTestKey();
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
-        app.Use(SignInFromHeader);
         app.UseApiPipeline();
         var v1 = app.MapV1();
+        var admin = v1.MapAdmin();
         TestEndpoints.Map(v1);
         TestEndpoints.MapTenant(v1.MapTenant());
+        TestEndpoints.MapAdmin(admin);
+        TestEndpoints.MapAdminTenant(admin.MapAdminTenant());
         await app.StartAsync(TestContext.Current.CancellationToken);
 
         return new PipelineHost(app);
@@ -67,22 +69,15 @@ internal sealed class PipelineHost : IAsyncDisposable
 
     public HttpClient CreateClient() => _app.GetTestClient();
 
-    public HttpClient CreateClient(string userId)
+    // A client signed in as the user, with a session token the host trusts.
+    public HttpClient CreateClient(string userId, bool secondFactor = false) => CreateClientWith(TestTokens.For(userId, secondFactor));
+
+    public HttpClient CreateClientWith(string token)
     {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Add(UserHeader, userId);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
-
-    private static Task SignInFromHeader(HttpContext context, RequestDelegate next)
-    {
-        if (context.Request.Headers[UserHeader] is [{ } userId])
-        {
-            context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId)], "test"));
-        }
-
-        return next(context);
-    }
 }

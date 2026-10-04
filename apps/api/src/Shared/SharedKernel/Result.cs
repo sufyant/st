@@ -29,6 +29,8 @@ public sealed class Result<TValue> : Result
 
     public TValue Value => IsSuccess ? _value : throw new InvalidOperationException("A failed result has no value.");
 
+    public Result<TOut> Map<TOut>(Func<TValue, TOut> map) => IsSuccess ? map(_value) : Error;
+
     public static implicit operator Result<TValue>(TValue value) => new(value);
 
     public static implicit operator Result<TValue>(Error error) => new(error);

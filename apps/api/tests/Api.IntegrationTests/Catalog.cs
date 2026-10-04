@@ -1,6 +1,7 @@
 namespace Api.IntegrationTests;
 
-// Writes catalog rows with plain SQL: the host's tests may not see ControlPlane's internals (0007).
+// Writes catalog rows with plain SQL: the host's tests may not see ControlPlane's internals (0007). Built-in roles are found by
+// name, the way the catalog stores them.
 internal sealed class Catalog(Database database)
 {
     public async Task<(Guid Id, string Slug)> AddTenantAsync(string status = "Active", string? slug = null)
@@ -12,13 +13,36 @@ internal sealed class Catalog(Database database)
         return (id, slug);
     }
 
-    public async Task<string> AddMemberAsync(Guid tenantId, string? externalId = null)
+    public async Task<string> AddMemberAsync(Guid tenantId, string? externalId = null, string role = "Member")
     {
         externalId ??= await AddUserAsync();
         await database.ScalarAsync<object>(
-            $"INSERT INTO catalog.memberships (tenant_id, user_id) SELECT '{tenantId}', id FROM catalog.users WHERE external_id = '{externalId}'");
+            $"""
+            INSERT INTO catalog.memberships (tenant_id, user_id, role_id)
+            SELECT '{tenantId}', users.id, roles.id FROM catalog.users, catalog.roles
+            WHERE users.external_id = '{externalId}' AND roles.built_in = '{role}'
+            """);
 
         return externalId;
+    }
+
+    public async Task<string> AddMemberWithRoleAsync(Guid tenantId, Guid roleId)
+    {
+        var externalId = await AddUserAsync();
+        await database.ScalarAsync<object>(
+            $"INSERT INTO catalog.memberships (tenant_id, user_id, role_id) SELECT '{tenantId}', id, '{roleId}' FROM catalog.users WHERE external_id = '{externalId}'");
+
+        return externalId;
+    }
+
+    public async Task<Guid> AddCustomRoleAsync(Guid tenantId, params string[] permissions)
+    {
+        var id = Guid.NewGuid();
+        var granted = string.Join(", ", permissions.Select(permission => $"'{permission}'"));
+        await database.ScalarAsync<object>(
+            $"INSERT INTO catalog.roles (id, tenant_id, name, permissions) VALUES ('{id}', '{tenantId}', 'Role {id:N}', ARRAY[{granted}]::text[])");
+
+        return id;
     }
 
     public async Task<string> AddUserAsync()
@@ -28,4 +52,15 @@ internal sealed class Catalog(Database database)
 
         return externalId;
     }
+
+    public async Task<string> AddSystemAdminAsync()
+    {
+        var externalId = await AddUserAsync();
+        await database.ScalarAsync<object>(
+            $"INSERT INTO catalog.system_admins (user_id, role, granted_at) SELECT id, 'Administrator', now() FROM catalog.users WHERE external_id = '{externalId}'");
+
+        return externalId;
+    }
+
+    public Task<long> CountAsync(string sql) => database.ScalarAsync<long>(sql);
 }

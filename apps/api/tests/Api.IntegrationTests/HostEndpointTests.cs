@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Hosting;
 using Tenancy;
 
 namespace Api.IntegrationTests;
@@ -66,6 +67,37 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         var ready = await ReadyStatusAsync(bypassing);
 
         ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted (0028).
+    [Fact]
+    public async Task Outside_development_the_application_is_not_ready_without_authorized_parties()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production, authorizedParties: []);
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task Outside_development_the_application_is_ready_with_authorized_parties()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production);
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task In_development_the_application_is_ready_without_authorized_parties()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, authorizedParties: []);
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]

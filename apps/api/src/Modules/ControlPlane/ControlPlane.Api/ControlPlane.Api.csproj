@@ -1,5 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- XML comments feed the OpenAPI descriptions; not every public member needs one. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WolverineFx" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\ControlPlane.Application\ControlPlane.Application.csproj" />
     <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
