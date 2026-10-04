@@ -1,6 +1,6 @@
 You are building the initial skeleton of a multi-tenant SaaS starter template. The API lives in `apps/api/` of this monorepo; all paths below are relative to the repository root.
 
-Before anything else, read `AGENTS.md` and `apps/api/docs/ARCHITECTURE.md` in full. They are your instructions. `ARCHITECTURE.md` is written in Turkish; ADRs and code are written in English.
+Before anything else, read `apps/api/AGENTS.md` and `apps/api/docs/ARCHITECTURE.md` in full. They are your instructions for the API. The `AGENTS.md` at the repository root holds general working guidelines and also applies. `ARCHITECTURE.md` is written in Turkish; ADRs and code are written in English.
 
 Work in the phases below. At the end of every phase: run the full build and test suite, then stop and report what you built, which tests prove it, any decision you had to make that the architecture document does not cover, and anything you are unsure about. Do not start the next phase until I approve.
 
@@ -8,7 +8,7 @@ Throughout: work test-first, keep each phase in scope, and never weaken a bounda
 
 ## Phase 0: Decisions and cleanup
 
-- Delete `docs/superpowers/`. It describes an earlier, rejected design. Remove the dead `api#build` (`openapi/Api.json` output) and `@st/api-client#build` tasks from `turbo.json`.
+- Remove the empty `docs/` folder at the repository root; ADRs live under `apps/api/docs/adr/`. Remove the dead `api#build` (`openapi/Api.json` output) and `@st/api-client#build` tasks from `turbo.json`.
 - Split `apps/api/docs/ARCHITECTURE.md` into individual ADRs under `apps/api/docs/adr/` (one decision per record: context, decision, alternatives considered, consequences), status Proposed. Overwrite any ADRs from an earlier attempt.
 - List any open questions that remain. Most were decided; do not reopen a decided point without a concrete reason.
 - No code in this phase.
