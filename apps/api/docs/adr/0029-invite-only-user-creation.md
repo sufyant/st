@@ -12,7 +12,7 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
 1. An authorized member or a system admin creates an invitation. The catalog stores the email, tenant, role, a hash of the token (never the token itself), an expiry and a status. An invitation is single-use.
 2. If the person has no Clerk account, the API also creates a Clerk invitation through Clerk's backend API, with our invitation id in its metadata.
 3. The person signs up or signs in through the link and accepts the invitation.
-4. The API validates the invitation. If the person is not yet in the catalog it creates the user record, and adds the membership in the same transaction.
+4. The API validates the invitation: the token must be valid, and the verified email of the Clerk user must match the invitation's email. The token alone is not enough, so a forwarded link does not let someone else in. If the person is not yet in the catalog it creates the user record, and adds the membership in the same transaction.
 
 - The catalog user record is created only when an invitation is accepted; no Clerk webhook is needed.
 - A user record alone grants nothing; access comes from membership (0030).
@@ -22,10 +22,12 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
 
 - **Create users from a Clerk webhook.** Another integration to secure and keep idempotent, with no need for it.
 - **Store invitation tokens in plain text.** A database leak would expose usable invitations.
+- **Accept on the token alone.** Whoever holds a forwarded or leaked link would join the tenant.
 
 ## Consequences
 
 - Every user enters through a known invitation.
+- Someone who wants to join with a different email address needs a new invitation.
 - Expired invitations are closed by a system job (0027).
 
 ## To verify

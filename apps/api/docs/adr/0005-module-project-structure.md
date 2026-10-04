@@ -14,6 +14,7 @@ Under `apps/api/`, modules are laid out flat, with no grouping folders such as C
 ```text
 apps/api/
   Api.slnx
+  package.json                         # build and test as Turborepo tasks (0046)
   docs/
     ARCHITECTURE.md
     adr/

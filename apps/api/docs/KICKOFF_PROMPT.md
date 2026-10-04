@@ -15,7 +15,7 @@ Throughout: work test-first, keep each phase in scope, and never weaken a bounda
 
 ## Phase 1: Solution skeleton and guard rails
 
-- `apps/api/Api.slnx`, module projects (empty) for ControlPlane, Notifications and Audit, SharedKernel (no third-party dependencies), the Api host and the test projects listed in the document. Keep the root `build` script working.
+- `apps/api/Api.slnx`, module projects (empty) for ControlPlane, Notifications and Audit, SharedKernel (no third-party dependencies), the Api host and `Architecture.Tests` as the only test project; every other test project is created when its first test is written. Keep the root `build` script working.
 - Repository-wide build settings: central package management, nullable enabled, warnings as errors, consistent analyzers.
 - Architecture tests that encode the module and layer reference table. Write them first and show they fail on a deliberate violation before removing it.
 

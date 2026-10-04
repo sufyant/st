@@ -13,6 +13,8 @@ An audit trail is business data kept for years, unlike operational logs (Fowler'
 - The module that runs a command writes the audit event to the outbox in its own transaction; the Audit module consumes and stores it.
 - Recorded: successful state-changing commands, denied authorization attempts and system admin entries into a tenant.
 - Content: who, when, which tenant, which operation, which record, and before and after values where needed.
+- A denied authorization attempt has no business transaction of its own. The pipeline writes its audit event to the outbox in a separate, small transaction.
+- If the tenant context could not be resolved (for example, the user is not a member of the tenant), the denial is written to the security log instead, because the audit table is tenant-scoped.
 - Queries are not audited.
 - If volume grows, the table is partitioned by date.
 
@@ -24,4 +26,4 @@ An audit trail is business data kept for years, unlike operational logs (Fowler'
 ## Consequences
 
 - Audit records are not lost with the business transaction and do not cross module boundaries.
-- A denied attempt has no successful business transaction to write its event in; how that event is recorded must be settled before Phase 6.
+- Denials before tenant resolution are only in the security log (0039), not in the audit table.

@@ -12,6 +12,7 @@ Problems in a multi-tenant system are usually tenant-specific; signals without t
 - OpenTelemetry for logs, metrics and traces, with Serilog for logging.
 - Every signal carries the tenant id.
 - Export through OTLP; the target comes from the environment. Locally, the console.
+- Security events that cannot be written to the tenant-scoped audit log, such as authorization denials before a tenant is resolved (0040), are written to the log as security events.
 
 ## Alternatives considered
 

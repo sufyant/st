@@ -14,13 +14,16 @@ Projects may reference only the following:
 | Project | May reference |
 | --- | --- |
 | `X.Domain` | SharedKernel |
-| `X.Contracts` | The .NET base library only; carries no transitive dependency to other modules |
+| `X.Contracts` | The .NET base library and SharedKernel; carries no transitive dependency to other modules |
 | `X.Application` | `X.Domain`, `X.Contracts`, other modules' `*.Contracts`, SharedKernel |
 | `X.Infrastructure` | `X.Application`, `X.Domain`, `X.Contracts`, SharedKernel |
 | `X.Api` | `X.Application`, `X.Contracts`, `X.Infrastructure` (only to register `AddXModule()`), SharedKernel |
 | `Api` host | Each module's `X.Api` project only |
 
 - A module reaches another module only through that module's `*.Contracts`.
+- Contracts may reference SharedKernel because SharedKernel has no dependencies (0022), so a synchronous contract can return SharedKernel's Result and error types without pulling anything else into its callers.
+- `X.Api` references `X.Infrastructure` only to register the module. A type-level rule enforces this: inside `X.Api`, only the module registration class (the one that provides `AddXModule()`) may use types from `X.Infrastructure`.
+- `InternalsVisibleTo` is allowed only between a module's own projects and its test projects, never between modules (0007).
 - The rules are encoded as NetArchTest tests in `Architecture.Tests`; a violation breaks the build. A rule is never weakened to make code compile.
 
 ## Alternatives considered
@@ -30,5 +33,6 @@ Projects may reference only the following:
 
 ## Consequences
 
+- Project references alone cannot express the registration-only rule, so it needs the type-level test above.
 - Boundary violations fail fast and visibly.
 - The architecture tests must stay green at all times.

@@ -10,6 +10,7 @@ One tenant must not be able to exhaust the API for others. A distributed limiter
 ## Decision
 
 - Rate limits are per tenant, in memory in each pod.
+- Requests without a tenant are partitioned too: an authenticated request outside a tenant by user id, an unauthenticated request by IP address.
 - Limits come from configuration and are not tied to a plan.
 - The effective limit is multiplied by the number of pods; this is accepted for the start.
 - A global limit comes with Redis when scaling requires it.
@@ -22,3 +23,4 @@ One tenant must not be able to exhaust the API for others. A distributed limiter
 ## Consequences
 
 - Limits are approximate across pods.
+- Clients behind a shared IP address share the limit for unauthenticated requests.

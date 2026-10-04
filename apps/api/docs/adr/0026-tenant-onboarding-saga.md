@@ -10,7 +10,7 @@ Creating a tenant spans several steps (tenant record, first owner invitation, ac
 ## Decision
 
 - An orchestrated saga in ControlPlane (0025), started by a system admin.
-- Flow: create the tenant as `provisioning`, send an invitation to the first owner, set the tenant to `active`.
+- Flow: create the tenant as `provisioning`, create the invitation record for the first owner, set the tenant to `active`, and send the invitation email last.
 - If a step fails, compensation sets the tenant to `failed`.
 - The invitation email is the last step and is not compensated.
 - The saga does not depend on who triggers it; self-serve sign-up can later trigger the same saga from a public endpoint.
@@ -22,4 +22,4 @@ Creating a tenant spans several steps (tenant record, first owner invitation, ac
 ## Consequences
 
 - A tenant is visibly `provisioning`, `active` or `failed`.
-- The overview lists the invitation before activation but also calls the invitation email the last step. One reading is that the invitation record is created before activation and the email is sent after it. This must be settled before Phase 5.
+- A failure while sending the email does not roll the tenant back; the tenant stays `active` with its invitation record.

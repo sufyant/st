@@ -16,7 +16,7 @@ The template is the base for every product; tests must allow refactoring without
   3. Our own database is never mocked. PostgreSQL, including RLS, is tested for real with Testcontainers. Only external systems (Clerk, email, push) are mocked.
   4. An interaction is verified only when it is itself the requirement ("the notification is sent exactly once").
   5. Test code has production quality.
-- Test projects are per module and per kind, created only when they contain tests:
+- Test projects are per module and per kind. The list below is the target set; each project is created when its first test is written:
 
 ```text
 apps/api/tests/

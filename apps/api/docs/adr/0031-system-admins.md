@@ -14,9 +14,9 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
 - The first system admin is created by a seed script during setup.
 - System permissions (for example `system.tenants.suspend`) form a separate pool. Tenant custom roles cannot select them.
 - To see tenant data, an admin enters the tenant context: the chosen tenant is set on the transaction and RLS applies as usual. Every entry is audited (0040).
-- Cross-tenant reports use only the read-only reporting role (0018), only from admin endpoints.
-- The admin API is a separate route group in the same host with its own authorization policy. The Hangfire dashboard also requires a system admin permission.
-- MFA is mandatory for system admins.
+- Cross-tenant reports use only the read-only reporting role (0018), only from admin endpoints. That role reads the catalog only.
+- The admin API is a separate route group in the same host with its own authorization policy. The Hangfire dashboard is open only in local development for now (0027).
+- MFA is mandatory for system admins and is enforced by the API: the admin route group requires second-factor verification in the token.
 
 ## Alternatives considered
 
@@ -27,3 +27,8 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
 
 - Admins see tenant data only the way the tenant itself would.
 - The admin surface is a distinct, separately authorized part of the API.
+- MFA does not depend on a setting in the identity provider alone.
+
+## To verify
+
+- Which claim Clerk uses to report second-factor verification in the token (Phase 4).
