@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Architecture.Tests;
@@ -10,15 +11,15 @@ internal static partial class Solution
 
     public static IReadOnlyList<string> Layers { get; } = ["Contracts", "Domain", "Application", "Infrastructure", "Api"];
 
-    // The test project references only the host, so the assemblies the runtime trusts are exactly those the host ships;
-    // stale files left in the output directory are not among them.
-    private static IReadOnlyList<string> AssemblyFiles { get; } =
-        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
+    // The deps file marks the solution's own projects apart from third-party packages, some of which follow the module
+    // naming pattern too (OpenTelemetry.Api). The test project references only the host, so these are exactly the projects
+    // the host ships.
+    private static IReadOnlyList<string> ProjectNames { get; } = ReadProjectNamesFromDepsFile();
 
     public static IReadOnlyList<string> Modules { get; } =
     [
-        .. AssemblyFiles
-            .Select(file => ModuleAssemblyFileName().Match(Path.GetFileName(file)))
+        .. ProjectNames
+            .Select(name => ModuleProjectName().Match(name))
             .Where(match => match.Success)
             .Select(match => match.Groups["module"].Value)
             .Distinct()
@@ -33,10 +34,24 @@ internal static partial class Solution
 
     public static IEnumerable<string> LayerOfEveryModule(string layer) => Modules.Select(module => $"{module}.{layer}");
 
-    public static bool IsShipped(string project) => AssemblyFiles.Any(file => Path.GetFileName(file) == $"{project}.dll");
+    public static bool IsShipped(string project) => ProjectNames.Contains(project);
 
     public static Assembly Load(string project) => Assembly.Load(project);
 
-    [GeneratedRegex(@"^(?<module>[A-Za-z]+)\.(Contracts|Domain|Application|Infrastructure|Api)\.dll$")]
-    private static partial Regex ModuleAssemblyFileName();
+    private static string[] ReadProjectNamesFromDepsFile()
+    {
+        // The runtime lists the application's own deps file first, separated by semicolons on every platform.
+        var depsFile = ((string)AppContext.GetData("APP_CONTEXT_DEPS_FILES")!).Split(';')[0];
+        using var deps = JsonDocument.Parse(File.ReadAllText(depsFile));
+
+        return
+        [
+            .. deps.RootElement.GetProperty("libraries").EnumerateObject()
+                .Where(library => library.Value.GetProperty("type").GetString() == "project")
+                .Select(library => library.Name.Split('/')[0]),
+        ];
+    }
+
+    [GeneratedRegex(@"^(?<module>[A-Za-z]+)\.(Contracts|Domain|Application|Infrastructure|Api)$")]
+    private static partial Regex ModuleProjectName();
 }

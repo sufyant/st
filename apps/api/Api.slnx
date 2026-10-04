@@ -29,5 +29,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
+    <Project Path="tests/Api.IntegrationTests/Api.IntegrationTests.csproj" />
+    <Project Path="tests/SharedKernel.UnitTests/SharedKernel.UnitTests.csproj" />
   </Folder>
 </Solution>

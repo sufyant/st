@@ -12,6 +12,8 @@ Mobile and other clients can stay on old versions for a long time; the API must 
 - The API is versioned from the first day, by URL segment.
 - Tenant-scoped routes: `/v1/{tenant-slug}/...`. Routes outside a tenant: for example `/v1/me`, `/v1/invitations/...`.
 - The API does not break older clients.
+- A version is a route group (`/v1`) in the host, without a versioning library. The group also carries the result mapping (0032) and rate limiting (0035). A second version would be a second group.
+- Infrastructure endpoints (health checks, the OpenAPI document and its UI) are not versioned.
 
 ## Alternatives considered
 

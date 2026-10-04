@@ -50,3 +50,4 @@ See [0001](0001-record-architecture-decisions.md) for how records are written. T
 | 0044 | [Test tooling](0044-test-tooling.md) | Proposed |
 | 0045 | [Template scope and deferred topics](0045-template-scope.md) | Proposed |
 | 0046 | [API build and tests run as Turborepo tasks](0046-api-build-through-turborepo.md) | Proposed |
+| 0047 | [Types Wolverine discovers are public](0047-wolverine-visible-types-are-public.md) | Proposed |

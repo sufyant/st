@@ -32,6 +32,7 @@ apps/api/tests/
 ```
 
 - The weight is on module integration tests: handlers are tested against a real database.
+- Host behaviour that needs endpoints of its own (result mapping, validation, rate limiting) is tested in `Api.IntegrationTests` on a test server that composes the host's real pipeline with test endpoints and handlers. Behaviour of the composed application uses WebApplicationFactory (0044).
 - Tenant isolation suite: every `ITenantEntity` automatically gets a "cannot read or write another tenant's data" test. The tenant-scoped catalog access point (0021) is tested the same way.
 - Architecture tests and tenant isolation tests break the build.
 

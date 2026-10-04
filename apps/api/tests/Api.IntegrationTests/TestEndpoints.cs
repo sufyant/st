@@ -1,0 +1,82 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Time.Testing;
+using SharedKernel;
+using Wolverine;
+
+namespace Api.IntegrationTests;
+
+internal static class TestEndpoints
+{
+    public static void Map(RouteGroupBuilder v1)
+    {
+        v1.MapPost("/greetings", (Greet command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result<Greeting>>(command, cancellationToken));
+
+        v1.MapPost("/acknowledgements", (Acknowledge command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(command, cancellationToken));
+
+        v1.MapPost("/failures/{type}", (ErrorType type, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(new Fail(type), cancellationToken));
+
+        v1.MapPost("/explosions", (IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(new Explode(), cancellationToken));
+
+        v1.MapPost("/slow-work", (DoSlowWork command, IMessageBus bus, CancellationToken cancellationToken) =>
+            bus.InvokeAsync<Result>(command, cancellationToken));
+
+        v1.MapGet("/ping", () => Results.Ok());
+
+        v1.MapGet("/{tenantSlug}/ping", (string tenantSlug) => Results.Ok());
+    }
+}
+
+// Wolverine only discovers public handlers, messages and validators (0047).
+public sealed record Greet(string Name);
+
+public sealed record Greeting(string Text);
+
+public sealed class GreetValidator : AbstractValidator<Greet>
+{
+    public GreetValidator() => RuleFor(command => command.Name).NotEmpty();
+}
+
+public static class GreetHandler
+{
+    public static Result<Greeting> Handle(Greet command) => new Greeting($"Hello, {command.Name}");
+}
+
+public sealed record Acknowledge;
+
+public static class AcknowledgeHandler
+{
+    public static Result Handle(Acknowledge command) => Result.Success();
+}
+
+public sealed record Fail(ErrorType Type);
+
+public static class FailHandler
+{
+    public static Result Handle(Fail command) => new Error("test.failure", "The test asked for a failure.", command.Type);
+}
+
+public sealed record Explode;
+
+public static class ExplodeHandler
+{
+    public static Result Handle(Explode command) =>
+        throw new InvalidOperationException("Host=internal-db;Password=hunter2");
+}
+
+public sealed record DoSlowWork(TimeSpan Duration);
+
+public static class DoSlowWorkHandler
+{
+    public static Result Handle(DoSlowWork command, FakeTimeProvider time)
+    {
+        time.Advance(command.Duration);
+        return Result.Success();
+    }
+}

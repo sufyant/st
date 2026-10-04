@@ -19,6 +19,8 @@ The application runs on Kubernetes with many pods. The Twelve-Factor App and Nyg
 | Real time | SignalR Redis backplane, enabled by configuration (0037) |
 | Configuration | Read from the environment; no secrets in the repository |
 
+Health checks are `/health/live`, which runs no checks and answers while the process can serve, and `/health/ready`, which runs the checks tagged `ready` (dependencies such as the database). The shutdown timeout is the generic host's `shutdownTimeoutSeconds` setting (for example `DOTNET_SHUTDOWNTIMEOUTSECONDS`), 30 seconds by default; it must stay below the orchestrator's termination grace period.
+
 ## Alternatives considered
 
 - **Sticky sessions or in-pod state.** Breaks on scale-out and on pod restarts.

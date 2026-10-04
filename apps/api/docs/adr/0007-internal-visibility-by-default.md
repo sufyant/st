@@ -22,8 +22,8 @@ Project references (0006) decide which assemblies can see each other; access mod
 
 - The compiler enforces part of the boundary.
 - Each module project lists its sibling projects and test projects in `InternalsVisibleTo`.
-- Wolverine's discovery and code generation may conflict with internal types (see To verify).
+- Wolverine's discovery requires its handlers, messages and validators to be public; 0047 records that exception.
 
-## To verify
+## Verified
 
-- Whether Wolverine handler discovery and code generation work with `internal` handlers and messages (Phase 2). Record the result here, or write the exception ADR.
+- Phase 2, WolverineFx 6.45.0: Wolverine does not discover internal handler types, internal handler methods or handlers of internal messages. Its FluentValidation middleware skips internal validators without an error. The exception is recorded in 0047.

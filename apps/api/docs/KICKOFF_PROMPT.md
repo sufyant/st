@@ -22,7 +22,7 @@ Throughout: work test-first, keep each phase in scope, and never weaken a bounda
 ## Phase 2: Cross-cutting pipeline
 
 - Result and error types in SharedKernel; global exception handling to Problem Details in the host.
-- Wolverine as mediator with middleware in the host for logging, validation, transactions and duration measurement. Verify whether Wolverine works with `internal` handlers and messages.
+- Wolverine as mediator with middleware in the host for logging, validation and duration measurement. Verify whether Wolverine works with `internal` handlers and messages.
 - OpenTelemetry (OTLP export configured from the environment, console locally) and Serilog, health checks, graceful shutdown.
 - OpenAPI with Scalar and a committed OpenAPI document, URL segment versioning (`/v1/...`), per-tenant in-memory rate limiting from configuration (tenant resolution can be stubbed until Phase 3).
 
@@ -31,6 +31,7 @@ Throughout: work test-first, keep each phase in scope, and never weaken a bounda
 - Database bootstrap script for the owner, application and read-only reporting roles; migrations run as a separate step after it, never on application start. Pooled and direct connection strings.
 - ControlPlane module with the `catalog` schema: tenants (slug, status), users, memberships.
 - Tenant resolution middleware: slug from `/v1/{tenant-slug}/...`, resolved to the tenant id, membership verified, tenant set on the transaction. One transaction per tenant-scoped request.
+- Transaction middleware in the host's Wolverine pipeline: every tenant-scoped command runs in one transaction with the tenant set at its start.
 - `ITenantEntity` automation: shadow tenant column with a database default from the tenant setting, global query filter, RLS policies with `USING` and `WITH CHECK` generated into migrations.
 - Tenant context for background work: message envelopes carry the tenant id and handlers set it; a narrow `SECURITY DEFINER` lookup for cross-tenant scanners. No role gets `BYPASSRLS`.
 - Integration tests against real PostgreSQL (the Neon version) proving one tenant cannot read or write another tenant's data, applied automatically to every tenant entity, plus tests for the tenant-scoped catalog access point.

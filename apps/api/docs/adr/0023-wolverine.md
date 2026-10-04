@@ -12,6 +12,8 @@ The template needs in-process command handling, a transactional outbox and inbox
 - Wolverine (MIT) is the single tool for mediator, transactional outbox and inbox, messaging between modules and sagas.
 - It is adopted layer by layer: commands and handlers first, then the outbox, then sagas.
 - Handlers are named explicitly.
+- Handler code is generated at runtime through `WolverineFx.RuntimeCompilation` (MIT). WolverineFx 6 no longer ships the runtime compiler in its core package; the alternative, pre-generated code (`TypeLoadMode.Static`), needs a regeneration step whenever a handler changes and can be adopted later if startup time requires it.
+- The host includes each module's handler assemblies in Wolverine's discovery before it switches on the FluentValidation middleware, because validators are found only in the assemblies known at that moment.
 
 ## Alternatives considered
 
@@ -21,4 +23,5 @@ The template needs in-process command handling, a transactional outbox and inbox
 ## Consequences
 
 - Accepted tension: Wolverine relies on conventions, and Ousterhout counts obscurity as a main source of complexity. Incremental adoption and explicit handler naming offset it.
-- Visibility constraints may follow from its code generation (0007).
+- Handlers, their messages and validators must be public (0047).
+- Runtime compilation adds Roslyn to the deployment and work to the first start.
