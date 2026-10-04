@@ -1,7 +1,5 @@
 # SaaS Template: Mimari Kararlar
 
-Oct 3, 2026 · @Sufyan Taskin
-
 ## Amaç ve felsefe
 
 Template, her yeni SaaS ürününün sıfırdan değil, hazır ve sağlam bir iskeletten başlaması için kurulur. Odak: backend API ve platformu. Web, mobil ve admin istemcileri bu API'yi tüketir; dokümanda yalnızca API'yi şekillendirdikleri yerde geçerler.
@@ -14,7 +12,7 @@ Template, her yeni SaaS ürününün sıfırdan değil, hazır ve sağlam bir is
 
 ## Teknoloji yığını
 
-Backend .NET 10 üzerinde modüler monolit, frontend Next.js, veritabanı Neon üzerinde tek PostgreSQL projesi.
+Backend .NET 10 üzerinde modüler monolit, veritabanı Neon üzerinde tek PostgreSQL projesi.
 
 | Alan | Seçim | Not |
 | --- | --- | --- |
@@ -54,7 +52,7 @@ Model: tek veritabanı, paylaşımlı tablolar, tenant izolasyonu Postgres Row L
 
 **Uygulama notları:** uygulamanın DB kullanıcısı tablo sahibi olmaz ve RLS zorunlu tutulur; tenant ayarı bağlantı havuzuyla uyumlu olması için transaction kapsamlı set edilir.
 
-**Catalog şeması:** ControlPlane modülünün sahibi olduğu, tenant üstü tek şema. İçinde tenant'lar, kullanıcılar (tek kimlik, birden çok tenant'a üye olabilir), tenant-kullanıcı üyelikleri, roller ve abonelik bilgisi durur. RLS yoktur, süper admin dünyasıdır. Catalog ile tenant şemaları arasında foreign key kurulmaz; tutarlılık uygulama katmanındadır, böylece bir tenant'ı ileride ayrı veritabanına taşımak engellenmez.
+**Catalog şeması:** ControlPlane modülünün sahibi olduğu, tenant üstü tek şema. İçinde tenant'lar, kullanıcılar (tek kimlik, birden çok tenant'a üye olabilir), tenant-kullanıcı üyelikleri, roller, system adminleri ve abonelik bilgisi durur. RLS yoktur, system admin dünyasıdır. Catalog ile tenant şemaları arasında foreign key kurulmaz; tutarlılık uygulama katmanındadır, böylece bir tenant'ı ileride ayrı veritabanına taşımak engellenmez.
 
 ## Modüler monolit
 
@@ -64,7 +62,7 @@ Tek deploy edilen bir host, içinde sınırları sıkı modüller. Her modül ke
 
 | Modül | Sorumluluk | Şema | RLS |
 | --- | --- | --- | --- |
-| ControlPlane | Tenant'lar, kullanıcılar, üyelikler, roller ve izinler, abonelik, onboarding saga'sı | `catalog` | Yok |
+| ControlPlane | Tenant'lar, kullanıcılar, üyelikler, roller ve izinler, system adminleri, abonelik, onboarding saga'sı | `catalog` | Yok |
 | Billing | Tenant içi faturalama | kendi şeması | Var |
 | Notifications | Bildirim kanalları, kullanıcı tanımlı zamanlanmış bildirimler | kendi şeması | Var |
 | Audit | Denetim kaydı | kendi şeması | Var |
@@ -110,7 +108,7 @@ Kural: mümkünse event, mecbursa açık sözleşmeyle senkron çağrı, asla ba
 
 | Katman | Örnek | Kimin için | Nerede |
 | --- | --- | --- | --- |
-| API tipleri | `CreateTenantRequest`, `TenantResponse` | Frontend ve mobil; OpenAPI'ye yansır | `X.Api` |
+| API tipleri | `CreateTenantRequest`, `TenantResponse` | API istemcileri; OpenAPI'ye yansır | `X.Api` |
 | Uygulama tipleri | `CreateTenantCommand` | Modül içi orkestrasyon | `X.Application` |
 | Modül sözleşmesi | `TenantSummary`, `IControlPlaneModule`, integration event'ler | Diğer modüller | `X.Contracts` |
 
@@ -135,21 +133,32 @@ Her iki tür de sunucuda tetiklenir; çok pod'da Hangfire'ın dağıtık kilidi 
 
 ## Kimlik, rol ve izinler
 
-Clerk sadece kimliği doğrular. Kullanıcının hangi tenant'ta olduğu, rolü ve izinleri bizim catalog şemamızdadır; böylece auth sağlayıcı değiştirilebilir kalır. Kimlik token merkezlidir; web ve mobil aynı kapıdan girer.
+Clerk sadece kimliği doğrular. Kullanıcının hangi tenant'ta olduğu, rolü ve izinleri bizim catalog şemamızdadır; böylece auth sağlayıcı değiştirilebilir kalır. Kimlik token merkezlidir; bütün istemciler aynı kapıdan girer.
 
 **Üç katman:**
 
 1. **İzin havuzu:** Kodda sabit tanımlı (`invoices.delete` gibi). Tenant izin üretemez, çünkü izin koddaki gerçek yeteneğe bağlıdır.
-2. **Roller:** Sistem rolleri (sahip, admin, üye, görüntüleyici) her tenant'ta hazır gelir, silinemez. Tenant ayrıca havuzdan seçerek kendi custom rollerini üretir.
+2. **Roller:** Yerleşik roller (built-in: sahip, admin, üye, görüntüleyici) her tenant'ta hazır gelir, silinemez. Tenant ayrıca havuzdan seçerek kendi custom rollerini üretir.
 3. **Üyelik:** Rol kullanıcıya değil, kullanıcı + tenant ikilisine bağlıdır. Aynı kişi bir tenant'ta admin, ötekinde görüntüleyici olabilir.
 
 **Kod rolü değil izni kontrol eder.** "Admin mi?" yerine "Bu izni var mı?" sorulur; custom roller koda dokunmadan çalışır.
 
 Güvenlik karşılığı (OWASP API Top 10): nesne seviyesi yetkilendirmeyi RLS, fonksiyon seviyesini izin sistemi, alan seviyesini ayrı response DTO'ları kapatır. Yetkilendirme davranışı testle doğrulanır.
 
+### System adminleri
+
+System adminleri (Golding'in terimi; SaaS sağlayıcısının kendi personeli) ayrı bir kişi tipi değil, tek kimliğe eklenen ek bir yetkidir.
+
+- **Yer:** catalog şemasında ayrı bir `system_admins` tablosu (kullanıcı, system rolü, kim verdi, ne zaman verdi). `users` tablosuna bayrak konmaz; kimin verdiği izlenemez ve farklı system rolleri (destek, faturalama) eklenemez.
+- **Ayrı izin havuzu:** System izinleri (`system.tenants.suspend` gibi) tenant izinlerinden ayrıdır; tenant'ın custom rolleri bunları seçemez.
+- **Tenant verisine erişim, tenant bağlamına girerek:** Admin bir tenant seçer, o tenant transaction'a set edilir, RLS normal çalışır. Her giriş audit'e yazılır.
+- **Tenant'lar arası rapor:** Sadece admin endpoint'lerinin kullandığı, RLS'i atlayan ayrı ve salt okunur bir DB rolü. Uygulamanın normal DB kullanıcısı bu yetkiyi asla almaz.
+- **Admin API:** Aynı host içinde ayrı route grubu ve ayrı yetkilendirme politikası; ayrı host şimdilik gereksiz.
+- **MFA zorunlu.**
+
 ## API tasarımı
 
-Bütün hatalar tek formatta döner: Problem Details (RFC 9457). Frontend ve mobil hatayı tek yerde yorumlar.
+Bütün hatalar tek formatta döner: Problem Details (RFC 9457). İstemciler hatayı tek yerde yorumlar.
 
 - **Beklenen hatalar** ("email zaten kayıtlı", "bulunamadı", "yetki yok") exception değildir; handler bir Result döner, host onu doğru HTTP koduna ve Problem Details'e çevirir.
 - **Beklenmeyen hatalar** tek bir global exception handler'da yakalanır; kullanıcıya güvenli genel mesaj, loglara tam detay. Stack trace asla dışarı çıkmaz.
@@ -157,7 +166,7 @@ Bütün hatalar tek formatta döner: Problem Details (RFC 9457). Frontend ve mob
 - **Versiyonlama ilk günden.** İstemciler eski sürümde kalabileceği için zorunlu; API eski istemciyi kırmaz.
 - **Verimli cevaplar:** sayfalama varsayılan, gereksiz büyük cevap yok.
 - **Tenant başına rate limit:** gürültülü komşuyu ve kaynak tüketimi saldırısını sınırlar.
-- **OpenAPI tek kaynak:** Minimal API'den şema üretilir, XML yorumları açıklamaya girer. Arayüz Scalar. Frontend tipleri ve API fonksiyonları şemadan generate edilir (`npm run generate`).
+- **OpenAPI tek kaynak:** Minimal API'den şema üretilir, XML yorumları açıklamaya girer. Arayüz Scalar. İstemci tipleri ve API fonksiyonları şemadan üretilir.
 
 ## Bildirimler ve gerçek zamanlı
 
@@ -238,6 +247,7 @@ Kararların büyük çoğunluğu kaynaklarla doğrudan uyumlu. Altı noktada bil
 | Modüler monolitle başla, gerekirse kopar | Richards ve Ford, *Fundamentals of Software Architecture* 2. baskı; Jovanović 2026 rehberleri |
 | Modül = bounded context, kendi verisi ve şeması | Evans, *Domain-Driven Design*; Vernon, Khononov |
 | Paylaşımlı DB + RLS, tenant detayı merkezde gizli | Golding, *Building Multi-Tenant SaaS Architectures*; Azure multitenant rehberi |
+| ControlPlane, system admin terimleri | Golding, *Building Multi-Tenant SaaS Architectures* |
 | RLS + izin sistemi + ayrı DTO | OWASP API Security Top 10 (BOLA, BFLA, BOPLA) |
 | Outbox, idempotent tüketici, orkestrasyon saga | Richardson, *Microservices Patterns*; Kleppmann, *DDIA* 2. baskı |
 | Mimari testler | Ford, Parsons, Kua, *Building Evolutionary Architectures* (fitness function) |
@@ -273,9 +283,9 @@ Aşağıdakiler kod iskeletini değiştirmediği için sonraya bırakıldı:
 - Dosya ve medya yönetimi (ilke: nesne deposu, tenant bazlı ayrım)
 - E-posta şablonları
 - Arama
-- Admin portal ve mobil istemcinin iç yapısı
+- System admin konsolu ve istemcilerin iç yapısı
 
 Açık sorular:
 
 - [ ] Catalog'daki roller ve üyelikler için uygulama katmanı izolasyonu yeterli mi, yoksa bu tablolara da RLS mi konmalı?
-- [ ] Süper admin portalı ayrı bir host mu, aynı API'de ayrı bir route grubu mu?
+- [x] System admin konsolu: aynı API'de ayrı route grubu (bkz. System adminleri).
