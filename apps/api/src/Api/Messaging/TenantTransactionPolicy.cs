@@ -9,7 +9,7 @@ namespace Api.Messaging;
 
 // Wraps every handler in TenantTransactionMiddleware. A plain middleware type cannot see what the handler returned: Wolverine
 // binds middleware parameters by exact type, and a handler returns Result<T> as often as Result. So the policy hands the
-// handler's return value to the commit itself.
+// handler's Result to the commit itself, also when it is one element of a tuple that carries the messages the handler sends.
 internal sealed class TenantTransactionPolicy : IHandlerPolicy
 {
     public void Apply(IReadOnlyList<HandlerChain> chains, GenerationRules rules, IServiceContainer container)
@@ -24,8 +24,8 @@ internal sealed class TenantTransactionPolicy : IHandlerPolicy
     private static MethodCall CommitFor(HandlerChain chain)
     {
         var result = chain.Handlers
-            .Select(handler => handler.ReturnVariable)
-            .FirstOrDefault(returned => returned is not null && typeof(Result).IsAssignableFrom(returned.VariableType));
+            .SelectMany(handler => handler.Creates)
+            .FirstOrDefault(returned => typeof(Result).IsAssignableFrom(returned.VariableType));
 
         if (result is null)
         {

@@ -13,7 +13,7 @@ internal sealed class Tenant
 
     public Guid Id { get; private init; }
 
-    /// <summary>The tenant's name in URLs (<c>/v1/{slug}/...</c>); it cannot change for now (0015).</summary>
+    /// <summary>The tenant's name in URLs (<c>/v1/tenants/{slug}/...</c>); it cannot change for now (0015).</summary>
     public string Slug { get; private init; }
 
     public TenantStatus Status { get; private set; }
@@ -25,7 +25,22 @@ internal sealed class Tenant
                 "tenant.slug_invalid",
                 "A slug is 3 to 63 lowercase letters, digits and single hyphens, and starts and ends with a letter or digit.");
 
-    public void Activate() => Status = TenantStatus.Active;
+    /// <summary>Ends the tenant's onboarding (0026). Only a provisioning tenant becomes active.</summary>
+    public bool Activate() => Leave(TenantStatus.Active);
+
+    /// <summary>Compensates a failed onboarding (0026). Only a provisioning tenant fails; an active one stays active.</summary>
+    public bool Fail() => Leave(TenantStatus.Failed);
+
+    private bool Leave(TenantStatus status)
+    {
+        if (Status != TenantStatus.Provisioning)
+        {
+            return false;
+        }
+
+        Status = status;
+        return true;
+    }
 
     private static bool IsUrlSafe(string slug) =>
         slug.Length is >= 3 and <= 63

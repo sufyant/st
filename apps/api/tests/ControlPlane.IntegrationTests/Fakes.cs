@@ -37,3 +37,10 @@ public sealed class FakeInvitationSender : IInvitationSender
 
     public Uri LinkSentTo(string email) => Sent.Single(sent => sent.Email == email).Link;
 }
+
+// An email channel that is down.
+public sealed class FailingInvitationSender : IInvitationSender
+{
+    public Task SendAsync(string email, Uri link, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException("The email channel is down.");
+}

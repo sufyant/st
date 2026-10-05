@@ -70,7 +70,6 @@ namespace ControlPlane.Infrastructure.Migrations
                         .HasColumnName("tenant_id");
 
                     b.Property<string>("TokenHash")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("token_hash");

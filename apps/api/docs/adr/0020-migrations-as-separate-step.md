@@ -12,6 +12,8 @@ Several pods start at the same time, and the application role must not own table
 - Migrations run as a separate, one-off step, never on application start.
 - Order: the bootstrap script (0018), then the migrations.
 - **The step is a command of the host:** `dotnet Api.dll migrate`. It builds the same service container as the application, runs every registered module migrator (`IModuleMigrator`, 0048) over `ConnectionStrings:Migrations` (the owner, 0019), and exits without serving requests. Without that setting it fails.
+- **The step also creates the message storage** (0024). After the modules, it creates or updates the `wolverine` schema as the owner, with Wolverine's own schema migration and the configuration the application uses. It then grants the application role the use of the schema's tables and sequences. No module owns that schema.
+- **Starting never migrates.** The application tells Wolverine not to build its storage (`AutoCreate.None`). Wolverine then checks at start that the storage exists and refuses to start without it, so an application whose database was not migrated does not start (0038).
 - **Each module owns its migrations**, in its Infrastructure project, with its own history table (`__ef_migrations_history`) in its own schema (0008).
 - **Writing a migration:** migrations are written with the repository's local `dotnet-ef` tool:
 

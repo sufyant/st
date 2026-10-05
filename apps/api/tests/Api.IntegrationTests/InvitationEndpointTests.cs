@@ -53,6 +53,41 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         body.EnumerateObject().Select(property => property.Name).ShouldBe(["id", "email", "roleId", "status", "expiresAt"], ignoreOrder: true);
     }
 
+    // The token travels only in the link the delivery sends; the stored messages that carried the invitation never held it (0029).
+    [Fact]
+    public async Task No_stored_message_holds_an_invitation_token()
+    {
+        var tenant = await _catalog.AddTenantAsync();
+        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
+        var email = $"{Guid.NewGuid():N}@example.com";
+        _api.Identity.AddAccount($"user_{Guid.NewGuid():N}", email);
+        var invited = await _api.WaitingForMessagesAsync(() => InviteAsync(tenant.Slug, owner, email, "Member"));
+        var invitationId = (await invited.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetString()!;
+
+        var holdingTheInvitation = await StoredMessagesHoldingAsync(invitationId);
+        var holdingTheToken = await StoredMessagesHoldingAsync(_api.Sender.TokenSentTo(email));
+
+        holdingTheInvitation.ShouldBeGreaterThan(0);
+        holdingTheToken.ShouldBe(0);
+    }
+
+    // Clerk is asked before the acceptance locks the invitation, never while its transaction holds the lock.
+    [Fact]
+    public async Task Accepting_asks_the_identity_provider_before_locking_the_invitation()
+    {
+        var tenant = await _catalog.AddTenantAsync();
+        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
+        var (invitee, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Member");
+        var lockedWhileAsked = false;
+        _api.Identity.WhileReadingVerifiedEmails = async () =>
+            lockedWhileAsked = await database.IsLockedAsync($"SELECT 1 FROM catalog.invitations WHERE tenant_id = '{tenant.Id}' FOR UPDATE NOWAIT");
+
+        var accepted = await AcceptAsync(invitee, token);
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
+        lockedWhileAsked.ShouldBeFalse();
+    }
+
     [Fact]
     public async Task An_invitation_token_cannot_be_used_twice()
     {
@@ -167,7 +202,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         var invitee = $"user_{Guid.NewGuid():N}";
         var email = $"{Guid.NewGuid():N}@example.com";
         _api.Identity.AddAccount(invitee, email);
-        (await InviteAsync(slug, inviter, email, builtInRole)).EnsureSuccessStatusCode();
+        (await _api.WaitingForMessagesAsync(() => InviteAsync(slug, inviter, email, builtInRole))).EnsureSuccessStatusCode();
 
         return (invitee, _api.Sender.TokenSentTo(email));
     }
@@ -180,6 +215,14 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
 
     private Task<HttpResponseMessage> AcceptAsync(string userId, string token) =>
         _api.CreateClient(userId).PostAsJsonAsync("/v1/invitations/accept", new { token }, Cancellation);
+
+    private Task<long> StoredMessagesHoldingAsync(string text) =>
+        database.ScalarAsync<long>(
+            $"""
+            SELECT (SELECT count(*) FROM wolverine.wolverine_incoming_envelopes WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
+                 + (SELECT count(*) FROM wolverine.wolverine_outgoing_envelopes WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
+                 + (SELECT count(*) FROM wolverine.wolverine_dead_letters WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
+            """);
 
     private static async Task<string?> CodeOfAsync(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString();

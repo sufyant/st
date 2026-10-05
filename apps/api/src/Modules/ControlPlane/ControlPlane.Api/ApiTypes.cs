@@ -21,3 +21,9 @@ public sealed record AcceptInvitationRequest(string Token);
 public sealed record AcceptedInvitationResponse(string TenantSlug);
 
 public sealed record TenantSummaryResponse(Guid Id, string Slug, string Status, int MemberCount);
+
+/// <summary>A new tenant, and the email address of its first owner, who is invited once the tenant is ready.</summary>
+public sealed record CreateTenantRequest(string Slug, string OwnerEmail);
+
+/// <summary>A tenant and where its onboarding stands: provisioning, active or failed.</summary>
+public sealed record TenantResponse(Guid Id, string Slug, string Status);

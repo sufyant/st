@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
@@ -19,7 +21,8 @@ internal sealed class ApiFactory(
     string? environment = null,
     IReadOnlyList<string>? authorizedParties = null,
     bool fakeInvitationSender = true,
-    Action<IServiceCollection>? configureServices = null) : WebApplicationFactory<Program>
+    Action<IServiceCollection>? configureServices = null,
+    string? directConnectionString = null) : WebApplicationFactory<Program>
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
 
@@ -34,10 +37,32 @@ internal sealed class ApiFactory(
         return client;
     }
 
+    // Runs the action and waits until every message it caused has been handled, such as the delivery of an invitation (0029).
+    public async Task<T> WaitingForMessagesAsync<T>(Func<Task<T>> action)
+    {
+        var result = default(T)!;
+        await Tracking().ExecuteAndWaitAsync(RunAsync);
+
+        return result;
+
+        async Task RunAsync(IMessageContext _) => result = await action();
+    }
+
+    // The same, for a test that expects a message to fail and inspects what became of it.
+    public Task<ITrackedSession> TrackMessagesAsync(Func<Task> action)
+    {
+        return Tracking().DoNotAssertOnExceptionsDetected().ExecuteAndWaitAsync(RunAsync);
+
+        Task RunAsync(IMessageContext _) => action();
+    }
+
+    private TrackedSessionConfiguration Tracking() => Services.GetRequiredService<IHost>().TrackActivity().Timeout(TimeSpan.FromSeconds(30));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment ?? Environments.Development);
         builder.UseSetting("ConnectionStrings:Pooled", pooledConnectionString);
+        builder.UseSetting("ConnectionStrings:Direct", directConnectionString ?? pooledConnectionString);
         builder.UseSetting("ConnectionStrings:Migrations", migrationsConnectionString);
         builder.UseSetting("ConnectionStrings:Reporting", reportingConnectionString);
         builder.UseSetting("Invitations:AcceptUrl", AcceptUrl);

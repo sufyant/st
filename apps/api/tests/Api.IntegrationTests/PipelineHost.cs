@@ -45,7 +45,11 @@ internal sealed class PipelineHost : IAsyncDisposable
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(DefaultSettings);
         builder.Configuration.AddInMemoryCollection(TestTokens.Settings);
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Pooled"] = database.ApplicationConnectionString });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Pooled"] = database.ApplicationConnectionString,
+            ["ConnectionStrings:Direct"] = database.ApplicationConnectionString,
+        });
         builder.Configuration.AddInMemoryCollection(settings ?? new Dictionary<string, string?>());
 
         builder.AddApiPipeline(typeof(PipelineHost).Assembly);

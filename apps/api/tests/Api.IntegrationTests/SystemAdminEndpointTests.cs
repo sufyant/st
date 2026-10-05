@@ -79,7 +79,8 @@ public sealed class SystemAdminEndpointTests(Database database) : IAsyncLifetime
         _api.Identity.AddAccount(owner, email);
         var ownerRole = await database.ScalarAsync<Guid>("SELECT id FROM catalog.roles WHERE built_in = 'Owner'");
 
-        var invited = await admin.PostAsJsonAsync($"/v1/admin/tenants/{tenant.Slug}/invitations", new { email, roleId = ownerRole }, Cancellation);
+        var invited = await _api.WaitingForMessagesAsync(() =>
+            admin.PostAsJsonAsync($"/v1/admin/tenants/{tenant.Slug}/invitations", new { email, roleId = ownerRole }, Cancellation));
         await _api.CreateClient(owner).PostAsJsonAsync("/v1/invitations/accept", new { token = _api.Sender.TokenSentTo(email) }, Cancellation);
 
         invited.StatusCode.ShouldBe(HttpStatusCode.OK);

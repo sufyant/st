@@ -4,6 +4,7 @@ using ControlPlane.Application.Members;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Reports;
 using ControlPlane.Application.Roles;
+using ControlPlane.Application.Tenants;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using SharedKernel;
@@ -33,11 +34,13 @@ public static class ControlPlaneEndpoints
                     .Map(ToResponse))
             .RequireAuthorization(Permissions.MembersInvite);
 
-        // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there (0029).
+        // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there (0029). The
+        // identity provider is asked first, so its call never runs while the acceptance holds the invitation locked.
         v1.MapPost("/invitations/accept", async (
             AcceptInvitationRequest request,
             ClaimsPrincipal user,
             IInvitationDirectory invitations,
+            IIdentityProvider identity,
             IMessageBus bus,
             CancellationToken cancellationToken) =>
         {
@@ -46,8 +49,9 @@ public static class ControlPlaneEndpoints
                 return (Result<AcceptedInvitationResponse>)InvitationNotFound;
             }
 
+            var verifiedEmails = await identity.FindVerifiedEmailsAsync(user.Id(), cancellationToken);
             var accepted = await bus.InvokeForTenantAsync<Result<InvitationAccepted>>(
-                tenantId.ToString(), new AcceptInvitation(request.Token, user.Id()), cancellationToken);
+                tenantId.ToString(), new AcceptInvitation(request.Token, user.Id(), verifiedEmails), cancellationToken);
             return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
         });
 
@@ -56,6 +60,15 @@ public static class ControlPlaneEndpoints
                     new ListTenants(page ?? 1, pageSize ?? PagedList<TenantSummary>.DefaultPageSize), cancellationToken))
                     .Map(tenants => tenants.Map(summary => new TenantSummaryResponse(summary.Id, summary.Slug, summary.Status, summary.MemberCount))))
             .RequireAuthorization(Permissions.SystemTenantsRead);
+
+        // Onboarding runs inside the tenant it creates (0026). The tenant's id is chosen here, by the server, never by the client.
+        admin.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
+                (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
+                    Guid.CreateVersion7(time.GetUtcNow()).ToString(),
+                    new StartTenantOnboarding(user.Id(), request.Slug, request.OwnerEmail),
+                    cancellationToken))
+                    .Map(tenant => new TenantResponse(tenant.Id, tenant.Slug, tenant.Status)))
+            .RequireAuthorization(Permissions.SystemTenantsCreate);
 
         adminTenant.MapPost("/invitations", async (InvitationRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
                 (await bus.InvokeAsync<Result<InvitationDetails>>(

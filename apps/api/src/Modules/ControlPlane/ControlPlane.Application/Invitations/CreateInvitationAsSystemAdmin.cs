@@ -18,11 +18,9 @@ public sealed class CreateInvitationAsSystemAdminValidator : AbstractValidator<C
 
 public static class CreateInvitationAsSystemAdminHandler
 {
-    public static async Task<Result<InvitationDetails>> HandleAsync(
+    public static async Task<(Result<InvitationDetails>, DeliverInvitation?)> HandleAsync(
         CreateInvitationAsSystemAdmin command,
         ITenantCatalog catalog,
-        IIdentityProvider identity,
-        IInvitationSender sender,
         InvitationSettings settings,
         TimeProvider time,
         CancellationToken cancellationToken)
@@ -32,10 +30,9 @@ public static class CreateInvitationAsSystemAdminHandler
 
         if (await catalog.FindRoleAsync(command.RoleId, cancellationToken) is not { } role)
         {
-            return Errors.RoleNotFound;
+            return (Errors.RoleNotFound, null);
         }
 
-        return await InvitationIssuer.IssueAsync(
-            command.Email, role, admin.Id, new(catalog, identity, sender, settings, time), cancellationToken);
+        return await InvitationIssuer.IssueAsync(command.Email, role, admin.Id, catalog, settings, time, cancellationToken);
     }
 }

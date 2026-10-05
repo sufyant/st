@@ -16,11 +16,9 @@ public sealed class CreateInvitationValidator : AbstractValidator<CreateInvitati
 
 public static class CreateInvitationHandler
 {
-    public static async Task<Result<InvitationDetails>> HandleAsync(
+    public static async Task<(Result<InvitationDetails>, DeliverInvitation?)> HandleAsync(
         CreateInvitation command,
         ITenantCatalog catalog,
-        IIdentityProvider identity,
-        IInvitationSender sender,
         InvitationSettings settings,
         TimeProvider time,
         CancellationToken cancellationToken)
@@ -28,20 +26,19 @@ public static class CreateInvitationHandler
         var actor = await Actor.FindAsync(catalog, command.ActorId, cancellationToken);
         if (!actor.IsSuccess)
         {
-            return actor.Error;
+            return (actor.Error, null);
         }
 
         if (await catalog.FindRoleAsync(command.RoleId, cancellationToken) is not { } role)
         {
-            return Errors.RoleNotFound;
+            return (Errors.RoleNotFound, null);
         }
 
         if (RoleGrant.Allows(actor.Value.Permissions, role.Permissions) is { IsSuccess: false } refused)
         {
-            return refused.Error;
+            return (refused.Error, null);
         }
 
-        return await InvitationIssuer.IssueAsync(
-            command.Email, role, actor.Value.UserId, new(catalog, identity, sender, settings, time), cancellationToken);
+        return await InvitationIssuer.IssueAsync(command.Email, role, actor.Value.UserId, catalog, settings, time, cancellationToken);
     }
 }

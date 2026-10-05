@@ -9,7 +9,7 @@ Modules must cooperate without knowing each other's internals. Richardson (*Micr
 
 ## Decision
 
-- **Event (default).** The publishing module publishes an integration event defined in its `*.Contracts` (for example `TenantCreatedEvent`) through the outbox (0024). It does not know its subscribers; adding a subscriber does not touch the publisher.
+- **Event (default).** The publishing module publishes an integration event defined in its `*.Contracts` through the outbox (0024); the first is `TenantActivated` (0026). It does not know its subscribers; adding a subscriber does not touch the publisher.
 - **Synchronous call (only when the caller needs an answer now).** An interface in `*.Contracts` (for example `IControlPlaneModule`), implemented in the owning module's Infrastructure and wired through DI. It is an in-memory method call, never HTTP.
 - A module never accesses another module's internal code.
 

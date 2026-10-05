@@ -7,9 +7,10 @@ namespace ControlPlane.Application.Invitations;
 
 /// <summary>
 /// Accepts an invitation in its tenant: the catalog user, when new, and the membership are created in the same transaction as
-/// the invitation is used up (0029).
+/// the invitation is used up (0029). The user's verified email addresses are read from the identity provider before that
+/// transaction begins, so no call leaves the process while the invitation is locked.
 /// </summary>
-public sealed record AcceptInvitation(string Token, string UserId);
+public sealed record AcceptInvitation(string Token, string UserId, IReadOnlyList<string> VerifiedEmails);
 
 public sealed record InvitationAccepted(string TenantSlug);
 
@@ -18,7 +19,6 @@ public static class AcceptInvitationHandler
     public static async Task<Result<InvitationAccepted>> HandleAsync(
         AcceptInvitation command,
         ITenantCatalog catalog,
-        IIdentityProvider identity,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
@@ -35,7 +35,7 @@ public static class AcceptInvitationHandler
         }
 
         var user = existing ?? new User(Guid.CreateVersion7(now), command.UserId);
-        var accepted = invitation.Accept(await identity.FindVerifiedEmailsAsync(command.UserId, cancellationToken), user.Id, now);
+        var accepted = invitation.Accept(command.VerifiedEmails, user.Id, now);
         if (!accepted.IsSuccess)
         {
             return accepted.Error;

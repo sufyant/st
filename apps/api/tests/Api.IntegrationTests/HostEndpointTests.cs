@@ -28,11 +28,24 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    // Wolverine registers the node and checks its message storage while it starts, so the database must be there (0038).
     [Fact]
-    public async Task Without_its_database_the_application_is_live_but_not_ready()
+    public async Task Without_its_database_the_application_does_not_start()
     {
         await using var api = new ApiFactory("Host=127.0.0.1;Port=1;Username=nobody;Password=none;Timeout=1");
+
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<AggregateException>();
+    }
+
+    [Fact]
+    public async Task When_its_database_goes_away_the_application_is_live_but_not_ready()
+    {
+        var name = await database.CreateMigratedDatabaseAsync();
+        await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, name));
         var client = api.CreateClient();
+        await database.CloseAsync(name);
 
         var live = await client.GetAsync("/health/live", TestContext.Current.CancellationToken);
         var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
@@ -67,6 +80,29 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         var ready = await ReadyStatusAsync(bypassing);
 
         ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    // The direct connection is the application's too: Wolverine keeps its messages over it (0019).
+    [Fact]
+    public async Task Connected_as_the_owner_over_the_direct_connection_the_application_is_not_ready()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: database.OwnerConnectionString);
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    // Like the pooled one, the setting is checked once the application runs rather than on start: the build starts the host to
+    // write the OpenAPI document, without any connection (0019, 0036).
+    [Fact]
+    public async Task Without_the_direct_connection_the_application_is_not_ready()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: "");
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
 
     // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted (0028).
@@ -109,9 +145,9 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
-    private static async Task<HttpStatusCode> ReadyStatusAsync(string pooledConnectionString)
+    private async Task<HttpStatusCode> ReadyStatusAsync(string pooledConnectionString)
     {
-        await using var api = new ApiFactory(pooledConnectionString);
+        await using var api = new ApiFactory(pooledConnectionString, directConnectionString: database.ApplicationConnectionString);
         var response = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
 
         return response.StatusCode;

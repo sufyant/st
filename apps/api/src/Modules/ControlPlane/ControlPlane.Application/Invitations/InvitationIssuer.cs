@@ -4,40 +4,27 @@ using ControlPlane.Domain.Roles;
 
 namespace ControlPlane.Application.Invitations;
 
-// Issuing an invitation, whoever asks for it: the record with the token's hash, a provider invitation for someone without an
-// account, and the link sent to the invited person (0029).
+// Issuing an invitation, whoever asks for it: the record is saved in the command's transaction, and its delivery is a message the
+// outbox sends once that transaction commits (0029). Nothing here calls out of the process.
 internal static class InvitationIssuer
 {
-    public static async Task<InvitationDetails> IssueAsync(
+    public static async Task<(InvitationDetails Invitation, DeliverInvitation Delivery)> IssueAsync(
         string email,
         Role role,
         Guid invitedBy,
-        InvitationServices services,
+        ITenantCatalog catalog,
+        InvitationSettings settings,
+        TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var now = services.Time.GetUtcNow();
-        var token = InvitationToken.Generate();
-        var invitation = Invitation.Create(
-            Guid.CreateVersion7(now), services.Catalog.TenantId, email, role, invitedBy, token, now, services.Settings.Lifetime);
+        var now = time.GetUtcNow();
+        var invitation = Invitation.Create(Guid.CreateVersion7(now), catalog.TenantId, email, role, invitedBy, now, settings.Lifetime);
 
-        var acceptLink = services.Settings.AcceptLink(token);
-        var link = await services.Identity.HasAccountAsync(invitation.Email, cancellationToken)
-            ? acceptLink
-            : await services.Identity.InviteAsync(invitation.Email, invitation.Id, acceptLink, cancellationToken);
+        catalog.Add(invitation);
+        await catalog.SaveChangesAsync(cancellationToken);
 
-        services.Catalog.Add(invitation);
-        await services.Catalog.SaveChangesAsync(cancellationToken);
-
-        // Sent after the record is saved; if sending fails, the transaction is not committed and the invitation does not exist.
-        await services.Sender.SendAsync(invitation.Email, link, cancellationToken);
-
-        return new InvitationDetails(invitation.Id, invitation.Email, invitation.RoleId, invitation.Status.ToString(), invitation.ExpiresAt);
+        return (
+            new InvitationDetails(invitation.Id, invitation.Email, invitation.RoleId, invitation.Status.ToString(), invitation.ExpiresAt),
+            new DeliverInvitation(invitation.Id));
     }
 }
-
-internal sealed record InvitationServices(
-    ITenantCatalog Catalog,
-    IIdentityProvider Identity,
-    IInvitationSender Sender,
-    InvitationSettings Settings,
-    TimeProvider Time);

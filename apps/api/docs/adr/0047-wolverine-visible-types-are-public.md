@@ -39,4 +39,4 @@ Module types are internal by default (0007), and 0007 asks for a narrow exceptio
 - Other modules still cannot reach these types: the reference rules and their architecture tests (0006) forbid any module from depending on another module's `X.Application`.
 - The boundary inside a module (Application versus Infrastructure, Domain and Api) is weaker for these types, because the compiler no longer hides them.
 - A handler or validator added with the wrong visibility fails the architecture tests instead of being skipped at runtime.
-- Saga classes (Phase 5, 0025) fall under the same rule, and the architecture tests are extended to them when the first saga is written.
+- The onboarding saga (Phase 5, 0025) uses no Wolverine `Saga` class: its steps and its compensation are ordinary handlers named `*Handler`, which the existing rules cover.

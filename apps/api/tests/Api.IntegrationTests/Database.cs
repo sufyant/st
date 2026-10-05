@@ -1,3 +1,4 @@
+using Api.Persistence;
 using ControlPlane.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -12,7 +13,8 @@ using Testcontainers.PostgreSql;
 namespace Api.IntegrationTests;
 
 // One PostgreSQL 18 server for the test assembly (0011). Its main database is set up the way a deployment is: the bootstrap
-// script, then every module's migrations as the owner (0018, 0020). The probe tables stand in for a module's tenant entity.
+// script, then every module's migrations and the message storage as the owner (0018, 0020). The probe tables stand in for a
+// module's tenant entity.
 public sealed class Database : IAsyncLifetime
 {
     private const string Password = "test-password";
@@ -30,15 +32,7 @@ public sealed class Database : IAsyncLifetime
         await _container.CopyAsync(await File.ReadAllBytesAsync("bootstrap.sql"), "/tmp/bootstrap.sql");
         await RunBootstrapScriptAsync(MainDatabase);
 
-        await using var services = new ServiceCollection()
-            .AddTenancy(_ => ApplicationConnectionString)
-            .AddControlPlaneModule()
-            .BuildServiceProvider();
-        foreach (var migrator in services.GetServices<IModuleMigrator>())
-        {
-            await migrator.MigrateAsync(services, OwnerConnectionString, CancellationToken.None);
-        }
-
+        await MigrateAsync(MainDatabase);
         await CreateProbesAsOwnerAsync();
     }
 
@@ -51,6 +45,46 @@ public sealed class Database : IAsyncLifetime
             Password = Password,
             Database = database,
         }.ConnectionString;
+
+    // A database set up the way a deployment is, for a test that must not disturb the main one.
+    public async Task<string> CreateMigratedDatabaseAsync()
+    {
+        var name = await CreateEmptyDatabaseAsync();
+        await MigrateAsync(name);
+        return name;
+    }
+
+    // As when the database goes away under a running application: nobody can connect any more, and open sessions end.
+    public async Task CloseAsync(string database)
+    {
+        await using var connection = new NpgsqlConnection(SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var close = new NpgsqlCommand(
+            $"""
+            ALTER DATABASE {database} ALLOW_CONNECTIONS false;
+            SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{database}';
+            """,
+            connection);
+        await close.ExecuteNonQueryAsync();
+    }
+
+    // Whether another transaction holds a lock on the rows the query selects FOR UPDATE NOWAIT.
+    public async Task<bool> IsLockedAsync(string selectForUpdateNoWait)
+    {
+        await using var connection = new NpgsqlConnection(ApplicationConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using var command = new NpgsqlCommand(selectForUpdateNoWait, connection, transaction);
+        try
+        {
+            await command.ExecuteNonQueryAsync();
+            return false;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.LockNotAvailable)
+        {
+            return true;
+        }
+    }
 
     public string SuperuserConnectionString =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = MainDatabase }.ConnectionString;
@@ -90,6 +124,16 @@ public sealed class Database : IAsyncLifetime
         var value = await command.ExecuteScalarAsync();
 
         return value is null or DBNull ? default : (T)value;
+    }
+
+    private async Task MigrateAsync(string database)
+    {
+        await using var services = new ServiceCollection()
+            .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
+            .AddControlPlaneModule()
+            .BuildServiceProvider();
+
+        await MigrationStep.RunAsync(services, ConnectionStringFor(DatabaseRoles.Owner, database), CancellationToken.None);
     }
 
     private async Task RunBootstrapScriptAsync(string database)

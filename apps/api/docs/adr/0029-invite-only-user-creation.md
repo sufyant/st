@@ -22,7 +22,7 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
 
 - **The record.** `catalog.invitations` holds:
   - The tenant, the email address and the role.
-  - The SHA-256 hash of the token. The token is 256 random bits, so a fast hash suffices.
+  - The SHA-256 hash of the token. The token is 256 random bits, so a fast hash suffices. The hash is written when the invitation is delivered and stays empty until then.
   - Who invited, when, the expiry, and the status: `Pending`, `Accepted` or `Expired`.
   - The lifetime comes from `Invitations:Lifetime` (seven days by default). Until the system job closes expired invitations (0027), the expiry date decides.
 - **Who invites.** A member with `members.invite` may invite with a role no greater than their own (0030):
@@ -39,7 +39,8 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
   - **How "has an account" is decided.** By listing Clerk users with that email address and matching the address exactly, because some of Clerk's email filters match partially.
 - **Accepting.** A signed-in user calls `POST /v1/invitations/accept` with the token. The route is outside any tenant.
   1. The token leads to the invitation's tenant. This is the second catalog reader that is not bound to a tenant (0021), and it reveals only the tenant id.
-  2. The acceptance then runs as one command for that tenant, in its transaction (0016):
+  2. The user's verified email addresses are read from Clerk, before any transaction begins.
+  3. The acceptance then runs as one command for that tenant, in its transaction (0016), with those addresses:
      - The invitation row is locked (`FOR UPDATE`).
      - The invitation must be pending and unexpired, and one of the user's verified email addresses at Clerk must match (case-insensitive).
      - The user is created if new, the membership is added, and the invitation is marked accepted.
@@ -54,10 +55,20 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
   | Email does not match | 403 `invitation.email_mismatch` |
   | Already a member | 409 `membership.exists` |
 
+- **Delivery.** Creating an invitation saves the record and, in the same transaction, sends a `DeliverInvitation` message through the outbox (0024). Nothing in the command calls out of the process. The delivery runs after the commit, in the invitation's tenant:
+  1. It locks the invitation. One that already has a token was delivered, so a delivery that arrives again does nothing.
+  2. It generates the token and writes the token's hash to the invitation.
+  3. It asks Clerk whether the person has an account, and creates the Clerk invitation if not.
+  4. It sends the email last. If sending fails, the hash rolls back with the delivery's transaction. The delivery is tried again after pauses of one, two and four seconds, each time with a new token, and then goes to the dead letter queue; it is not compensated (0026).
+  - The token is born in the delivery, so no stored message ever carries it; only the link that is sent does. A test checks the stored messages for it.
+  - An email sent by a delivery whose transaction then fails to commit carries a link that does not work; the retry sends a new one.
 - **Delivery until Notifications exists.** The email goes through an `IInvitationSender` port. Until the Notifications module sends it through Resend (Phase 6, 0037), the sender depends on the environment:
   - In Development it writes the link to the log.
-  - Anywhere else, sending fails with an explicit error. The command's transaction rolls back, so no invitation is kept whose link nobody received. A Clerk invitation created just before may remain, which is harmless.
-- **Clerk calls.** They run inside the command, before the transaction commits. A Clerk failure fails the command. A commit that fails after Clerk succeeded leaves a harmless Clerk invitation without ours. Resilience policies come with 0041.
+  - Anywhere else, sending fails with an explicit error and the delivery ends in the dead letter queue. The invitation is kept, because its delivery comes after its transaction, but it has no token, so nobody can accept it. Before Phase 5 the command itself failed and nothing was kept.
+- **Clerk calls and open transactions.** The acceptance reads the verified addresses before its transaction begins, so it holds no lock while it waits on Clerk. The delivery deliberately keeps its transaction open while it calls Clerk and sends the email:
+  - **Why.** The token must be born in the step that sends it, and its hash may be kept only once the link has gone out. Committing the hash first would keep a token nobody received whenever sending fails. Handing the token to a later step would put it in a stored message.
+  - **What it costs.** For the length of the calls, the delivery holds one pooled connection and a lock on its own invitation row, nothing else. The calls are bounded by their clients' timeouts, and resilience policies come with 0041. The lock also keeps a second copy of the message from issuing a second token at the same time.
+  - **What can go wrong.** An email sent by a delivery whose transaction then fails to commit carries a link that does not work; the retry sends a new one.
 
 ## Alternatives considered
 
@@ -74,7 +85,8 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
 - Expired invitations are closed by a system job (0027).
 - Our token appears in plain text in the redirect URL stored at Clerk. A leak there gives no access on its own, because accepting also needs the verified email address.
 - Clerk limits invitation creation to 100 per hour per instance.
-- Once the email goes through the outbox and Notifications (Phases 5 and 6), the plain token would sit in a stored message; how to avoid that is decided then.
+- The token never sits in a stored message: it is generated when the invitation is delivered (Phase 5).
+- An invitation is visible as pending before its email is sent, and outside Development it stays without a token until the Notifications module sends emails (Phase 6).
 
 ## Verified
 

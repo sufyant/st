@@ -21,8 +21,18 @@ internal sealed class FakeIdentityProvider : IIdentityProvider
         return Task.FromResult(new Uri($"https://clerk.test/invitations/{invitationId}"));
     }
 
-    public Task<IReadOnlyList<string>> FindVerifiedEmailsAsync(string externalUserId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<string>>(_verifiedEmails.GetValueOrDefault(externalUserId, []));
+    // Lets a test look at the database at the moment the application asks for a user's verified email addresses.
+    public Func<Task>? WhileReadingVerifiedEmails { get; set; }
+
+    public async Task<IReadOnlyList<string>> FindVerifiedEmailsAsync(string externalUserId, CancellationToken cancellationToken)
+    {
+        if (WhileReadingVerifiedEmails is { } probe)
+        {
+            await probe();
+        }
+
+        return _verifiedEmails.GetValueOrDefault(externalUserId, []);
+    }
 }
 
 internal sealed class FakeInvitationSender : IInvitationSender
@@ -40,5 +50,24 @@ internal sealed class FakeInvitationSender : IInvitationSender
     {
         var link = Sent.Single(sent => sent.Email == email).Link;
         return Uri.UnescapeDataString(link.Query["?token=".Length..]);
+    }
+}
+
+// An email channel that is down for its first sends, then recovers.
+internal sealed class FlakyInvitationSender(int failures) : IInvitationSender
+{
+    private int _attempts;
+
+    public ConcurrentBag<(string Email, Uri Link)> Sent { get; } = [];
+
+    public Task SendAsync(string email, Uri link, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Increment(ref _attempts) <= failures)
+        {
+            throw new InvalidOperationException("The email channel is down for a moment.");
+        }
+
+        Sent.Add((email, link));
+        return Task.CompletedTask;
     }
 }

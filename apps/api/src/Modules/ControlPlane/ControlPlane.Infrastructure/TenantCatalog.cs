@@ -58,6 +58,15 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
         return catalog.Tenants.Where(t => t.Id == tenantId).Select(t => t.Slug).SingleAsync(cancellationToken);
     }
 
+    async Task<Tenant> ITenantCatalog.FindTenantForUpdateAsync(CancellationToken cancellationToken)
+    {
+        var found = await catalog.Tenants
+            .FromSql($"SELECT * FROM catalog.tenants WHERE id = {ActiveTenant} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        return found.Single();
+    }
+
     Task<Role?> ITenantCatalog.FindRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
         Roles.SingleOrDefaultAsync(role => role.Id == roleId, cancellationToken);
 
@@ -87,10 +96,30 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
         return found.SingleOrDefault();
     }
 
+    async Task<Invitation?> ITenantCatalog.FindInvitationForUpdateAsync(Guid invitationId, CancellationToken cancellationToken)
+    {
+        var found = await catalog.Invitations
+            .FromSql($"SELECT * FROM catalog.invitations WHERE id = {invitationId} AND tenant_id = {ActiveTenant} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+
+        return found.SingleOrDefault();
+    }
+
     Task<User?> ITenantCatalog.FindUserAsync(string externalUserId, CancellationToken cancellationToken) =>
         catalog.Users.SingleOrDefaultAsync(user => user.ExternalId == externalUserId, cancellationToken);
 
     public void AddMember(Guid userId, Guid roleId) => catalog.Memberships.Add(new Membership(ActiveTenant, userId, roleId));
+
+    // An insert of a slug that another onboarding has inserted but not yet committed waits for it, and is skipped if it commits.
+    async Task<bool> ITenantCatalog.TryAddAsync(Tenant tenant, CancellationToken cancellationToken)
+    {
+        var added = OfActiveTenant(tenant, tenant.Id);
+        var inserted = await catalog.Database.ExecuteSqlAsync(
+            $"INSERT INTO catalog.tenants (id, slug, status) VALUES ({added.Id}, {added.Slug}, {added.Status.ToString()}) ON CONFLICT (slug) DO NOTHING",
+            cancellationToken);
+
+        return inserted == 1;
+    }
 
     void ITenantCatalog.Add(Role role) => catalog.Roles.Add(OfActiveTenant(role, role.TenantId));
 

@@ -24,6 +24,10 @@ public interface ITenantCatalog
 
     internal Task<string> FindSlugAsync(CancellationToken cancellationToken);
 
+    /// <summary>The active tenant, locked for the rest of the transaction, so the steps of its onboarding run one at a time.</summary>
+    internal Task<Tenant> FindTenantForUpdateAsync(CancellationToken cancellationToken);
+
+
     /// <summary>A built-in role, or a custom role of the active tenant.</summary>
     internal Task<Role?> FindRoleAsync(Guid roleId, CancellationToken cancellationToken);
 
@@ -41,9 +45,18 @@ public interface ITenantCatalog
     /// <summary>The invitation with this token hash, locked for the rest of the transaction so it is accepted only once.</summary>
     internal Task<Invitation?> FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken);
 
+    /// <summary>The invitation with this id, locked for the rest of the transaction so it is delivered only once.</summary>
+    internal Task<Invitation?> FindInvitationForUpdateAsync(Guid invitationId, CancellationToken cancellationToken);
+
     internal Task<User?> FindUserAsync(string externalUserId, CancellationToken cancellationToken);
 
     internal void AddMember(Guid userId, Guid roleId);
+
+    /// <summary>
+    /// Adds the active tenant itself, which its onboarding creates (0026), unless another tenant has its slug. The slug's unique index
+    /// decides, also between two onboardings at the same moment, and nothing else about the other tenant is revealed.
+    /// </summary>
+    internal Task<bool> TryAddAsync(Tenant tenant, CancellationToken cancellationToken);
 
     internal void Add(Role role);
 

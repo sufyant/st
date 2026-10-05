@@ -4,8 +4,9 @@ using SharedKernel;
 namespace ControlPlane.Domain.Invitations;
 
 /// <summary>
-/// An invitation to join a tenant with a role (0029). It is single-use and expires. Accepting it needs both the token and a
-/// verified email address of the accepting user that matches the invited one, so a forwarded link does not let someone else in.
+/// An invitation to join a tenant with a role (0029). It is single-use and expires. Its token is issued when it is delivered, so no
+/// stored message ever carries one. Accepting it needs both the token and a verified email address of the accepting user that
+/// matches the invited one, so a forwarded link does not let someone else in.
 /// </summary>
 internal sealed class Invitation
 {
@@ -16,7 +17,6 @@ internal sealed class Invitation
         Guid tenantId,
         string email,
         Guid roleId,
-        string tokenHash,
         Guid invitedBy,
         DateTimeOffset createdAt,
         DateTimeOffset expiresAt)
@@ -25,7 +25,6 @@ internal sealed class Invitation
         TenantId = tenantId;
         Email = email;
         RoleId = roleId;
-        TokenHash = tokenHash;
         InvitedBy = invitedBy;
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
@@ -40,7 +39,8 @@ internal sealed class Invitation
 
     public Guid RoleId { get; private init; }
 
-    public string TokenHash { get; private init; }
+    /// <summary>The SHA-256 hash of the token the invitation's link carries; empty until the invitation is delivered.</summary>
+    public string? TokenHash { get; private set; }
 
     public Guid InvitedBy { get; private init; }
 
@@ -60,10 +60,24 @@ internal sealed class Invitation
         string email,
         Role role,
         Guid invitedBy,
-        string token,
         DateTimeOffset now,
         TimeSpan lifetime) =>
-        new(id, tenantId, email.Trim(), role.Id, InvitationToken.Hash(token), invitedBy, now, now + lifetime);
+        new(id, tenantId, email.Trim(), role.Id, invitedBy, now, now + lifetime);
+
+    /// <summary>
+    /// Gives a pending invitation the token its link carries, keeping only the hash. A token is issued once: a delivery that arrives
+    /// again must not replace the link already sent.
+    /// </summary>
+    public bool IssueToken(string token)
+    {
+        if (Status != InvitationStatus.Pending || TokenHash is not null)
+        {
+            return false;
+        }
+
+        TokenHash = InvitationToken.Hash(token);
+        return true;
+    }
 
     public Result Accept(IEnumerable<string> verifiedEmails, Guid userId, DateTimeOffset now)
     {

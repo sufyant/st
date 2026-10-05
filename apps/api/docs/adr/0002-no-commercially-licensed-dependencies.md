@@ -34,3 +34,6 @@ Every product built on the template inherits its dependencies. MediatR, AutoMapp
   - `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.Extensions.Http`, `Microsoft.Extensions.Hosting.Abstractions` and `Microsoft.Extensions.Options.ConfigurationExtensions` (10.0.12): MIT, part of .NET.
   - `FluentValidation` 12.0.0: Apache 2.0, the version WolverineFx.FluentValidation already brings, now referenced by `ControlPlane.Application` for its validators.
   - No Clerk SDK: the adapter calls Clerk's Backend API over HTTP.
+- Phase 5:
+  - `WolverineFx.Postgresql` 6.45.0 (MIT), Wolverine's PostgreSQL message storage (0024). It brings `WolverineFx.RDBMS` 6.45.0, `Weasel.Core` and `Weasel.Postgresql` 9.38.0, `JasperFx.Events`, and `Patched.DistributedLock.Core` and `Patched.DistributedLock.Postgres` (all MIT); `Npgsql.NetTopologySuite` 9.0.4 (PostgreSQL License); and `NetTopologySuite` 2.5.0 and `NetTopologySuite.IO.PostGis` 2.1.0 (BSD-3-Clause). All of it runs on .NET 10 with the Npgsql 10 the application already uses.
+  - `WolverineFx`, already in the host, is now referenced by `ControlPlane.Application` too, for the failure policies its handlers declare (0023).

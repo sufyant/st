@@ -10,6 +10,7 @@ using Api.Persistence;
 using Api.RateLimiting;
 using Api.Tenants;
 using JasperFx.CodeGeneration.Model;
+using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Wolverine;
@@ -52,6 +53,18 @@ internal static class ApiPipeline
             // Module DbContexts are built by factories on the scope's tenant connection (0016), which Wolverine can only resolve
             // from the message's scope.
             options.ServiceLocationPolicy = ServiceLocationPolicy.AlwaysAllowed;
+
+            // Wolverine takes its data source while it is configured. The build writes the OpenAPI document, and the migration step
+            // runs, from a host without the setting; a host that runs without it keeps no messages and is never ready
+            // (DatabaseHealthCheck).
+            if (builder.Configuration.GetConnectionString(PersistenceExtensions.DirectConnection) is { Length: > 0 } direct)
+            {
+                MessageStorage.Configure(options, NpgsqlDataSource.Create(direct));
+            }
+
+            // A message that fails for good goes to the dead letter queue, and its fault is published for a flow that has to react,
+            // such as a saga's compensation (0025). Faults are stored messages, so they carry only the exception's type (0029).
+            options.PublishFaultEvents(includeExceptionMessage: false, includeStackTrace: false);
 
             options.UseFluentValidation();
             options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));

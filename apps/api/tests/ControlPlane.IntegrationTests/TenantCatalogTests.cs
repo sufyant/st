@@ -109,7 +109,7 @@ public sealed class TenantCatalogTests(Database database)
         var other = await Catalog.AddTenantAsync(database.Services);
         var owner = await Catalog.AddMemberAsync(database.Services, other, BuiltInRoles.Owner);
         var email = Unique.Email();
-        await Handlers.InviteAsync(database.Services, other.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+        await Handlers.InviteAndDeliverAsync(database.Services, other.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
         var tokenHash = InvitationToken.Hash(Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
@@ -117,5 +117,31 @@ public sealed class TenantCatalogTests(Database database)
             ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(tokenHash, Cancellation));
 
         found.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_tenant_does_not_find_the_invitation_of_another_tenant_by_its_id()
+    {
+        var other = await Catalog.AddTenantAsync(database.Services);
+        var owner = await Catalog.AddMemberAsync(database.Services, other, BuiltInRoles.Owner);
+        var (invitation, _) = await Handlers.InviteAsync(database.Services, other.Id, owner.ExternalId, Unique.Email(), BuiltInRoles.Member.Id);
+        var tenant = await Catalog.AddTenantAsync(database.Services);
+
+        var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
+            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(invitation.Value.Id, Cancellation));
+
+        found.ShouldBeNull();
+    }
+
+    // Onboarding adds the tenant it runs in, and only that one (0026).
+    [Fact]
+    public async Task A_tenant_cannot_add_another_tenant()
+    {
+        var other = Domain.Tenants.Tenant.Create(Guid.CreateVersion7(), Unique.Slug()).Value;
+
+        var add = () => InTenant.ReadAsync(database.Services, Guid.CreateVersion7(), scope =>
+            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).TryAddAsync(other, Cancellation));
+
+        await add.ShouldThrowAsync<InvalidOperationException>();
     }
 }

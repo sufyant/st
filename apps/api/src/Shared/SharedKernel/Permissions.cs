@@ -20,11 +20,13 @@ public static class Permissions
 
     public const string SystemTenantsEnter = "system.tenants.enter";
 
+    public const string SystemTenantsCreate = "system.tenants.create";
+
     public const string SystemMembersInvite = "system.members.invite";
 
     public static IReadOnlySet<string> TenantPool { get; } =
         FrozenSet.Create(StringComparer.Ordinal, MembersInvite, MembersManage, OwnersManage, RolesManage);
 
     public static IReadOnlySet<string> SystemPool { get; } =
-        FrozenSet.Create(StringComparer.Ordinal, SystemTenantsRead, SystemTenantsEnter, SystemMembersInvite);
+        FrozenSet.Create(StringComparer.Ordinal, SystemTenantsRead, SystemTenantsEnter, SystemTenantsCreate, SystemMembersInvite);
 }

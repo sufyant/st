@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SharedKernel;
 using Tenancy;
 using Wolverine;
@@ -81,6 +82,14 @@ public static class WriteProbeLaterHandler
 
 public sealed record ReadProbes;
 
+// Cascades a read; a message without a tenant hands it on with Wolverine's default tenant id.
+public sealed record ReadProbesLater;
+
+public static class ReadProbesLaterHandler
+{
+    public static ReadProbes Handle(ReadProbesLater command) => new();
+}
+
 public static class ReadProbesHandler
 {
     public static async Task<Result<string[]>> Handle(ReadProbes query, ProbeDbContext probes, CancellationToken cancellationToken) =>
@@ -96,5 +105,104 @@ public static class ReadTenantSettingHandler
         await using var command = transaction.Connection.CreateCommand();
         command.CommandText = "SELECT NULLIF(current_setting('app.tenant_id', true), '')";
         return await command.ExecuteScalarAsync(cancellationToken) as string;
+    }
+}
+
+// Publishes a message, then counts its stored envelope from inside the command's transaction and from a connection of its own.
+public sealed record PublishAndCountStored(string Marker);
+
+public sealed record StoredCounts(long Inside, long Outside);
+
+public static class PublishAndCountStoredHandler
+{
+    public static async Task<Result<StoredCounts>> Handle(
+        PublishAndCountStored command,
+        IMessageBus bus,
+        TenantTransaction transaction,
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken)
+    {
+        await bus.PublishAsync(new ProbeAnnounced(command.Marker));
+
+        var inside = await StoredMessages.CountAsync(transaction.Connection, command.Marker, cancellationToken);
+        await using var outside = await dataSource.OpenConnectionAsync(cancellationToken);
+        return new StoredCounts(inside, await StoredMessages.CountAsync(outside, command.Marker, cancellationToken));
+    }
+}
+
+// Write a probe and announce it in one handler, which reports success or rejects the probe afterwards (0032).
+public sealed record WriteProbeAndAnnounce(string Value);
+
+public static class WriteProbeAndAnnounceHandler
+{
+    public static async Task<(Result, ProbeAnnounced)> Handle(WriteProbeAndAnnounce command, ProbeDbContext probes, CancellationToken cancellationToken)
+    {
+        probes.Probes.Add(new Probe { Value = command.Value });
+        await probes.SaveChangesAsync(cancellationToken);
+        return (Result.Success(), new ProbeAnnounced(command.Value));
+    }
+}
+
+public sealed record WriteProbeThenRejectAndAnnounce(string Value);
+
+public static class WriteProbeThenRejectAndAnnounceHandler
+{
+    public static async Task<(Result, ProbeAnnounced)> Handle(
+        WriteProbeThenRejectAndAnnounce command,
+        ProbeDbContext probes,
+        CancellationToken cancellationToken)
+    {
+        probes.Probes.Add(new Probe { Value = command.Value });
+        await probes.SaveChangesAsync(cancellationToken);
+        return (Error.Conflict("probe.rejected", "The handler rejected the probe after writing it."), new ProbeAnnounced(command.Value));
+    }
+}
+
+public sealed record WriteProbeThenRejectWithValueAndAnnounce(string Value);
+
+public static class WriteProbeThenRejectWithValueAndAnnounceHandler
+{
+    public static async Task<(Result<Guid>, ProbeAnnounced)> Handle(
+        WriteProbeThenRejectWithValueAndAnnounce command,
+        ProbeDbContext probes,
+        CancellationToken cancellationToken)
+    {
+        probes.Probes.Add(new Probe { Value = command.Value });
+        await probes.SaveChangesAsync(cancellationToken);
+        return (Error.Conflict("probe.rejected", "The handler rejected the probe after writing it."), new ProbeAnnounced(command.Value));
+    }
+}
+
+// Rejects without writing anything, for a message that carries no tenant.
+public sealed record RejectAndAnnounce(string Value);
+
+public static class RejectAndAnnounceHandler
+{
+    public static (Result, ProbeAnnounced) Handle(RejectAndAnnounce command) =>
+        (Error.Conflict("probe.rejected", "The handler rejected the probe."), new ProbeAnnounced(command.Value));
+}
+
+public sealed record ProbeAnnounced(string Value);
+
+// Records the announcement as a probe, under the tenant of the message that announced it.
+public static class ProbeAnnouncedHandler
+{
+    public static async Task Handle(ProbeAnnounced message, ProbeDbContext probes, CancellationToken cancellationToken)
+    {
+        probes.Probes.Add(new Probe { Value = $"announced:{message.Value}" });
+        await probes.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// The envelopes Wolverine has stored whose body carries the marker (0024).
+public static class StoredMessages
+{
+    public static async Task<long> CountAsync(NpgsqlConnection connection, string marker, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM wolverine.wolverine_incoming_envelopes WHERE position(convert_to(@marker, 'UTF8') in body) > 0",
+            connection);
+        command.Parameters.AddWithValue("marker", marker);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 }

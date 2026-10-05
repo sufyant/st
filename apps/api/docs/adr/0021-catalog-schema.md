@@ -26,11 +26,12 @@ Some data sits above tenants: the tenants themselves, users who can belong to se
 - **Users.** `users (id, external_id)`. `external_id` is the identity provider's user id and is unique.
 - **Memberships.** `memberships (tenant_id, user_id, role_id)`; the role is a foreign key to `roles` (0030).
 - **Roles.** `roles (id, tenant_id, name, built_in, permissions)`. Built-in roles are rows without a tenant, shared by every tenant; custom roles belong to one (0030).
-- **Invitations.** `invitations (id, tenant_id, email, role_id, token_hash, invited_by, created_at, expires_at, status, accepted_at, accepted_by)` (0029).
+- **Invitations.** `invitations (id, tenant_id, email, role_id, token_hash, invited_by, created_at, expires_at, status, accepted_at, accepted_by)` (0029). `token_hash` stays empty until the invitation is delivered.
 - **System admins.** `system_admins (user_id, role, granted_by, granted_at)` (0031).
 - **The access point.** `TenantCatalog` is bound to the scope's tenant. It is the implementation of the `ITenantCatalog` port that ControlPlane's handlers use (0047).
   - It reads only the active tenant's rows, plus the built-in roles, which belong to no tenant.
   - It stamps the active tenant on the memberships it adds. It refuses to add or remove a role or an invitation of another tenant.
+  - It adds a tenant only as the active tenant itself, which its onboarding creates (0026), and only if no other tenant has its slug. The slug's unique index decides, also between two onboardings at the same moment, and nothing else about the other tenant is revealed.
   - It throws when used outside a tenant.
 - **The readers outside a tenant.** They read deliberately, before any tenant is known, and each reveals as little as its caller needs:
   - `TenantDirectory` (0015) reads memberships with their role's permissions, and finds a tenant by slug for a system admin entering it (0031).

@@ -7,6 +7,8 @@ internal static class PersistenceExtensions
 {
     public const string PooledConnection = "Pooled";
 
+    public const string DirectConnection = "Direct";
+
     public static WebApplicationBuilder AddPersistence(this WebApplicationBuilder builder)
     {
         // Checked on first use rather than on start: the build starts the host to write the OpenAPI document, without a database.

@@ -56,4 +56,41 @@ public class TenantTests
 
         tenant.Status.ShouldBe(TenantStatus.Active);
     }
+
+    // A tenant's onboarding ends active or failed, never both (0026).
+    [Fact]
+    public void Only_a_provisioning_tenant_is_activated()
+    {
+        var tenant = Tenant.Create(Id, "acme").Value;
+        tenant.Fail();
+
+        var activated = tenant.Activate();
+
+        activated.ShouldBeFalse();
+        tenant.Status.ShouldBe(TenantStatus.Failed);
+    }
+
+    [Fact]
+    public void A_provisioning_tenant_fails()
+    {
+        var tenant = Tenant.Create(Id, "acme").Value;
+
+        var failed = tenant.Fail();
+
+        failed.ShouldBeTrue();
+        tenant.Status.ShouldBe(TenantStatus.Failed);
+    }
+
+    // The invitation's delivery comes after activation and is not compensated, so an active tenant stays active.
+    [Fact]
+    public void An_active_tenant_does_not_fail()
+    {
+        var tenant = Tenant.Create(Id, "acme").Value;
+        tenant.Activate();
+
+        var failed = tenant.Fail();
+
+        failed.ShouldBeFalse();
+        tenant.Status.ShouldBe(TenantStatus.Active);
+    }
 }

@@ -21,7 +21,7 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
 ### How it works
 
 - **The grant.** `catalog.system_admins` holds `user_id`, `role`, `granted_by` and `granted_at`.
-  - There is one system role, `Administrator`, with the whole system pool: `system.tenants.read`, `system.tenants.enter`, `system.members.invite`.
+  - There is one system role, `Administrator`, with the whole system pool: `system.tenants.read`, `system.tenants.enter`, `system.tenants.create`, `system.members.invite`.
   - More system roles come when a need appears.
 - **The seed script.** `apps/api/db/seed-system-admin.sql` runs after the migrations:
   - `psql -v external_id=<Clerk user id> -f seed-system-admin.sql`.
@@ -39,6 +39,8 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
   - `GET /v1/admin/tenants?page&pageSize` (`system.tenants.read`): every tenant with its status and member count, paginated (0034).
     - It reads the catalog as the reporting role over `ConnectionStrings:Reporting` (0018, 0019), never as the application.
   - `POST /v1/admin/tenants/{slug}/invitations` (`system.members.invite`): invites someone with any role, for example a tenant's first owner (0029).
+- **Endpoints of Phase 5.**
+  - `POST /v1/admin/tenants` (`system.tenants.create`): creates a tenant and starts its onboarding, which invites its first owner (0026).
 
 ## Alternatives considered
 

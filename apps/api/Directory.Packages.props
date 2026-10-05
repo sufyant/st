@@ -22,6 +22,7 @@
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="WolverineFx" Version="6.45.0" />
     <PackageVersion Include="WolverineFx.FluentValidation" Version="6.45.0" />
+    <PackageVersion Include="WolverineFx.Postgresql" Version="6.45.0" />
     <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.45.0" />
   </ItemGroup>
   <ItemGroup Label="Tests">

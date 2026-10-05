@@ -1,3 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
+using ControlPlane.Application.Invitations;
+using ControlPlane.Application.Ports;
 using ControlPlane.Domain.Roles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,45 +14,95 @@ namespace ControlPlane.IntegrationTests;
 
 public sealed class InvitationTests(Database database)
 {
+    // The command only saves the invitation; Clerk and the email are left to the delivery, which the outbox runs once it commits.
     [Fact]
-    public async Task Inviting_someone_without_an_account_creates_a_provider_invitation_that_carries_ours()
+    public async Task Inviting_saves_the_invitation_and_leaves_its_delivery_to_a_message()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var owner = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Owner);
         var email = Unique.Email();
 
-        var invitation = await Handlers.InviteAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+        var (invitation, delivery) = await Handlers.InviteAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
 
-        var invited = database.Identity.Invitations.Where(invited => invited.Email == email).ShouldHaveSingleItem();
-        invited.InvitationId.ShouldBe(invitation.Value.Id);
-        invited.AcceptLink.GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl);
-        database.Sender.LinkSentTo(email).ShouldBe(new Uri($"https://clerk.test/invitations/{invitation.Value.Id}"));
+        delivery.ShouldBe(new DeliverInvitation(invitation.Value.Id));
+        database.Identity.Invitations.ShouldNotContain(invited => invited.Email == email);
+        database.Sender.Sent.ShouldNotContain(sent => sent.Email == email);
+        (await ScalarAsync<long>($"SELECT count(*) FROM catalog.invitations WHERE id = '{invitation.Value.Id}' AND token_hash IS NULL")).ShouldBe(1);
     }
 
     [Fact]
-    public async Task Inviting_someone_with_an_account_sends_our_accept_link_only()
+    public async Task Delivering_to_someone_without_an_account_creates_a_provider_invitation_that_carries_ours()
+    {
+        var tenant = await Catalog.AddTenantAsync(database.Services);
+        var owner = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Owner);
+        var email = Unique.Email();
+
+        var invitation = await Handlers.InviteAndDeliverAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+
+        var invited = database.Identity.Invitations.Where(invited => invited.Email == email).ShouldHaveSingleItem();
+        invited.InvitationId.ShouldBe(invitation.Id);
+        invited.AcceptLink.GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl);
+        database.Sender.LinkSentTo(email).ShouldBe(new Uri($"https://clerk.test/invitations/{invitation.Id}"));
+    }
+
+    [Fact]
+    public async Task Delivering_to_someone_with_an_account_sends_our_accept_link_only()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var owner = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Owner);
         var email = Unique.Email();
         database.Identity.AddAccount(Unique.ExternalId(), email);
 
-        await Handlers.InviteAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+        await Handlers.InviteAndDeliverAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
 
         database.Identity.Invitations.ShouldNotContain(invited => invited.Email == email);
         database.Sender.LinkSentTo(email).GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl);
     }
 
+    // The token is born in the delivery and only its SHA-256 hash is stored (0029).
     [Fact]
-    public async Task The_invitation_stores_no_token()
+    public async Task Delivery_stores_the_hash_of_the_token_it_sends()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var owner = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Owner);
-        var (email, token) = await InviteAsync(tenant.Id, owner.ExternalId, BuiltInRoles.Member);
+        var email = Unique.Email();
+        database.Identity.AddAccount(Unique.ExternalId(), email);
 
-        var stored = await ScalarAsync<long>($"SELECT count(*) FROM catalog.invitations WHERE email = '{email}' AND token_hash <> '{token}'");
+        var invitation = await Handlers.InviteAndDeliverAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
 
-        stored.ShouldBe(1);
+        var token = Handlers.TokenOf(database.Sender.LinkSentTo(email));
+        (await ScalarAsync<string>($"SELECT token_hash FROM catalog.invitations WHERE id = '{invitation.Id}'")).ShouldBe(Sha256(token));
+    }
+
+    // A message may arrive twice (0024); the second delivery must not send another link.
+    [Fact]
+    public async Task An_invitation_is_delivered_only_once()
+    {
+        var tenant = await Catalog.AddTenantAsync(database.Services);
+        var owner = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Owner);
+        var email = Unique.Email();
+        database.Identity.AddAccount(Unique.ExternalId(), email);
+        var (_, delivery) = await Handlers.InviteAsync(database.Services, tenant.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+        await Handlers.DeliverAsync(database.Services, tenant.Id, delivery.ShouldNotBeNull());
+
+        await Handlers.DeliverAsync(database.Services, tenant.Id, delivery);
+
+        database.Sender.Sent.Where(sent => sent.Email == email).ShouldHaveSingleItem();
+    }
+
+    // The hash is written in the delivery's transaction, so a link that was never sent leaves no token behind.
+    [Fact]
+    public async Task When_sending_fails_no_token_is_kept()
+    {
+        await using var services = database.BuildServices(services => services.Replace(ServiceDescriptor.Singleton<IInvitationSender>(new FailingInvitationSender())));
+        var tenant = await Catalog.AddTenantAsync(services);
+        var owner = await Catalog.AddMemberAsync(services, tenant, BuiltInRoles.Owner);
+        var (invitation, delivery) = await Handlers.InviteAsync(services, tenant.Id, owner.ExternalId, Unique.Email(), BuiltInRoles.Member.Id);
+
+        var deliver = () => Handlers.DeliverAsync(services, tenant.Id, delivery.ShouldNotBeNull());
+
+        await deliver.ShouldThrowAsync<InvalidOperationException>();
+        (await ScalarAsync<long>($"SELECT count(*) FROM catalog.invitations WHERE id = '{invitation.Value.Id}' AND token_hash IS NULL")).ShouldBe(1);
     }
 
     [Fact]
@@ -140,15 +194,16 @@ public sealed class InvitationTests(Database database)
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var admin = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Admin);
 
-        var invitation = await Handlers.InviteAsync(database.Services, tenant.Id, admin.ExternalId, Unique.Email(), BuiltInRoles.Owner.Id);
+        var (invitation, delivery) = await Handlers.InviteAsync(database.Services, tenant.Id, admin.ExternalId, Unique.Email(), BuiltInRoles.Owner.Id);
 
         invitation.Error.Code.ShouldBe("role.beyond_your_permissions");
+        delivery.ShouldBeNull();
     }
 
     private async Task<(string Email, string Token)> InviteAsync(Guid tenantId, string actorId, Role role, IServiceProvider? services = null)
     {
         var email = Unique.Email();
-        (await Handlers.InviteAsync(services ?? database.Services, tenantId, actorId, email, role.Id)).IsSuccess.ShouldBeTrue();
+        await Handlers.InviteAndDeliverAsync(services ?? database.Services, tenantId, actorId, email, role.Id);
 
         return (email, Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
     }
@@ -160,6 +215,8 @@ public sealed class InvitationTests(Database database)
         return await scope.ServiceProvider.GetRequiredService<ITenantDirectory>()
             .FindMembershipAsync(slug, externalUserId, TestContext.Current.CancellationToken);
     }
+
+    private static string Sha256(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     private async Task<T> ScalarAsync<T>(string sql)
     {

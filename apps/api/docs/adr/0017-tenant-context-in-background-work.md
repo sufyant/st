@@ -10,6 +10,7 @@ Handlers, saga steps and scheduled jobs run outside HTTP requests, yet they must
 ## Decision
 
 - **Every message envelope carries the tenant id.** The handler's transaction sets it (0016). This is Wolverine's own envelope tenant id: a message sent with a tenant (`InvokeForTenantAsync`, `DeliveryOptions.TenantId`) carries it, and a message cascaded from a handler inherits the tenant of the message being handled.
+- **A stored message keeps its tenant.** The tenant id is part of the stored envelope (0024), so a message recovered after a crash runs under its tenant. A message sent without a tenant comes back with Wolverine's default tenant id, which names no tenant (0016).
 - **Jobs that find work across tenants** (the Hangfire scanner, system cleanup) either fetch due items through a narrow `SECURITY DEFINER` function that returns only `(tenant_id, id)`, or iterate tenants from the catalog. Each item is then processed separately under its own tenant.
 - **No database role gets `BYPASSRLS`.**
 
