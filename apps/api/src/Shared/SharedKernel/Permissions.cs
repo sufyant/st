@@ -16,6 +16,8 @@ public static class Permissions
 
     public const string RolesManage = "roles.manage";
 
+    public const string NotificationsSchedule = "notifications.schedule";
+
     public const string SystemTenantsRead = "system.tenants.read";
 
     public const string SystemTenantsEnter = "system.tenants.enter";
@@ -25,7 +27,7 @@ public static class Permissions
     public const string SystemMembersInvite = "system.members.invite";
 
     public static IReadOnlySet<string> TenantPool { get; } =
-        FrozenSet.Create(StringComparer.Ordinal, MembersInvite, MembersManage, OwnersManage, RolesManage);
+        FrozenSet.Create(StringComparer.Ordinal, MembersInvite, MembersManage, OwnersManage, RolesManage, NotificationsSchedule);
 
     public static IReadOnlySet<string> SystemPool { get; } =
         FrozenSet.Create(StringComparer.Ordinal, SystemTenantsRead, SystemTenantsEnter, SystemTenantsCreate, SystemMembersInvite);

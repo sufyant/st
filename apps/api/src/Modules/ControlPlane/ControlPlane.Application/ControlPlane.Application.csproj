@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
     <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
+    <ProjectReference Include="..\..\Notifications\Notifications.Contracts\Notifications.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
   </ItemGroup>
 

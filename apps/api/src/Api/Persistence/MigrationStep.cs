@@ -1,10 +1,11 @@
+using Api.Jobs;
 using Api.Messaging;
 using Tenancy;
 
 namespace Api.Persistence;
 
 // The separate migration step (0020): `dotnet Api.dll migrate` applies every module's migrations and creates the message storage
-// as the owner, over the direct connection, and exits. Starting the application never migrates.
+// and the scheduled jobs' storage as the owner, over the direct connection, and exits. Starting the application never migrates.
 internal static class MigrationStep
 {
     public const string Command = "migrate";
@@ -26,5 +27,6 @@ internal static class MigrationStep
         }
 
         await MessageStorage.MigrateAsync(connectionString, cancellationToken);
+        await ScheduledJobs.MigrateAsync(connectionString, cancellationToken);
     }
 }

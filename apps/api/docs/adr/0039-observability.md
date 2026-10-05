@@ -15,7 +15,7 @@ Problems in a multi-tenant system are usually tenant-specific; signals without t
 - Serilog writes logs to the console and forwards every event to the OpenTelemetry logger. Logs, metrics (ASP.NET Core and Wolverine) and traces (ASP.NET Core and Wolverine) are exported over OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, configured by the standard `OTEL_*` variables. Without it, logs go to the console and metrics and traces are not exported.
 - Each host keeps its own Serilog logger and does not replace Serilog's static logger.
 - The tenant id is added to logs, traces and metrics by tenant resolution (0015).
-- Security events that cannot be written to the tenant-scoped audit log, such as authorization denials before a tenant is resolved (0040), are written to the log as security events.
+- Security events that cannot be written to the tenant-scoped audit log, such as authorization denials before a tenant is resolved (0040), are written to the log as security events. They use the `Api.Security` log category: `AuthorizationDenied` with the user and the request's method and path, and `SystemAdminTenantEntry` (0031).
 
 ## Alternatives considered
 

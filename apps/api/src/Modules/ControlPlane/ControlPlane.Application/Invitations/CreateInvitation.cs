@@ -6,7 +6,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Invitations;
 
 /// <summary>A member invites someone to the active tenant with a role no greater than their own (0029, 0030).</summary>
-public sealed record CreateInvitation(string ActorId, string Email, Guid RoleId);
+public sealed record CreateInvitation(string ActorId, string Email, Guid RoleId) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { Email, RoleId };
+}
 
 public sealed class CreateInvitationValidator : AbstractValidator<CreateInvitation>
 {

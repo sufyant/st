@@ -29,7 +29,7 @@ public sealed class TenantDirectoryTests(Database database)
         var membership = await FindMembershipAsync(tenant.Slug, admin.ExternalId);
 
         membership.ShouldNotBeNull().Permissions.ShouldBe(
-            [Permissions.MembersInvite, Permissions.MembersManage, Permissions.RolesManage], ignoreOrder: true);
+            [Permissions.MembersInvite, Permissions.MembersManage, Permissions.RolesManage, Permissions.NotificationsSchedule], ignoreOrder: true);
     }
 
     // Custom roles work without code changes (0030).

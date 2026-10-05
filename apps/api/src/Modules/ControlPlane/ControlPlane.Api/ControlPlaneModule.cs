@@ -1,4 +1,5 @@
 using System.Reflection;
+using Hangfire;
 using ControlPlane.Application.Roles;
 using ControlPlane.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,4 +13,8 @@ public static class ControlPlaneModule
 
     public static IServiceCollection AddControlPlaneModule(this IServiceCollection services) =>
         services.AddControlPlaneInfrastructure();
+
+    /// <summary>The module's system-defined recurring jobs (0027).</summary>
+    public static void ScheduleJobs(IRecurringJobManager jobs) =>
+        jobs.AddOrUpdate<CloseExpiredInvitationsJob>("controlplane.close-expired-invitations", job => job.RunAsync(CancellationToken.None), Cron.Hourly());
 }

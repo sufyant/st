@@ -5,7 +5,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Roles;
 
 /// <summary>Renames a custom role or changes its permissions; built-in roles cannot be changed (0030).</summary>
-public sealed record ChangeRole(string ActorId, Guid RoleId, string Name, IReadOnlyCollection<string> Permissions);
+public sealed record ChangeRole(string ActorId, Guid RoleId, string Name, IReadOnlyCollection<string> Permissions) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { RoleId, Name, Permissions };
+}
 
 public static class ChangeRoleHandler
 {

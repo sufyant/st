@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Audit.Infrastructure" />
+    <InternalsVisibleTo Include="Audit.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Audit.Domain\Audit.Domain.csproj" />
     <ProjectReference Include="..\Audit.Contracts\Audit.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />

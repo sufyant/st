@@ -1,9 +1,12 @@
 using Api.Persistence;
+using Audit.Api;
 using ControlPlane.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Notifications.Api;
 using Npgsql;
 using Tenancy;
 using Testcontainers.PostgreSql;
@@ -20,7 +23,12 @@ public sealed class Database : IAsyncLifetime
     private const string Password = "test-password";
     private const string MainDatabase = "api";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18").WithDatabase(MainDatabase).Build();
+    // The tests run the application in many hosts at once, each with its own pools for requests, messages and jobs (0019); together
+    // they need more connections than PostgreSQL's default of 100.
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18")
+        .WithDatabase(MainDatabase)
+        .WithCommand("-c", "max_connections=300")
+        .Build();
 
     public string ApplicationConnectionString => ConnectionStringFor(DatabaseRoles.Application);
 
@@ -89,13 +97,14 @@ public sealed class Database : IAsyncLifetime
     public string SuperuserConnectionString =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = MainDatabase }.ConnectionString;
 
-    // A role the bootstrap script never creates, for proving that the application refuses to run as one.
+    // A role the bootstrap script never creates, for proving that the application refuses to run as one. It holds the application
+    // role's privileges, so only its attributes set it apart.
     public async Task<string> CreateLoginRoleAsync(string attributes)
     {
         var name = $"role_{Guid.NewGuid():N}";
         await using var connection = new NpgsqlConnection(SuperuserConnectionString);
         await connection.OpenAsync();
-        await using var create = new NpgsqlCommand($"CREATE ROLE {name} LOGIN {attributes} PASSWORD '{Password}'", connection);
+        await using var create = new NpgsqlCommand($"CREATE ROLE {name} LOGIN {attributes} PASSWORD '{Password}' IN ROLE {DatabaseRoles.Application}", connection);
         await create.ExecuteNonQueryAsync();
 
         return ConnectionStringFor(name);
@@ -131,6 +140,8 @@ public sealed class Database : IAsyncLifetime
         await using var services = new ServiceCollection()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
             .AddControlPlaneModule()
+            .AddNotificationsModule(new ConfigurationBuilder().Build())
+            .AddAuditModule()
             .BuildServiceProvider();
 
         await MigrationStep.RunAsync(services, ConnectionStringFor(DatabaseRoles.Owner, database), CancellationToken.None);

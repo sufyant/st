@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Notifications.Application" />
+    <InternalsVisibleTo Include="Notifications.Infrastructure" />
+    <InternalsVisibleTo Include="Notifications.UnitTests" />
+    <InternalsVisibleTo Include="Notifications.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
   </ItemGroup>
 

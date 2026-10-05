@@ -24,10 +24,11 @@ Three layers:
 - **The catalogue lives in SharedKernel** (`Permissions`), as constants with two pools: tenant and system (0031).
   - SharedKernel is the only project every module layer and the host can see (0006). An endpoint in any module names its permission there, and the role rules in ControlPlane check against the same pool.
   - A permission is added there when its capability is built.
-  - Phase 4 has these tenant permissions: `members.invite`, `members.manage`, `owners.manage`, `roles.manage`.
+  - Phase 4 has these tenant permissions: `members.invite`, `members.manage`, `owners.manage`, `roles.manage`. Phase 6 adds `notifications.schedule`, scheduling notifications for oneself (0027).
 - **Built-in roles.**
   - Owner holds the whole tenant pool. Admin holds all of it except `owners.manage`.
-  - Member and viewer hold nothing yet. Modules give them permissions as they add capabilities for them.
+  - Modules give members and viewers permissions as they add capabilities for them. A member holds `notifications.schedule`. A viewer only reads, and no permission that only reads exists yet, so a viewer holds nothing.
+  - Because nobody hands out more than they hold, inviting someone as a member takes every permission a member has. A custom role that holds only `members.invite` can invite viewers, but no longer members, once members hold `notifications.schedule`.
   - Built-in roles are stored once, with fixed ids, as `catalog.roles` rows that belong to no tenant. Their permissions come from code and the rows hold none. This way memberships and invitations reference every role through one foreign key.
 - **Custom roles** are rows of their tenant in `catalog.roles`, with their permissions as a text array.
   - Names are unique in the tenant and cannot be a built-in role's name.

@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,9 +13,8 @@ using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
-// Until the Notifications module sends invitation emails through Resend (0029, 0037), only Development writes the link to the
-// log. Delivery is a message the outbox sends once the invitation is saved, so anywhere else the invitation is kept but its delivery
-// fails loudly, and without a token nobody can accept it.
+// The invitation email goes through the Notifications module (0029, 0037): through Resend, or to the log in Development without
+// Resend. Delivery is a message the outbox sends once the invitation is saved.
 public sealed class InvitationDeliveryTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -33,19 +34,31 @@ public sealed class InvitationDeliveryTests(Database database)
     }
 
     [Fact]
-    public async Task Outside_development_the_invitation_is_kept_without_a_token_and_its_delivery_fails_explicitly()
+    public async Task Outside_development_the_invitation_email_is_sent_through_resend()
     {
-        await using var api = Api(Environments.Production);
+        using var resend = new StubResend();
+        await using var api = Api(Environments.Production, resend, Resend);
         var email = $"{Guid.NewGuid():N}@example.com";
-        HttpResponseMessage response = null!;
 
-        var messages = await api.TrackMessagesAsync(async () => response = await InviteAsync(api, email));
+        var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        messages.MovedToErrorQueue.SingleMessage<DeliverInvitation>().ShouldNotBeNull();
-        api.Services.GetFakeLogCollector().GetSnapshot()
-            .ShouldContain(record => record.Exception is InvalidOperationException && record.Exception.Message.Contains("Development", StringComparison.Ordinal));
-        (await _catalog.CountAsync($"SELECT count(*) FROM catalog.invitations WHERE email = '{email}' AND token_hash IS NULL")).ShouldBe(1);
+        var sent = resend.Requests.ShouldHaveSingleItem();
+        sent.Uri.ShouldBe(new Uri("https://api.resend.test/emails"));
+        var body = JsonDocument.Parse(sent.Body).RootElement;
+        body.GetProperty("to").EnumerateArray().Single().GetString().ShouldBe(email);
+        body.GetProperty("text").GetString()!.ShouldContain(api.Identity.Invitations.Single(invitation => invitation.Email == email).InvitationId.ToString());
+    }
+
+    // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email gets no traffic.
+    [Fact]
+    public async Task Outside_development_the_application_is_not_ready_without_resend()
+    {
+        await using var api = Api(Environments.Production);
+
+        var ready = await api.CreateClient().GetAsync("/health/ready", Cancellation);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
 
     // Clerk or the email channel may be down for a moment: a failed delivery is tried again, each time after a longer pause.
@@ -70,11 +83,27 @@ public sealed class InvitationDeliveryTests(Database database)
         sender.Sent.ShouldHaveSingleItem().Email.ShouldBe(email);
     }
 
-    private ApiFactory Api(string environment) => new(
+    private static readonly Dictionary<string, string?> Resend = new()
+    {
+        ["Resend:ApiKey"] = "re_test_key",
+        ["Resend:From"] = "App <no-reply@app.test>",
+        ["Resend:ApiUrl"] = "https://api.resend.test/",
+    };
+
+    // The application's own invitation sender and email channel, with Resend replaced at the HTTP boundary when it is configured.
+    private ApiFactory Api(string environment, StubResend? resend = null, Dictionary<string, string?>? settings = null) => new(
         database.ConnectionStringFor(DatabaseRoles.Application),
         environment: environment,
         fakeInvitationSender: false,
-        configureServices: services => services.AddFakeLogging());
+        settings: settings,
+        configureServices: services =>
+        {
+            services.AddFakeLogging();
+            if (resend is not null)
+            {
+                services.ConfigureHttpClientDefaults(client => client.ConfigurePrimaryHttpMessageHandler(() => resend));
+            }
+        });
 
     private async Task<HttpResponseMessage> InviteAsync(ApiFactory api, string email)
     {
@@ -83,5 +112,16 @@ public sealed class InvitationDeliveryTests(Database database)
         var roleId = await database.ScalarAsync<Guid>("SELECT id FROM catalog.roles WHERE built_in = 'Member'");
 
         return await api.CreateClient(owner).PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/invitations", new { email, roleId }, Cancellation);
+    }
+
+    private sealed class StubResend : HttpMessageHandler
+    {
+        public ConcurrentBag<(Uri Uri, string Body)> Requests { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add((request.RequestUri!, await request.Content!.ReadAsStringAsync(cancellationToken)));
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"id":"email_1"}""") };
+        }
     }
 }

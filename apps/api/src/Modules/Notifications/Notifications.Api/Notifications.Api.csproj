@@ -1,5 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- XML comments feed the OpenAPI descriptions; not every public member needs one. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hangfire.Core" />
+    <!-- Hangfire.Core accepts Newtonsoft.Json 11, which has a known vulnerability; this lifts it to a fixed release. -->
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="WolverineFx" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Notifications.Application\Notifications.Application.csproj" />
     <ProjectReference Include="..\Notifications.Contracts\Notifications.Contracts.csproj" />

@@ -1,10 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Audit.Api" />
+    <InternalsVisibleTo Include="Audit.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Audit.Application\Audit.Application.csproj" />
     <ProjectReference Include="..\Audit.Domain\Audit.Domain.csproj" />
     <ProjectReference Include="..\Audit.Contracts\Audit.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Tenancy\Tenancy.csproj" />
   </ItemGroup>
 
 </Project>

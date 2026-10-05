@@ -1,10 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Notifications.Api" />
+    <InternalsVisibleTo Include="Notifications.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Notifications.Application\Notifications.Application.csproj" />
     <ProjectReference Include="..\Notifications.Domain\Notifications.Domain.csproj" />
     <ProjectReference Include="..\Notifications.Contracts\Notifications.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Tenancy\Tenancy.csproj" />
   </ItemGroup>
 
 </Project>

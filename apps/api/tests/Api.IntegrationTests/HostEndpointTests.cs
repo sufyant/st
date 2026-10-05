@@ -119,7 +119,10 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task Outside_development_the_application_is_ready_with_authorized_parties()
     {
-        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production);
+        await using var api = new ApiFactory(
+            database.ApplicationConnectionString,
+            environment: Environments.Production,
+            settings: new Dictionary<string, string?> { ["Resend:ApiKey"] = "re_test_key", ["Resend:From"] = "no-reply@app.test" });
 
         var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
 

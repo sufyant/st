@@ -24,14 +24,18 @@ internal static class BuiltInRoles
     private static readonly FrozenSet<string> AdminPermissions =
         OwnerPermissions.Except([Permissions.OwnersManage]).ToFrozenSet(StringComparer.Ordinal);
 
-    // Members and viewers get the permissions of the capabilities that modules add for them; none exists yet.
+    // Members and viewers get the permissions of the capabilities that modules add for them. A viewer only reads, and no module
+    // has a permission that only reads yet.
+    private static readonly FrozenSet<string> MemberPermissions = FrozenSet.Create(StringComparer.Ordinal, Permissions.NotificationsSchedule);
+
     private static readonly FrozenSet<string> NoPermissions = FrozenSet<string>.Empty;
 
     public static IReadOnlySet<string> PermissionsOf(BuiltInRole role) => role switch
     {
         BuiltInRole.Owner => OwnerPermissions,
         BuiltInRole.Admin => AdminPermissions,
-        BuiltInRole.Member or BuiltInRole.Viewer => NoPermissions,
+        BuiltInRole.Member => MemberPermissions,
+        BuiltInRole.Viewer => NoPermissions,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Every built-in role has its permissions."),
     };
 }

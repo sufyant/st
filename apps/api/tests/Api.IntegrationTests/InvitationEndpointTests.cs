@@ -189,7 +189,9 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     public async Task A_custom_role_with_the_permission_to_invite_can_invite()
     {
         var tenant = await _catalog.AddTenantAsync();
-        var recruiter = await _catalog.AddCustomRoleAsync(tenant.Id, Permissions.MembersInvite);
+
+        // Nobody hands out more than they hold (0030), so inviting a member takes a member's permissions as well.
+        var recruiter = await _catalog.AddCustomRoleAsync(tenant.Id, Permissions.MembersInvite, Permissions.NotificationsSchedule);
         var member = await _catalog.AddMemberWithRoleAsync(tenant.Id, recruiter);
 
         var response = await InviteAsync(tenant.Slug, member, $"{Guid.NewGuid():N}@example.com", "Member");

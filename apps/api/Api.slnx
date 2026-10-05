@@ -31,8 +31,11 @@
   <Folder Name="/tests/">
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
     <Project Path="tests/Api.IntegrationTests/Api.IntegrationTests.csproj" />
+    <Project Path="tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj" />
     <Project Path="tests/ControlPlane.IntegrationTests/ControlPlane.IntegrationTests.csproj" />
     <Project Path="tests/ControlPlane.UnitTests/ControlPlane.UnitTests.csproj" />
+    <Project Path="tests/Notifications.IntegrationTests/Notifications.IntegrationTests.csproj" />
+    <Project Path="tests/Notifications.UnitTests/Notifications.UnitTests.csproj" />
     <Project Path="tests/Onboarding.EndToEndTests/Onboarding.EndToEndTests.csproj" />
     <Project Path="tests/SharedKernel.UnitTests/SharedKernel.UnitTests.csproj" />
     <Project Path="tests/Tenancy.IntegrationTests/Tenancy.IntegrationTests.csproj" />

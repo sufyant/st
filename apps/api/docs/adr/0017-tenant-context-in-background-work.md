@@ -35,4 +35,4 @@ It sees every tenant because the owner owns the table and row level security is 
 
 - Background work is isolated exactly like requests.
 - Each `SECURITY DEFINER` function is a reviewed, minimal exception and must stay narrow.
-- The first real scanner arrives with the Notifications module (Phase 6); until then the shape is proven on a test table.
+- The first real scanner is the Notifications module's (Phase 6): `notifications.due_scheduled_notifications(due_at_or_before)` returns the tenant and id of every scheduled notification that is due, and each is then sent under its own tenant (0027, 0037). The shape is also proven on a test table in `Tenancy.IntegrationTests`.

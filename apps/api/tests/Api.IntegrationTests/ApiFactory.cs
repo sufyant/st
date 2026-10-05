@@ -22,7 +22,8 @@ internal sealed class ApiFactory(
     IReadOnlyList<string>? authorizedParties = null,
     bool fakeInvitationSender = true,
     Action<IServiceCollection>? configureServices = null,
-    string? directConnectionString = null) : WebApplicationFactory<Program>
+    string? directConnectionString = null,
+    IReadOnlyDictionary<string, string?>? settings = null) : WebApplicationFactory<Program>
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
 
@@ -70,6 +71,11 @@ internal sealed class ApiFactory(
         foreach (var (party, index) in (authorizedParties ?? [TestTokens.AuthorizedParty]).Select((party, index) => (party, index)))
         {
             builder.UseSetting($"Clerk:AuthorizedParties:{index}", party);
+        }
+
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+        {
+            builder.UseSetting(key, value);
         }
 
         builder.ConfigureTestServices(services =>

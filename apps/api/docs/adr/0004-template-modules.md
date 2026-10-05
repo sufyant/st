@@ -29,4 +29,4 @@ The template ships these modules:
 ## Consequences
 
 - Accepted tension: the ControlPlane name comes from SaaS architecture vocabulary, not from the business domain.
-- The schema names for Notifications and Audit are chosen when those modules are built.
+- The schema names for Notifications and Audit were chosen when the modules were built (Phase 6): `notifications` and `audit`.

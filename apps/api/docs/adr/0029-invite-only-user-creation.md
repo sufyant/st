@@ -24,7 +24,8 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
   - The tenant, the email address and the role.
   - The SHA-256 hash of the token. The token is 256 random bits, so a fast hash suffices. The hash is written when the invitation is delivered and stays empty until then.
   - Who invited, when, the expiry, and the status: `Pending`, `Accepted` or `Expired`.
-  - The lifetime comes from `Invitations:Lifetime` (seven days by default). Until the system job closes expired invitations (0027), the expiry date decides.
+  - The lifetime comes from `Invitations:Lifetime` (seven days by default).
+  - **Closing expired invitations.** An hourly system job (0027) sends `CloseExpiredInvitations`, which moves every pending invitation past its expiry to `Expired` in one statement, outside any tenant (0021). Before the job runs, the expiry date alone decides. Either way, accepting an expired invitation answers `invitation.expired`.
 - **Who invites.** A member with `members.invite` may invite with a role no greater than their own (0030):
   - Route: `POST /v1/tenants/{slug}/invitations`.
   - A system admin invites through `POST /v1/admin/tenants/{slug}/invitations` with `system.members.invite`, with any role; this is how a tenant gets its first owner (0031).
@@ -62,12 +63,13 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
   4. It sends the email last. If sending fails, the hash rolls back with the delivery's transaction. The delivery is tried again after pauses of one, two and four seconds, each time with a new token, and then goes to the dead letter queue; it is not compensated (0026).
   - The token is born in the delivery, so no stored message ever carries it; only the link that is sent does. A test checks the stored messages for it.
   - An email sent by a delivery whose transaction then fails to commit carries a link that does not work; the retry sends a new one.
-- **Delivery until Notifications exists.** The email goes through an `IInvitationSender` port. Until the Notifications module sends it through Resend (Phase 6, 0037), the sender depends on the environment:
-  - In Development it writes the link to the log.
-  - Anywhere else, sending fails with an explicit error and the delivery ends in the dead letter queue. The invitation is kept, because its delivery comes after its transaction, but it has no token, so nobody can accept it. Before Phase 5 the command itself failed and nothing was kept.
+- **The email.** The delivery sends it through the `IInvitationSender` port, whose implementation hands a plain-text email with the link to the Notifications module's synchronous contract, `INotificationsModule.SendEmailAsync` (0009, 0037). The call is synchronous so that the link, and the token in it, never sit in a stored message.
+  - The Notifications module sends it through Resend. In Development without Resend settings, it writes the email to the log instead.
+  - Outside Development a pod without Resend settings is not ready, so an invitation is never left undelivered for want of configuration. A send that Resend refuses fails the delivery, which is retried and then goes to the dead letter queue.
+  - Until Phase 6 no email was sent outside Development: the delivery failed explicitly and the invitation stayed without a token.
 - **Clerk calls and open transactions.** The acceptance reads the verified addresses before its transaction begins, so it holds no lock while it waits on Clerk. The delivery deliberately keeps its transaction open while it calls Clerk and sends the email:
   - **Why.** The token must be born in the step that sends it, and its hash may be kept only once the link has gone out. Committing the hash first would keep a token nobody received whenever sending fails. Handing the token to a later step would put it in a stored message.
-  - **What it costs.** For the length of the calls, the delivery holds one pooled connection and a lock on its own invitation row, nothing else. The calls are bounded by their clients' timeouts, and resilience policies come with 0041. The lock also keeps a second copy of the message from issuing a second token at the same time.
+  - **What it costs.** For the length of the calls, the delivery holds one pooled connection and a lock on its own invitation row, nothing else. The calls are bounded by their clients' resilience handlers (0041): ten seconds per attempt, at most four attempts, thirty seconds in all. The lock also keeps a second copy of the message from issuing a second token at the same time.
   - **What can go wrong.** An email sent by a delivery whose transaction then fails to commit carries a link that does not work; the retry sends a new one.
 
 ## Alternatives considered
@@ -86,7 +88,7 @@ Sign-up is closed (0028). People join a tenant only when invited, and the invita
 - Our token appears in plain text in the redirect URL stored at Clerk. A leak there gives no access on its own, because accepting also needs the verified email address.
 - Clerk limits invitation creation to 100 per hour per instance.
 - The token never sits in a stored message: it is generated when the invitation is delivered (Phase 5).
-- An invitation is visible as pending before its email is sent, and outside Development it stays without a token until the Notifications module sends emails (Phase 6).
+- An invitation is visible as pending before its email is sent.
 
 ## Verified
 

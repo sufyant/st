@@ -3,6 +3,7 @@ using System.Reflection;
 using Api.Authentication;
 using Api.Authorization;
 using Api.ErrorHandling;
+using Api.Jobs;
 using Api.Messaging;
 using Api.Networking;
 using Api.Observability;
@@ -71,6 +72,7 @@ internal static class ApiPipeline
             options.Policies.Add<TenantTransactionPolicy>();
         });
 
+        builder.AddScheduledJobs();
         builder.Services.AddTenantRateLimiting();
         builder.Services.AddHealthChecks();
         builder.Services.AddOpenApi();
@@ -107,6 +109,8 @@ internal static class ApiPipeline
             app.MapOpenApi();
             app.MapScalarApiReference();
         }
+
+        app.UseJobsDashboard();
 
         return app;
     }

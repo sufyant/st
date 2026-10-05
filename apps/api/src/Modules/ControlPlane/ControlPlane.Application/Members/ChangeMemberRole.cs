@@ -5,7 +5,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Members;
 
 /// <summary>Assigns a member another role; the tenant keeps at least one owner (0030).</summary>
-public sealed record ChangeMemberRole(string ActorId, Guid UserId, Guid RoleId);
+public sealed record ChangeMemberRole(string ActorId, Guid UserId, Guid RoleId) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { UserId, RoleId };
+}
 
 public static class ChangeMemberRoleHandler
 {

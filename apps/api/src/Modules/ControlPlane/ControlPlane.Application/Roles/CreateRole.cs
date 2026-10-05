@@ -5,7 +5,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Roles;
 
 /// <summary>Creates a custom role in the active tenant from the tenant permission pool (0030).</summary>
-public sealed record CreateRole(string ActorId, string Name, IReadOnlyCollection<string> Permissions);
+public sealed record CreateRole(string ActorId, string Name, IReadOnlyCollection<string> Permissions) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { Name, Permissions };
+}
 
 public static class CreateRoleHandler
 {

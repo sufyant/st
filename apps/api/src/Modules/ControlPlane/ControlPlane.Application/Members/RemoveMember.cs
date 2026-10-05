@@ -5,7 +5,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Members;
 
 /// <summary>Removes a member from the tenant; the tenant keeps at least one owner (0030).</summary>
-public sealed record RemoveMember(string ActorId, Guid UserId);
+public sealed record RemoveMember(string ActorId, Guid UserId) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { UserId };
+}
 
 public static class RemoveMemberHandler
 {

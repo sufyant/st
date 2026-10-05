@@ -37,6 +37,7 @@ Some data sits above tenants: the tenants themselves, users who can belong to se
   - `TenantDirectory` (0015) reads memberships with their role's permissions, and finds a tenant by slug for a system admin entering it (0031).
   - `InvitationDirectory` finds the tenant of an invitation from its token, so that accepting it can run in that tenant (0029). It reveals only the tenant id.
   - `SystemAdminDirectory` reads a user's system permissions; system admin grants belong to no tenant.
+- **The writer outside a tenant.** `InvitationExpiry` is the one catalog writer not bound to a tenant. The system job that closes expired invitations (0027, 0029) moves every pending invitation past its expiry to `Expired` in one statement, across all tenants. It reads nothing back and changes nothing else. Acceptance locks the invitation's row as well, so the two never both change one invitation.
 
 ## Alternatives considered
 

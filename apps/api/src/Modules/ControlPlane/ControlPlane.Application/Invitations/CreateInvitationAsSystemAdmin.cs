@@ -8,7 +8,12 @@ namespace ControlPlane.Application.Invitations;
 /// A system admin, inside the tenant's context, invites someone to it with any role, for example its first owner (0029, 0031).
 /// The admin route group has already checked the admin's system permissions.
 /// </summary>
-public sealed record CreateInvitationAsSystemAdmin(string AdminId, string Email, Guid RoleId);
+public sealed record CreateInvitationAsSystemAdmin(string AdminId, string Email, Guid RoleId) : IAuditedCommand
+{
+    string IAuditedCommand.ActorId => AdminId;
+
+    object IAuditedCommand.AuditDetails => new { Email, RoleId };
+}
 
 public sealed class CreateInvitationAsSystemAdminValidator : AbstractValidator<CreateInvitationAsSystemAdmin>
 {

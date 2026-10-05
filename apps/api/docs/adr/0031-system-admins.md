@@ -33,7 +33,9 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
 - **Rejection.**
   - Without a second factor, or without a grant: 403.
   - An unknown slug: 404, but only for an admin who passes every other check; others cannot tell whether a slug exists.
-- **Recording entries.** An endpoint filter on the admin tenant group runs after authorization and records every entry as a security event: `SystemAdminTenantEntry` in the `Api.Security` log category, with the user, the tenant and the request. The audit record (0040) joins it there once the Audit module exists (Phase 6).
+- **Recording entries.** An endpoint filter on the admin tenant group runs after authorization and before the endpoint, and records every entry twice:
+  - As a security event: `SystemAdminTenantEntry` in the `Api.Security` log category, with the user, the tenant and the request.
+  - In the entered tenant's audit log (0040), as a `SystemAdminEntry` record with the user and the request's method and path. It is stored on its own, so it is kept whatever the endpoint's command then does.
 - **Rate limiting.** A system admin inside a tenant is not its member and spends their own limit, not the tenant's (0035).
 - **Endpoints of Phase 4.**
   - `GET /v1/admin/tenants?page&pageSize` (`system.tenants.read`): every tenant with its status and member count, paginated (0034).
@@ -52,7 +54,7 @@ The SaaS provider's own staff (system admins, in Golding's terms) must manage te
 - Admins see tenant data only the way the tenant itself would.
 - The admin surface is a distinct, separately authorized part of the API.
 - MFA does not depend on a setting in the identity provider alone.
-- Until the Audit module exists, entries are recorded only in the log.
+- Every entry is in the tenant's audit log as well as in the security log (since Phase 6).
 
 ## Verified
 

@@ -5,7 +5,10 @@ using SharedKernel;
 namespace ControlPlane.Application.Roles;
 
 /// <summary>Deletes a custom role that no member or pending invitation is assigned (0030).</summary>
-public sealed record DeleteRole(string ActorId, Guid RoleId);
+public sealed record DeleteRole(string ActorId, Guid RoleId) : IAuditedCommand
+{
+    object IAuditedCommand.AuditDetails => new { RoleId };
+}
 
 public static class DeleteRoleHandler
 {

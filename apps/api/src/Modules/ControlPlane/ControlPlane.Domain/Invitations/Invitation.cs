@@ -81,12 +81,13 @@ internal sealed class Invitation
 
     public Result Accept(IEnumerable<string> verifiedEmails, Guid userId, DateTimeOffset now)
     {
-        if (Status != InvitationStatus.Pending)
+        if (Status == InvitationStatus.Accepted)
         {
             return Error.Conflict("invitation.not_pending", "The invitation has already been used.");
         }
 
-        if (now >= ExpiresAt)
+        // Expired either by the system job or, before it runs, by its lifetime.
+        if (Status == InvitationStatus.Expired || now >= ExpiresAt)
         {
             return Error.Conflict("invitation.expired", "The invitation has expired; ask for a new one.");
         }

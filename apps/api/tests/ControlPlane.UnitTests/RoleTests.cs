@@ -18,7 +18,7 @@ public class RoleTests
     public void An_admin_holds_every_tenant_permission_except_managing_owners()
     {
         BuiltInRoles.Admin.Permissions.ShouldBe(
-            [Permissions.MembersInvite, Permissions.MembersManage, Permissions.RolesManage], ignoreOrder: true);
+            [Permissions.MembersInvite, Permissions.MembersManage, Permissions.RolesManage, Permissions.NotificationsSchedule], ignoreOrder: true);
     }
 
     [Fact]

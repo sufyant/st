@@ -38,6 +38,15 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
         RequestLogs().ShouldHaveSingleItem().StructuredState.ShouldNotBeNull().ShouldContain(new KeyValuePair<string, string?>("TenantId", tenant.Id.ToString()));
     }
 
+    // A SignalR hub takes the session token from the query string (0037), so the logged path leaves the query string out.
+    [Fact]
+    public async Task The_query_string_is_not_logged()
+    {
+        await _client.GetAsync("/v1/ping?access_token=secret-token", TestContext.Current.CancellationToken);
+
+        RequestLogs().ShouldHaveSingleItem().Message.ShouldNotContain("secret-token");
+    }
+
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
