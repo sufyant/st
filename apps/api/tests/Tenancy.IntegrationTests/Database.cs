@@ -59,7 +59,6 @@ public sealed class Database : IAsyncLifetime
             $"""
             GRANT USAGE ON SCHEMA {NotesDbContext.Schema} TO {DatabaseRoles.Application};
             GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {NotesDbContext.Schema} TO {DatabaseRoles.Application};
-            {TenantScan.CreateFunctionSql(NotesDbContext.Schema, "notes_containing", "fragment text", "notes", "scanned.text LIKE '%' || fragment || '%'")}
             """,
             connection);
         await grant.ExecuteNonQueryAsync();

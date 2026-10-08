@@ -140,7 +140,7 @@ public sealed class Database : IAsyncLifetime
         await using var services = new ServiceCollection()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
             .AddControlPlaneModule()
-            .AddNotificationsModule(new ConfigurationBuilder().Build())
+            .AddNotificationsModule()
             .AddAuditModule()
             .BuildServiceProvider();
 

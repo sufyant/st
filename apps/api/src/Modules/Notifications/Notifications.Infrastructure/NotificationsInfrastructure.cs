@@ -1,39 +1,21 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Notifications.Application.Ports;
 using Notifications.Contracts;
-using Notifications.Infrastructure.Channels;
 using Notifications.Infrastructure.Email;
-using StackExchange.Redis;
 using Tenancy;
 
 namespace Notifications.Infrastructure;
 
 internal static class NotificationsInfrastructure
 {
-    public const string RedisConnection = "Redis";
-
-    public static IServiceCollection AddNotificationsInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddNotificationsInfrastructure(this IServiceCollection services)
     {
         services.AddTransient<INotificationsModule, EmailNotifications>();
 
         services.AddModuleDbContext<NotificationsDbContext>(NotificationsDbContext.Schema);
-        services.AddScoped<IScheduledNotifications, ScheduledNotifications>();
-        services.AddScoped<IDueNotificationScan, DueNotificationScan>();
-
-        // In-app notifications go out over SignalR. With more than one pod the Redis backplane carries them to the pod that holds
-        // the user's connection; it is on when its connection string is set, and off by default (0037, 0038).
-        var signalR = services.AddSignalR();
-        if (configuration.GetConnectionString(RedisConnection) is { Length: > 0 } redis)
-        {
-            signalR.AddStackExchangeRedis(redis, options => options.Configuration.ChannelPrefix = RedisChannel.Literal(NotificationsDbContext.Schema));
-        }
-
-        services.AddSingleton<INotificationChannel, SignalRNotificationChannel>();
-        services.AddSingleton<INotificationChannel, LogPushChannel>();
 
         services.AddOptions<ResendOptions>().BindConfiguration(ResendOptions.Section);
         services.AddHealthChecks().AddCheck<EmailChannelHealthCheck>("email", tags: ["ready"]);

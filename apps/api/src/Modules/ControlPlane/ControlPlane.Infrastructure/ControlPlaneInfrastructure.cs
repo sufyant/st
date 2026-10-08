@@ -18,7 +18,6 @@ internal static class ControlPlaneInfrastructure
         services.AddScoped<TenantCatalog>();
         services.AddScoped<ITenantCatalog>(provider => provider.GetRequiredService<TenantCatalog>());
         services.AddScoped<IInvitationDirectory, InvitationDirectory>();
-        services.AddScoped<IInvitationExpiry, InvitationExpiry>();
         services.AddSingleton<ITenantReport, TenantReport>();
 
         services.AddOptions<InvitationSettings>().BindConfiguration(InvitationSettings.Section);

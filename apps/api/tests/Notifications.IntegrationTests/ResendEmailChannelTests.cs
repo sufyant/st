@@ -87,7 +87,7 @@ public sealed class ResendEmailChannelTests : IDisposable
             .AddSingleton<IConfiguration>(configuration)
             .AddSingleton<IHostEnvironment>(new TestEnvironment(Environments.Production))
             .AddLogging()
-            .AddNotificationsModule(configuration)
+            .AddNotificationsModule()
             .ConfigureHttpClientDefaults(client => client.ConfigurePrimaryHttpMessageHandler(() => _resend))
             .BuildServiceProvider()
             .GetRequiredService<INotificationsModule>();

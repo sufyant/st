@@ -3,7 +3,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Notifications.Application" />
     <InternalsVisibleTo Include="Notifications.Infrastructure" />
-    <InternalsVisibleTo Include="Notifications.UnitTests" />
     <InternalsVisibleTo Include="Notifications.IntegrationTests" />
   </ItemGroup>
 

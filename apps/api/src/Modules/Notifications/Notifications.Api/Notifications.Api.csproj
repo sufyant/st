@@ -11,9 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hangfire.Core" />
-    <!-- Hangfire.Core accepts Newtonsoft.Json 11, which has a known vulnerability; this lifts it to a fixed release. -->
-    <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="WolverineFx" />
   </ItemGroup>
 

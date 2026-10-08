@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -37,24 +36,10 @@ internal static class ClerkAuthentication
                     // Clerk's session tokens live a minute; its own SDKs allow five seconds of clock skew.
                     ClockSkew = TimeSpan.FromSeconds(5),
                 };
-                options.Events = new JwtBearerEvents { OnMessageReceived = ReadHubTokenFromQuery, OnTokenValidated = CheckClerkClaimsAsync };
+                options.Events = new JwtBearerEvents { OnTokenValidated = CheckClerkClaimsAsync };
             });
 
         return builder;
-    }
-
-    // A browser cannot send a header when it opens a WebSocket, so a SignalR hub takes the token from the query string (0037). Only
-    // there: anywhere else a token in a URL would end up in logs and caches. Routing runs before authentication, so the endpoint
-    // is known here. The request log records the path without its query string.
-    private static Task ReadHubTokenFromQuery(MessageReceivedContext context)
-    {
-        if (context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<HubMetadata>() is not null
-            && context.Request.Query["access_token"] is [{ Length: > 0 } token])
-        {
-            context.Token = token;
-        }
-
-        return Task.CompletedTask;
     }
 
     private static Task CheckClerkClaimsAsync(TokenValidatedContext context)

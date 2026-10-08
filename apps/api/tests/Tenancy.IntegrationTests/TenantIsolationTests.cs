@@ -189,6 +189,20 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         setting.ShouldBe(DBNull.Value);
     }
 
+    [Fact]
+    public async Task No_database_role_bypasses_row_level_security()
+    {
+        await using var connection = new NpgsqlConnection(database.ApplicationConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM pg_roles WHERE rolname IN ('api_owner', 'api_application', 'api_reporting') AND NOT rolbypassrls AND NOT rolsuper",
+            connection);
+
+        var rolesWithoutBypass = (long)(await command.ExecuteScalarAsync(Cancellation))!;
+
+        rolesWithoutBypass.ShouldBe(3);
+    }
+
     private async Task<Note> WriteNoteAsync(Guid tenant, string text)
     {
         var note = new Note { Text = text };

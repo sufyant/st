@@ -86,8 +86,7 @@ internal sealed class Invitation
             return Error.Conflict("invitation.not_pending", "The invitation has already been used.");
         }
 
-        // Expired either by the system job or, before it runs, by its lifetime.
-        if (Status == InvitationStatus.Expired || now >= ExpiresAt)
+        if (now >= ExpiresAt)
         {
             return Error.Conflict("invitation.expired", "The invitation has expired; ask for a new one.");
         }

@@ -6,19 +6,23 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Notifications.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialNotifications : Migration
+    public partial class RemoveScheduledNotifications : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP FUNCTION notifications.due_scheduled_notifications(timestamptz);");
+
+            migrationBuilder.DropTable(
+                name: "scheduled_notifications",
+                schema: "notifications");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
             migrationBuilder.EnsureSchema(
                 name: "notifications");
-
-            // Privileges come from migrations (0018).
-            migrationBuilder.Sql("""
-                GRANT USAGE ON SCHEMA notifications TO api_application;
-                ALTER DEFAULT PRIVILEGES IN SCHEMA notifications GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO api_application;
-                """);
 
             migrationBuilder.CreateTable(
                 name: "scheduled_notifications",
@@ -26,14 +30,14 @@ namespace Notifications.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    recipient_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     body = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
-                    due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    recipient_id = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     sent_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    tenant_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "NULLIF(current_setting('app.tenant_id', true), '')::uuid")
+                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    tenant_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "NULLIF(current_setting('app.tenant_id', true), '')::uuid"),
+                    title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -58,7 +62,6 @@ namespace Notifications.Infrastructure.Migrations
                 table: "scheduled_notifications",
                 column: "tenant_id");
 
-            // The scanner's narrow lookup across tenants: the tenant and id of every due notification, nothing else (0017).
             migrationBuilder.Sql("""
                 CREATE FUNCTION "notifications"."due_scheduled_notifications"(due_at_or_before timestamptz)
                 RETURNS TABLE (tenant_id uuid, id uuid)
@@ -69,21 +72,6 @@ namespace Notifications.Infrastructure.Migrations
                 $scan$;
                 REVOKE ALL ON FUNCTION "notifications"."due_scheduled_notifications"(due_at_or_before timestamptz) FROM PUBLIC;
                 GRANT EXECUTE ON FUNCTION "notifications"."due_scheduled_notifications"(due_at_or_before timestamptz) TO api_application;
-                """);
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.Sql("DROP FUNCTION notifications.due_scheduled_notifications(timestamptz);");
-
-            migrationBuilder.DropTable(
-                name: "scheduled_notifications",
-                schema: "notifications");
-
-            migrationBuilder.Sql("""
-                ALTER DEFAULT PRIVILEGES IN SCHEMA notifications REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM api_application;
-                REVOKE USAGE ON SCHEMA notifications FROM api_application;
                 """);
         }
     }

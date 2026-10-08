@@ -55,7 +55,7 @@ internal sealed class PipelineHost : IAsyncDisposable
 
         builder.AddApiPipeline(typeof(PipelineHost).Assembly);
         builder.Services.AddControlPlaneModule();
-        builder.Services.AddNotificationsModule(builder.Configuration);
+        builder.Services.AddNotificationsModule();
         builder.Services.AddModuleDbContext<ProbeDbContext>(ProbeDbContext.Schema);
         builder.Services.TrustTestKey();
         configureServices?.Invoke(builder.Services);
