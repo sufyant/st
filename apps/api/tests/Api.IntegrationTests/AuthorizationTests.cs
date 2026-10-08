@@ -37,7 +37,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
-    // System admins enter tenants through the admin routes only.
+    // A system admin is not a member, so the tenant routes do not let them in.
     [Fact]
     public async Task A_system_admin_who_is_not_a_member_does_not_find_the_tenant()
     {

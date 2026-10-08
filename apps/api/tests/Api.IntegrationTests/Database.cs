@@ -23,7 +23,7 @@ public sealed class Database : IAsyncLifetime
     private const string Password = "test-password";
     private const string MainDatabase = "api";
 
-    // The tests run the application in many hosts at once, each with its own pools for requests, messages and jobs; together
+    // The tests run the application in many hosts at once, each with its own pools for requests and messages; together
     // they need more connections than PostgreSQL's default of 100.
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18")
         .WithDatabase(MainDatabase)
