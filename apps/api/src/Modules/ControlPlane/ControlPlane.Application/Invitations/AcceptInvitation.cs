@@ -10,13 +10,7 @@ namespace ControlPlane.Application.Invitations;
 /// the invitation is used up (0029). The user's verified email addresses are read from the identity provider before that
 /// transaction begins, so no call leaves the process while the invitation is locked.
 /// </summary>
-public sealed record AcceptInvitation(string Token, string UserId, IReadOnlyList<string> VerifiedEmails) : IAuditedCommand
-{
-    string IAuditedCommand.ActorId => UserId;
-
-    // The token is a credential and stays out of the record; the result names the tenant joined.
-    object? IAuditedCommand.AuditDetails => null;
-}
+public sealed record AcceptInvitation(string Token, string UserId, IReadOnlyList<string> VerifiedEmails);
 
 public sealed record InvitationAccepted(string TenantSlug);
 

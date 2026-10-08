@@ -29,6 +29,4 @@ internal sealed class AuditEntry(Guid id, DateTimeOffset occurredAt, string acto
 internal enum AuditEntryKind
 {
     Command,
-    Denied,
-    SystemAdminEntry,
 }

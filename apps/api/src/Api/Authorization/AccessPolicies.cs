@@ -1,16 +1,13 @@
-using System.Security.Claims;
 using Api.Authentication;
-using Audit.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.Extensions.Options;
-using Wolverine;
 
 namespace Api.Authorization;
 
 // Authorization asks for permissions, never roles (0030). An endpoint names the permission it needs as its policy; the route
 // groups add who may reach them at all.
-internal static partial class AccessPolicies
+internal static class AccessPolicies
 {
     public const string TenantMember = "tenant-member";
 
@@ -40,20 +37,12 @@ internal static partial class AccessPolicies
     }
 
     // A tenant route the caller cannot enter answers 404, so it looks the same as a tenant that does not exist (0015).
-    // Every denial of a signed-in user is recorded (0040): in the tenant's audit log when the request entered a tenant, otherwise as
-    // a security event in the log, because the audit log is tenant-scoped (0039).
-    private sealed partial class AccessDeniedHandler(ILoggerFactory loggers, TimeProvider time) : IAuthorizationMiddlewareResultHandler
+    private sealed class AccessDeniedHandler : IAuthorizationMiddlewareResultHandler
     {
         private readonly AuthorizationMiddlewareResultHandler _default = new();
-        private readonly ILogger _security = loggers.CreateLogger("Api.Security");
 
         public async Task HandleAsync(RequestDelegate next, HttpContext context, AuthorizationPolicy policy, PolicyAuthorizationResult authorizeResult)
         {
-            if (authorizeResult.Forbidden)
-            {
-                await RecordDenialAsync(context);
-            }
-
             if (authorizeResult.Forbidden && TenantNotFound(context))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -63,21 +52,6 @@ internal static partial class AccessPolicies
             await _default.HandleAsync(next, context, policy, authorizeResult);
         }
 
-        private async Task RecordDenialAsync(HttpContext context)
-        {
-            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var access = context.RequestServices.GetRequiredService<RequestAccess>();
-            var operation = $"{context.Request.Method} {context.Request.Path}";
-            if (userId is not null && access.Membership is not null)
-            {
-                // Tenant resolution has put the tenant on the request's bus, so the record is stored under it.
-                await AuditTrail.RecordDeniedAsync(context.RequestServices.GetRequiredService<IMessageBus>(), time, userId, operation);
-                return;
-            }
-
-            LogDenial(_security, userId, operation);
-        }
-
         private static bool TenantNotFound(HttpContext context)
         {
             var metadata = context.GetEndpoint()?.Metadata;
@@ -85,9 +59,6 @@ internal static partial class AccessPolicies
 
             return metadata?.GetMetadata<Tenants.TenantScopedEndpoint>() is not null && access.Membership is null;
         }
-
-        [LoggerMessage(EventName = "AuthorizationDenied", Level = LogLevel.Warning, Message = "Authorization denied to {UserId}: {Operation}")]
-        private static partial void LogDenial(ILogger logger, string? userId, string operation);
     }
 }
 

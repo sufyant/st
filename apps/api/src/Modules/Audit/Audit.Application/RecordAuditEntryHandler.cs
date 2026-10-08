@@ -23,8 +23,6 @@ public static class RecordAuditEntryHandler
     private static AuditEntryKind KindOf(AuditKind kind) => kind switch
     {
         AuditKind.Command => AuditEntryKind.Command,
-        AuditKind.Denied => AuditEntryKind.Denied,
-        AuditKind.SystemAdminEntry => AuditEntryKind.SystemAdminEntry,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "An audit entry has a known kind."),
     };
 }

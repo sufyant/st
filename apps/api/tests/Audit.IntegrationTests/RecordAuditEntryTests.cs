@@ -6,7 +6,7 @@ using Npgsql;
 
 namespace Audit.IntegrationTests;
 
-// The Audit module stores the records other modules and the pipeline send it, under the tenant they were sent in (0040).
+// The Audit module stores the records other modules send it, under the tenant they were sent in (0040).
 public sealed class RecordAuditEntryTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
