@@ -103,21 +103,19 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
         await hasAccount.ShouldThrowAsync<HttpRequestException>();
     }
 
-    // Clerk may be unavailable for a moment; the adapter tries again before it gives up (0041).
+    // Every call to Clerk has a time limit, set from configuration.
     [Fact]
-    public async Task A_transient_failure_is_tried_again()
+    public async Task A_call_that_takes_longer_than_the_timeout_is_given_up()
     {
-        _clerk.RespondOnce("""{"errors":[{"code":"unavailable"}]}""", HttpStatusCode.ServiceUnavailable);
-        _clerk.Respond("""[{"id":"user_1","email_addresses":[{"email_address":"ada@example.com","verification":{"status":"verified"}}]}]""");
+        _clerk.Delay = TimeSpan.FromSeconds(30);
 
-        var hasAccount = await Identity().HasAccountAsync("ada@example.com", Cancellation);
+        var hasAccount = async () => await Identity(timeout: "00:00:00.100").HasAccountAsync("ada@example.com", Cancellation);
 
-        hasAccount.ShouldBeTrue();
-        _clerk.Requests.Count.ShouldBe(2);
+        await hasAccount.ShouldThrowAsync<TaskCanceledException>();
     }
 
     // The module's real adapter, as the host registers it, with Clerk replaced at the HTTP boundary.
-    private IIdentityProvider Identity()
+    private IIdentityProvider Identity(string timeout = "00:00:10")
     {
         var services = database.BuildServices(
             services => services.ConfigureHttpClientDefaults(client => client.ConfigurePrimaryHttpMessageHandler(() => _clerk)),
@@ -125,7 +123,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
             {
                 ["Clerk:SecretKey"] = "sk_test_secret",
                 ["Clerk:BackendApiUrl"] = "https://api.clerk.test/v1/",
-                ["Clerk:RetryDelay"] = "00:00:00",
+                ["Clerk:Timeout"] = timeout,
             },
             realIdentityProvider: true);
 
@@ -134,7 +132,6 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
 
     private sealed class StubClerk : HttpMessageHandler
     {
-        private readonly Queue<(string Body, HttpStatusCode Status)> _once = new();
         private string _body = "{}";
         private HttpStatusCode _status = HttpStatusCode.OK;
 
@@ -142,7 +139,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
 
         public void Respond(string body, HttpStatusCode status = HttpStatusCode.OK) => (_body, _status) = (body, status);
 
-        public void RespondOnce(string body, HttpStatusCode status) => _once.Enqueue((body, status));
+        public TimeSpan Delay { get; set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -152,8 +149,8 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
                 request.Headers.Authorization?.ToString(),
                 request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken)));
 
-            var (body, status) = _once.TryDequeue(out var once) ? once : (_body, _status);
-            return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+            await Task.Delay(Delay, cancellationToken);
+            return new HttpResponseMessage(_status) { Content = new StringContent(_body, Encoding.UTF8, "application/json") };
         }
     }
 }

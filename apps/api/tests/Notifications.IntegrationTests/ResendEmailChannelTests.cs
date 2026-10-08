@@ -35,17 +35,15 @@ public sealed class ResendEmailChannelTests : IDisposable
         body.GetProperty("text").GetString().ShouldBe("Open https://app.test/accept?token=abc");
     }
 
-    // A send is retried after a transient failure; the idempotency key stays the same, so Resend sends the email once (0041).
+    // Every send to Resend has a time limit, set from configuration.
     [Fact]
-    public async Task A_transient_failure_is_tried_again_with_the_same_idempotency_key()
+    public async Task A_send_that_takes_longer_than_the_timeout_is_given_up()
     {
-        _resend.RespondOnce(HttpStatusCode.ServiceUnavailable);
+        _resend.Delay = TimeSpan.FromSeconds(30);
 
-        await Notifications().SendEmailAsync(Email, Cancellation);
+        var send = () => Notifications(timeout: "00:00:00.100").SendEmailAsync(Email, Cancellation);
 
-        _resend.Requests.Count.ShouldBe(2);
-        _resend.Requests[0].IdempotencyKey.ShouldNotBeNullOrEmpty();
-        _resend.Requests[1].IdempotencyKey.ShouldBe(_resend.Requests[0].IdempotencyKey);
+        await send.ShouldThrowAsync<TaskCanceledException>();
     }
 
     [Fact]
@@ -71,7 +69,7 @@ public sealed class ResendEmailChannelTests : IDisposable
     }
 
     // The module as the host registers it, outside Development, with Resend replaced at the HTTP boundary.
-    private INotificationsModule Notifications()
+    private INotificationsModule Notifications(string timeout = "00:00:10")
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -79,7 +77,7 @@ public sealed class ResendEmailChannelTests : IDisposable
                 ["Resend:ApiKey"] = "re_test_key",
                 ["Resend:From"] = "App <no-reply@app.test>",
                 ["Resend:ApiUrl"] = "https://api.resend.test/",
-                ["Resend:RetryDelay"] = "00:00:00",
+                ["Resend:Timeout"] = timeout,
             })
             .Build();
 
@@ -95,14 +93,13 @@ public sealed class ResendEmailChannelTests : IDisposable
 
     private sealed class StubResend : HttpMessageHandler
     {
-        private readonly Queue<HttpStatusCode> _once = new();
         private HttpStatusCode _status = HttpStatusCode.OK;
 
         public List<(HttpMethod Method, Uri Uri, string? Authorization, string? IdempotencyKey, string Body)> Requests { get; } = [];
 
         public void Respond(HttpStatusCode status) => _status = status;
 
-        public void RespondOnce(HttpStatusCode status) => _once.Enqueue(status);
+        public TimeSpan Delay { get; set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -113,8 +110,8 @@ public sealed class ResendEmailChannelTests : IDisposable
                 request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null,
                 await request.Content!.ReadAsStringAsync(cancellationToken)));
 
-            var status = _once.TryDequeue(out var once) ? once : _status;
-            return new HttpResponseMessage(status) { Content = new StringContent("""{"id":"email_1"}""", Encoding.UTF8, "application/json") };
+            await Task.Delay(Delay, cancellationToken);
+            return new HttpResponseMessage(_status) { Content = new StringContent("""{"id":"email_1"}""", Encoding.UTF8, "application/json") };
         }
     }
 }

@@ -4,8 +4,7 @@ using ControlPlane.Application.Ports;
 
 namespace ControlPlane.Infrastructure.Clerk;
 
-// Clerk's Backend API, as far as invitations need it (0028, 0029). Its client retries transient failures and breaks the circuit
-// when Clerk keeps failing (0041); a call that still fails fails the command.
+// Clerk's Backend API, as far as invitations need it (0028, 0029). A call that fails or runs out of time fails the command.
 internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
 {
     // Clerk matches some of its email filters partially, so only a user who owns exactly this address counts as an account.

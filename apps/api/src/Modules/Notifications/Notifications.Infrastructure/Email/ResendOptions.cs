@@ -12,11 +12,8 @@ internal sealed class ResendOptions
 
     public Uri ApiUrl { get; set; } = new("https://api.resend.com/");
 
-    // How long one attempt may take; a send is tried up to four times in all (0041).
+    // How long a send may take.
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);
-
-    // The pause before the first retry, doubling with each further one.
-    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(From);
 }

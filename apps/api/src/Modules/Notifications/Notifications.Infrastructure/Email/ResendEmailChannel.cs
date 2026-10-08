@@ -5,8 +5,7 @@ using Notifications.Contracts;
 
 namespace Notifications.Infrastructure.Email;
 
-// Sends email through Resend's API (0037). Its client retries transient failures (0041); every attempt of one send carries the same
-// idempotency key, so Resend sends the email once however often the request reaches it.
+// Sends email through Resend's API (0037). Each send carries an idempotency key of its own.
 internal sealed class ResendEmailChannel(HttpClient http, IOptions<ResendOptions> options) : IEmailChannel
 {
     public async Task SendAsync(EmailMessage email, CancellationToken cancellationToken)

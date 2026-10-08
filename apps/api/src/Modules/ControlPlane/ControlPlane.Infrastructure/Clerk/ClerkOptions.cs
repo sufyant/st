@@ -9,9 +9,6 @@ internal sealed class ClerkOptions
 
     public Uri BackendApiUrl { get; set; } = new("https://api.clerk.com/v1/");
 
-    // How long one attempt may take; a call is tried up to four times in all (0041).
+    // How long a call may take.
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);
-
-    // The pause before the first retry, doubling with each further one.
-    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 }
