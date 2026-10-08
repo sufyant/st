@@ -87,24 +87,6 @@ public sealed class AuditTrailTests(Database database) : IAsyncLifetime
             record.Category == "Api.Security" && record.Id.Name == "AuthorizationDenied" && record.Message.Contains(stranger, StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task A_system_admin_entering_a_tenant_is_recorded()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var admin = await _catalog.AddSystemAdminAsync();
-        var roleId = await database.ScalarAsync<Guid>("SELECT id FROM catalog.roles WHERE built_in = 'Member'");
-
-        var response = await _api.WaitingForMessagesAsync(() => _api.CreateClient(admin, secondFactor: true).PostAsJsonAsync(
-            $"/v1/admin/tenants/{tenant.Slug}/invitations", new { email = $"{Guid.NewGuid():N}@example.com", roleId }, Cancellation));
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var entries = await EntriesAsync(tenant.Id);
-        entries.ShouldContain(entry => entry.Kind == "SystemAdminEntry"
-            && entry.Operation == $"POST /v1/admin/tenants/{tenant.Slug}/invitations"
-            && entry.ActorId == admin);
-        entries.ShouldContain(entry => entry.Kind == "Command" && entry.Operation == "CreateInvitationAsSystemAdmin" && entry.ActorId == admin);
-    }
-
     // The owner reads every tenant's rows, so the test sees what the Audit module stored for this tenant.
     private async Task<List<(string Kind, string Operation, string ActorId, string Details)>> EntriesAsync(Guid tenantId)
     {

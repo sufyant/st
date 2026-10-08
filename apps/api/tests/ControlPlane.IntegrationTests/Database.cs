@@ -36,7 +36,7 @@ public sealed class Database : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
-        await RunScriptAsync("bootstrap.sql", "-v", $"owner_password={Password}", "-v", $"application_password={Password}", "-v", $"reporting_password={Password}");
+        await RunScriptAsync("bootstrap.sql", "-v", $"owner_password={Password}", "-v", $"application_password={Password}");
 
         _services = BuildServices();
         foreach (var migrator in _services.GetServices<IModuleMigrator>())
@@ -54,14 +54,12 @@ public sealed class Database : IAsyncLifetime
     // The module as the host composes it, against this database; a test replaces services it needs to control, such as time.
     public ServiceProvider BuildServices(
         Action<IServiceCollection>? configure = null,
-        string? reportingConnectionString = null,
         Dictionary<string, string?>? settings = null,
         bool realIdentityProvider = false)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Reporting"] = reportingConnectionString ?? ConnectionStringFor(DatabaseRoles.Reporting),
                 ["Invitations:AcceptUrl"] = AcceptUrl,
             })
             .AddInMemoryCollection(settings ?? [])
@@ -82,18 +80,6 @@ public sealed class Database : IAsyncLifetime
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();
-    }
-
-    // A role the bootstrap script never creates, without any privilege on the catalog.
-    public async Task<string> CreateLoginRoleAsync()
-    {
-        var name = $"role_{Guid.NewGuid():N}";
-        await using var connection = new NpgsqlConnection(_container.GetConnectionString());
-        await connection.OpenAsync();
-        await using var create = new NpgsqlCommand($"CREATE ROLE {name} LOGIN PASSWORD '{Password}'", connection);
-        await create.ExecuteNonQueryAsync();
-
-        return ConnectionStringFor(name);
     }
 
     public async Task RunScriptAsync(string script, params string[] variables)

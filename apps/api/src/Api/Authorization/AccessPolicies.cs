@@ -4,7 +4,6 @@ using Audit.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.Extensions.Options;
-using SharedKernel;
 using Wolverine;
 
 namespace Api.Authorization;
@@ -16,8 +15,6 @@ internal static partial class AccessPolicies
     public const string TenantMember = "tenant-member";
 
     public const string SystemAdmin = "system-admin";
-
-    public const string AdminTenant = "admin-tenant";
 
     public static IServiceCollection AddAccessAuthorization(this IServiceCollection services)
     {
@@ -32,9 +29,6 @@ internal static partial class AccessPolicies
                 .RequireAuthenticatedUser()
                 .RequireClaim(ClerkAuthentication.SecondFactorClaim)
                 .AddRequirements(new SystemAdminRequirement()))
-            .AddPolicy(AdminTenant, policy => policy
-                .RequireAuthenticatedUser()
-                .AddRequirements(new PermissionRequirement(Permissions.SystemTenantsEnter), new AdminTenantRequirement()))
             .Services;
     }
 
@@ -45,8 +39,7 @@ internal static partial class AccessPolicies
             ?? new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(policyName)).Build();
     }
 
-    // A tenant route the caller cannot enter answers 404, so it looks the same as a tenant that does not exist (0015). On an admin
-    // tenant route only a system admin who has passed every other check learns that a tenant does not exist.
+    // A tenant route the caller cannot enter answers 404, so it looks the same as a tenant that does not exist (0015).
     // Every denial of a signed-in user is recorded (0040): in the tenant's audit log when the request entered a tenant, otherwise as
     // a security event in the log, because the audit log is tenant-scoped (0039).
     private sealed partial class AccessDeniedHandler(ILoggerFactory loggers, TimeProvider time) : IAuthorizationMiddlewareResultHandler
@@ -75,7 +68,7 @@ internal static partial class AccessPolicies
             var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             var access = context.RequestServices.GetRequiredService<RequestAccess>();
             var operation = $"{context.Request.Method} {context.Request.Path}";
-            if (userId is not null && (access.Membership?.TenantId ?? access.AdminTenantId) is not null)
+            if (userId is not null && access.Membership is not null)
             {
                 // Tenant resolution has put the tenant on the request's bus, so the record is stored under it.
                 await AuditTrail.RecordDeniedAsync(context.RequestServices.GetRequiredService<IMessageBus>(), time, userId, operation);
@@ -90,11 +83,7 @@ internal static partial class AccessPolicies
             var metadata = context.GetEndpoint()?.Metadata;
             var access = context.RequestServices.GetRequiredService<RequestAccess>();
 
-            return (metadata?.GetMetadata<Tenants.TenantScopedEndpoint>() is not null && access.Membership is null)
-                || (metadata?.GetMetadata<Admin.AdminTenantScopedEndpoint>() is not null
-                    && access.Has(Permissions.SystemTenantsEnter)
-                    && context.User.HasClaim(claim => claim.Type == ClerkAuthentication.SecondFactorClaim)
-                    && access.AdminTenantId is null);
+            return metadata?.GetMetadata<Tenants.TenantScopedEndpoint>() is not null && access.Membership is null;
         }
 
         [LoggerMessage(EventName = "AuthorizationDenied", Level = LogLevel.Warning, Message = "Authorization denied to {UserId}: {Operation}")]
@@ -107,8 +96,6 @@ internal sealed record PermissionRequirement(string Permission) : IAuthorization
 internal sealed record TenantMemberRequirement : IAuthorizationRequirement;
 
 internal sealed record SystemAdminRequirement : IAuthorizationRequirement;
-
-internal sealed record AdminTenantRequirement : IAuthorizationRequirement;
 
 internal sealed class AccessHandler : IAuthorizationHandler
 {
@@ -127,7 +114,6 @@ internal sealed class AccessHandler : IAuthorizationHandler
                 PermissionRequirement permission => access.Has(permission.Permission),
                 TenantMemberRequirement => access.Membership is not null,
                 SystemAdminRequirement => access.SystemPermissions is not null,
-                AdminTenantRequirement => access.AdminTenantId is not null,
                 _ => false,
             };
 

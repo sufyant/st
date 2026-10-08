@@ -67,7 +67,6 @@ internal sealed class PipelineHost : IAsyncDisposable
         TestEndpoints.Map(v1);
         TestEndpoints.MapTenant(v1.MapTenant());
         TestEndpoints.MapAdmin(admin);
-        TestEndpoints.MapAdminTenant(admin.MapAdminTenant());
         await app.StartAsync(TestContext.Current.CancellationToken);
 
         return new PipelineHost(app);

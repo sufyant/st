@@ -68,20 +68,6 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // A system admin inside a tenant is not its member, so they spend their own limit, not the tenant's.
-    [Fact]
-    public async Task A_system_admin_inside_a_tenant_does_not_spend_the_tenant_limit()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var member = await _catalog.AddMemberAsync(tenant.Id);
-        var admin = await _catalog.AddSystemAdminAsync();
-        await _host.CreateClient(admin, secondFactor: true).GetAsync($"/v1/admin/tenants/{tenant.Slug}/probes", TestContext.Current.CancellationToken);
-
-        var response = await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-    }
-
     [Fact]
     public async Task A_user_who_is_not_a_member_is_limited_as_a_user()
     {

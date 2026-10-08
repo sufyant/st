@@ -6,6 +6,4 @@ public static class DatabaseRoles
     public const string Owner = "api_owner";
 
     public const string Application = "api_application";
-
-    public const string Reporting = "api_reporting";
 }

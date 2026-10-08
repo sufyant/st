@@ -16,7 +16,6 @@ namespace Api.IntegrationTests;
 internal sealed class ApiFactory(
     string pooledConnectionString,
     string? migrationsConnectionString = null,
-    string? reportingConnectionString = null,
     TimeProvider? time = null,
     string? environment = null,
     IReadOnlyList<string>? authorizedParties = null,
@@ -65,7 +64,6 @@ internal sealed class ApiFactory(
         builder.UseSetting("ConnectionStrings:Pooled", pooledConnectionString);
         builder.UseSetting("ConnectionStrings:Direct", directConnectionString ?? pooledConnectionString);
         builder.UseSetting("ConnectionStrings:Migrations", migrationsConnectionString);
-        builder.UseSetting("ConnectionStrings:Reporting", reportingConnectionString);
         builder.UseSetting("Invitations:AcceptUrl", AcceptUrl);
         builder.UseSetting("Clerk:Issuer", TestTokens.Issuer);
         foreach (var (party, index) in (authorizedParties ?? [TestTokens.AuthorizedParty]).Select((party, index) => (party, index)))

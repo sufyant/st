@@ -10,8 +10,6 @@ internal sealed class RequestAccess
 
     public IReadOnlySet<string>? SystemPermissions { get; set; }
 
-    public Guid? AdminTenantId { get; set; }
-
     // The tenant and system pools never share a permission, so one set never satisfies the other's checks.
     public bool Has(string permission) =>
         Membership?.Permissions.Contains(permission) == true || SystemPermissions?.Contains(permission) == true;

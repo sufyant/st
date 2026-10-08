@@ -22,7 +22,4 @@ internal sealed class TenantDirectory(CatalogDbContext catalog) : ITenantDirecto
 
         return found is null ? null : new TenantMembership(found.TenantId, found.Role.Permissions);
     }
-
-    public Task<Guid?> FindTenantAsync(string slug, CancellationToken cancellationToken) =>
-        catalog.Tenants.Where(tenant => tenant.Slug == slug).Select(tenant => (Guid?)tenant.Id).SingleOrDefaultAsync(cancellationToken);
 }

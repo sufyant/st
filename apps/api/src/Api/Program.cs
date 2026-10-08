@@ -25,6 +25,6 @@ app.UseApiPipeline();
 var v1 = app.MapV1();
 var admin = v1.MapAdmin();
 var tenant = v1.MapTenant();
-v1.MapControlPlaneEndpoints(tenant, admin, admin.MapAdminTenant());
+v1.MapControlPlaneEndpoints(tenant, admin);
 
 app.Run();

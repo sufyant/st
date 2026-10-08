@@ -14,11 +14,10 @@ namespace ControlPlane.Infrastructure.Migrations
             migrationBuilder.EnsureSchema(
                 name: "catalog");
 
-            // Privileges come from migrations (0018): the application role works with the catalog, the reporting role only reads it.
+            // Privileges come from migrations (0018): the application role works with the catalog.
             migrationBuilder.Sql("""
-                GRANT USAGE ON SCHEMA catalog TO api_application, api_reporting;
+                GRANT USAGE ON SCHEMA catalog TO api_application;
                 ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO api_application;
-                ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT ON TABLES TO api_reporting;
                 """);
 
             migrationBuilder.CreateTable(
@@ -112,9 +111,8 @@ namespace ControlPlane.Infrastructure.Migrations
                 schema: "catalog");
 
             migrationBuilder.Sql("""
-                ALTER DEFAULT PRIVILEGES IN SCHEMA catalog REVOKE SELECT ON TABLES FROM api_reporting;
                 ALTER DEFAULT PRIVILEGES IN SCHEMA catalog REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM api_application;
-                REVOKE USAGE ON SCHEMA catalog FROM api_application, api_reporting;
+                REVOKE USAGE ON SCHEMA catalog FROM api_application;
                 """);
         }
     }

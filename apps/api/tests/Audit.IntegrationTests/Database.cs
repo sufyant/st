@@ -30,7 +30,7 @@ public sealed class Database : IAsyncLifetime
         var bootstrap = await _container.ExecAsync(
         [
             "psql", "--username", "postgres", "--dbname", new NpgsqlConnectionStringBuilder(_container.GetConnectionString()).Database!,
-            "-v", $"owner_password={Password}", "-v", $"application_password={Password}", "-v", $"reporting_password={Password}",
+            "-v", $"owner_password={Password}", "-v", $"application_password={Password}",
             "--file", "/tmp/bootstrap.sql",
         ]);
         bootstrap.ExitCode.ShouldBe(0, bootstrap.Stderr);

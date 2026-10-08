@@ -5,7 +5,6 @@ using Api.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog;
 using Serilog.Context;
-using SharedKernel;
 using Tenancy;
 using Wolverine;
 
@@ -13,7 +12,7 @@ namespace Api.Tenants;
 
 // Resolves the tenant of a request and what the caller may do there, never from the client's word alone (0015). On a tenant
 // route the tenant comes from the slug and the user's membership, with the permissions of the member's role (0030); on an admin
-// route the user's system permissions are read, and a system admin allowed to enter tenants enters the one in the path (0031).
+// route the user's system permissions are read (0031).
 // It rejects nothing: the rate limiter runs next and limits the others by user or address (0035), and authorization turns them
 // away afterwards.
 internal sealed class TenantResolutionMiddleware(RequestDelegate next)
@@ -41,10 +40,6 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next)
         if (metadata.GetMetadata<SystemAdminEndpoint>() is not null)
         {
             access.SystemPermissions = await systemAdmins.FindSystemPermissionsAsync(userId, context.RequestAborted);
-            if (metadata.GetMetadata<AdminTenantScopedEndpoint>() is not null && slug is not null && access.Has(Permissions.SystemTenantsEnter))
-            {
-                tenantId = access.AdminTenantId = await directory.FindTenantAsync(slug, context.RequestAborted);
-            }
         }
         else if (metadata.GetMetadata<TenantScopedEndpoint>() is not null && slug is not null)
         {

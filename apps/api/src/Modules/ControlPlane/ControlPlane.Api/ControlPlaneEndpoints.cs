@@ -2,7 +2,6 @@ using System.Security.Claims;
 using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Members;
 using ControlPlane.Application.Ports;
-using ControlPlane.Application.Reports;
 using ControlPlane.Application.Roles;
 using ControlPlane.Application.Tenants;
 using Microsoft.AspNetCore.Builder;
@@ -23,8 +22,7 @@ public static class ControlPlaneEndpoints
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder v1,
         RouteGroupBuilder tenant,
-        RouteGroupBuilder admin,
-        RouteGroupBuilder adminTenant)
+        RouteGroupBuilder admin)
     {
         MapRoles(tenant.MapGroup("/roles").RequireAuthorization(Permissions.RolesManage));
         MapMembers(tenant.MapGroup("/members").RequireAuthorization(Permissions.MembersManage));
@@ -55,12 +53,6 @@ public static class ControlPlaneEndpoints
             return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
         });
 
-        admin.MapGet("/tenants", async (int? page, int? pageSize, IMessageBus bus, CancellationToken cancellationToken) =>
-                (await bus.InvokeAsync<Result<PagedList<TenantSummary>>>(
-                    new ListTenants(page ?? 1, pageSize ?? PagedList<TenantSummary>.DefaultPageSize), cancellationToken))
-                    .Map(tenants => tenants.Map(summary => new TenantSummaryResponse(summary.Id, summary.Slug, summary.Status, summary.MemberCount))))
-            .RequireAuthorization(Permissions.SystemTenantsRead);
-
         // Onboarding runs inside the tenant it creates (0026). The tenant's id is chosen here, by the server, never by the client.
         admin.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
                 (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
@@ -69,12 +61,6 @@ public static class ControlPlaneEndpoints
                     cancellationToken))
                     .Map(tenant => new TenantResponse(tenant.Id, tenant.Slug, tenant.Status)))
             .RequireAuthorization(Permissions.SystemTenantsCreate);
-
-        adminTenant.MapPost("/invitations", async (InvitationRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-                (await bus.InvokeAsync<Result<InvitationDetails>>(
-                    new CreateInvitationAsSystemAdmin(user.Id(), request.Email, request.RoleId), cancellationToken))
-                    .Map(ToResponse))
-            .RequireAuthorization(Permissions.SystemMembersInvite);
     }
 
     private static void MapRoles(RouteGroupBuilder roles)

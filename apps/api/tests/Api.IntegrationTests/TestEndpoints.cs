@@ -61,15 +61,6 @@ internal static class TestEndpoints
     }
 
     public static void MapAdmin(RouteGroupBuilder admin) => admin.MapGet("/ping", () => Results.Ok());
-
-    public static void MapAdminTenant(RouteGroupBuilder adminTenant)
-    {
-        adminTenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
-
-        adminTenant.MapGet("/tenant-setting", (IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<string?>(new ReadTenantSetting(), cancellationToken));
-    }
 }
 
 // Wolverine only discovers public handlers, messages and validators (0047).

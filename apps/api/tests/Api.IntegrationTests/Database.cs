@@ -152,7 +152,7 @@ public sealed class Database : IAsyncLifetime
         var result = await _container.ExecAsync(
         [
             "psql", "--username", "postgres", "--dbname", database,
-            "-v", $"owner_password={Password}", "-v", $"application_password={Password}", "-v", $"reporting_password={Password}",
+            "-v", $"owner_password={Password}", "-v", $"application_password={Password}",
             "--file", "/tmp/bootstrap.sql",
         ]);
 

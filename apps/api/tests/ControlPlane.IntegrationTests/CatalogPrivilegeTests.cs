@@ -16,24 +16,6 @@ public sealed class CatalogPrivilegeTests(Database database)
         owners.ShouldBe([DatabaseRoles.Owner]);
     }
 
-    [Fact]
-    public async Task The_reporting_role_reads_the_catalog()
-    {
-        var read = () => QueryAsync<long>(DatabaseRoles.Reporting, "SELECT count(*) FROM catalog.tenants");
-
-        await read.ShouldNotThrowAsync();
-    }
-
-    [Fact]
-    public async Task The_reporting_role_cannot_write_the_catalog()
-    {
-        var write = () => QueryAsync<long>(
-            DatabaseRoles.Reporting, "INSERT INTO catalog.users (id, external_id) VALUES (gen_random_uuid(), 'user_reporting') RETURNING 1");
-
-        var failure = await write.ShouldThrowAsync<PostgresException>();
-        failure.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
-    }
-
     private async Task<List<T>> QueryAsync<T>(string role, string sql)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionStringFor(role));

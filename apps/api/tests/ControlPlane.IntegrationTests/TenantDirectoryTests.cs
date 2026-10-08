@@ -90,37 +90,11 @@ public sealed class TenantDirectoryTests(Database database)
         membership.ShouldBeNull();
     }
 
-    // A system admin enters a tenant without being its member, also while it is provisioning or has failed (0031).
-    [Fact]
-    public async Task A_tenant_is_found_by_its_slug_whatever_its_status()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services, TenantStatus.Provisioning);
-
-        var found = await FindTenantAsync(tenant.Slug);
-
-        found.ShouldBe(tenant.Id);
-    }
-
-    [Fact]
-    public async Task An_unknown_slug_finds_no_tenant()
-    {
-        var found = await FindTenantAsync("no-such-tenant");
-
-        found.ShouldBeNull();
-    }
-
     private async Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId)
     {
         await using var scope = database.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ITenantDirectory>()
             .FindMembershipAsync(slug, externalUserId, TestContext.Current.CancellationToken);
-    }
-
-    private async Task<Guid?> FindTenantAsync(string slug)
-    {
-        await using var scope = database.Services.CreateAsyncScope();
-
-        return await scope.ServiceProvider.GetRequiredService<ITenantDirectory>().FindTenantAsync(slug, TestContext.Current.CancellationToken);
     }
 }

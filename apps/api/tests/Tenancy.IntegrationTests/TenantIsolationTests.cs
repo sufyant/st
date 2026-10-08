@@ -195,12 +195,12 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         await using var connection = new NpgsqlConnection(database.ApplicationConnectionString);
         await connection.OpenAsync(Cancellation);
         await using var command = new NpgsqlCommand(
-            "SELECT count(*) FROM pg_roles WHERE rolname IN ('api_owner', 'api_application', 'api_reporting') AND NOT rolbypassrls AND NOT rolsuper",
+            "SELECT count(*) FROM pg_roles WHERE rolname IN ('api_owner', 'api_application') AND NOT rolbypassrls AND NOT rolsuper",
             connection);
 
         var rolesWithoutBypass = (long)(await command.ExecuteScalarAsync(Cancellation))!;
 
-        rolesWithoutBypass.ShouldBe(3);
+        rolesWithoutBypass.ShouldBe(2);
     }
 
     private async Task<Note> WriteNoteAsync(Guid tenant, string text)

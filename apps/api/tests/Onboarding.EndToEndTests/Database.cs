@@ -22,7 +22,7 @@ public sealed class Database : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
-        await RunScriptAsync("bootstrap.sql", "-v", $"owner_password={Password}", "-v", $"application_password={Password}", "-v", $"reporting_password={Password}");
+        await RunScriptAsync("bootstrap.sql", "-v", $"owner_password={Password}", "-v", $"application_password={Password}");
         await MigrateAsync();
         await RunScriptAsync("seed-system-admin.sql", "-v", $"external_id={SystemAdmin}");
     }
