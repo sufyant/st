@@ -5,5 +5,4 @@ internal enum BuiltInRole
     Owner,
     Admin,
     Member,
-    Viewer,
 }

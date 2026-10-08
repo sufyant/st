@@ -12,6 +12,6 @@ VALUES (uuidv7(), :'external_id')
 ON CONFLICT (external_id) DO NOTHING;
 
 -- The seed grants itself: no one granted it, so granted_by stays empty.
-INSERT INTO catalog.system_admins (user_id, role, granted_by, granted_at)
-SELECT id, 'Administrator', NULL, now() FROM catalog.users WHERE external_id = :'external_id'
+INSERT INTO catalog.system_admins (user_id, granted_by, granted_at)
+SELECT id, NULL, now() FROM catalog.users WHERE external_id = :'external_id'
 ON CONFLICT (user_id) DO NOTHING;

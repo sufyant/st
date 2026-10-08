@@ -38,13 +38,6 @@ internal static class Catalog
         return user;
     }
 
-    public static async Task<Role> AddCustomRoleAsync(IServiceProvider services, Tenant tenant, params string[] permissions)
-    {
-        var role = Role.CreateCustom(Guid.CreateVersion7(), tenant.Id, $"Role {Guid.NewGuid():N}", permissions).Value;
-        await SaveAsync(services, catalog => catalog.Roles.Add(role));
-        return role;
-    }
-
     private static async Task SaveAsync(IServiceProvider services, Action<CatalogDbContext> change)
     {
         await using var scope = services.CreateAsyncScope();

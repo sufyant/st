@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using ControlPlane.Application.Invitations;
-using ControlPlane.Application.Members;
 using ControlPlane.Application.Ports;
-using ControlPlane.Application.Roles;
 using ControlPlane.Application.Tenants;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -12,8 +10,7 @@ using Wolverine;
 namespace ControlPlane.Api;
 
 /// <summary>
-/// The module's endpoints, mapped into the host's route groups: <c>/v1</c>, the tenant routes (0015), and the admin routes
-/// (0031). Each endpoint names the permission it needs (0030) and sends one command; the host maps its result (0032).
+/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the admin routes (0031). Each endpoint names the permission it needs (0030) and sends one command; the host maps its result (0032).
 /// </summary>
 public static class ControlPlaneEndpoints
 {
@@ -21,17 +18,8 @@ public static class ControlPlaneEndpoints
 
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder v1,
-        RouteGroupBuilder tenant,
         RouteGroupBuilder admin)
     {
-        MapRoles(tenant.MapGroup("/roles").RequireAuthorization(Permissions.RolesManage));
-        MapMembers(tenant.MapGroup("/members").RequireAuthorization(Permissions.MembersManage));
-
-        tenant.MapPost("/invitations", async (InvitationRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-                (await bus.InvokeAsync<Result<InvitationDetails>>(new CreateInvitation(user.Id(), request.Email, request.RoleId), cancellationToken))
-                    .Map(ToResponse))
-            .RequireAuthorization(Permissions.MembersInvite);
-
         // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there (0029). The
         // identity provider is asked first, so its call never runs while the acceptance holds the invitation locked.
         v1.MapPost("/invitations/accept", async (
@@ -63,35 +51,7 @@ public static class ControlPlaneEndpoints
             .RequireAuthorization(Permissions.SystemTenantsCreate);
     }
 
-    private static void MapRoles(RouteGroupBuilder roles)
-    {
-        roles.MapPost("", async (RoleRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-            (await bus.InvokeAsync<Result<RoleDetails>>(new CreateRole(user.Id(), request.Name, request.Permissions), cancellationToken))
-                .Map(ToResponse));
-
-        roles.MapPut("/{roleId:guid}", async (Guid roleId, RoleRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-            (await bus.InvokeAsync<Result<RoleDetails>>(new ChangeRole(user.Id(), roleId, request.Name, request.Permissions), cancellationToken))
-                .Map(ToResponse));
-
-        roles.MapDelete("/{roleId:guid}", (Guid roleId, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(new DeleteRole(user.Id(), roleId), cancellationToken));
-    }
-
-    private static void MapMembers(RouteGroupBuilder members)
-    {
-        members.MapPut("/{userId:guid}/role", (Guid userId, ChangeMemberRoleRequest request, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(new ChangeMemberRole(user.Id(), userId, request.RoleId), cancellationToken));
-
-        members.MapDelete("/{userId:guid}", (Guid userId, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(new RemoveMember(user.Id(), userId), cancellationToken));
-    }
-
     // The version group lets only signed-in users through, so the identity provider's user id is always there (0015).
     private static string Id(this ClaimsPrincipal user) =>
         user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("The request has no signed-in user.");
-
-    private static RoleResponse ToResponse(RoleDetails role) => new(role.Id, role.Name, role.BuiltIn, role.Permissions);
-
-    private static InvitationResponse ToResponse(InvitationDetails invitation) =>
-        new(invitation.Id, invitation.Email, invitation.RoleId, invitation.Status, invitation.ExpiresAt);
 }

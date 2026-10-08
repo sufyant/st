@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Time.Testing;
-using SharedKernel;
 using Tenancy;
 
 namespace Api.IntegrationTests;
@@ -26,43 +25,30 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _api.DisposeAsync();
 
     [Fact]
-    public async Task An_invited_person_accepts_and_can_then_act_in_the_tenant()
+    public async Task An_invited_person_accepts_and_becomes_a_member_of_the_tenant()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var (invitee, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Admin");
+        var (slug, invitee, token) = await InviteSomeoneWithAnAccountAsync();
 
         var accepted = await AcceptAsync(invitee, token);
 
         accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("tenantSlug").GetString().ShouldBe(tenant.Slug);
-        var invites = await InviteAsync(tenant.Slug, invitee, $"{Guid.NewGuid():N}@example.com", "Member");
-        invites.StatusCode.ShouldBe(HttpStatusCode.OK);
-    }
-
-    // Property level: the invitation response carries no token and no hash; the token only travels in the link sent by email.
-    [Fact]
-    public async Task The_invitation_response_reveals_no_token()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-
-        var response = await InviteAsync(tenant.Slug, owner, $"{Guid.NewGuid():N}@example.com", "Member");
-
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>(Cancellation);
-        body.EnumerateObject().Select(property => property.Name).ShouldBe(["id", "email", "roleId", "status", "expiresAt"], ignoreOrder: true);
+        (await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("tenantSlug").GetString().ShouldBe(slug);
+        (await database.ScalarAsync<long>(
+            $"""
+            SELECT count(*) FROM catalog.memberships
+            JOIN catalog.tenants ON tenants.id = memberships.tenant_id JOIN catalog.users ON users.id = memberships.user_id
+            WHERE tenants.slug = '{slug}' AND users.external_id = '{invitee}'
+            """)).ShouldBe(1);
     }
 
     // The token travels only in the link the delivery sends; the stored messages that carried the invitation never held it (0029).
     [Fact]
     public async Task No_stored_message_holds_an_invitation_token()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
         var email = $"{Guid.NewGuid():N}@example.com";
         _api.Identity.AddAccount($"user_{Guid.NewGuid():N}", email);
-        var invited = await _api.WaitingForMessagesAsync(() => InviteAsync(tenant.Slug, owner, email, "Member"));
-        var invitationId = (await invited.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetString()!;
+        await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
+        var invitationId = (await database.ScalarAsync<Guid>($"SELECT id FROM catalog.invitations WHERE email = '{email}'")).ToString();
 
         var holdingTheInvitation = await StoredMessagesHoldingAsync(invitationId);
         var holdingTheToken = await StoredMessagesHoldingAsync(_api.Sender.TokenSentTo(email));
@@ -75,12 +61,10 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task Accepting_asks_the_identity_provider_before_locking_the_invitation()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var (invitee, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Member");
+        var (slug, invitee, token) = await InviteSomeoneWithAnAccountAsync();
         var lockedWhileAsked = false;
-        _api.Identity.WhileReadingVerifiedEmails = async () =>
-            lockedWhileAsked = await database.IsLockedAsync($"SELECT 1 FROM catalog.invitations WHERE tenant_id = '{tenant.Id}' FOR UPDATE NOWAIT");
+        _api.Identity.WhileReadingVerifiedEmails = async () => lockedWhileAsked = await database.IsLockedAsync(
+            $"SELECT 1 FROM catalog.invitations WHERE tenant_id = (SELECT id FROM catalog.tenants WHERE slug = '{slug}') FOR UPDATE NOWAIT");
 
         var accepted = await AcceptAsync(invitee, token);
 
@@ -91,9 +75,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task An_invitation_token_cannot_be_used_twice()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var (invitee, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Member");
+        var (_, invitee, token) = await InviteSomeoneWithAnAccountAsync();
         var sameEmail = $"user_{Guid.NewGuid():N}";
         _api.Identity.AddAccount(sameEmail, (await _api.Identity.FindVerifiedEmailsAsync(invitee, Cancellation))[0]);
         await AcceptAsync(invitee, token);
@@ -107,9 +89,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task An_invitation_token_cannot_be_used_after_the_invitation_expires()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var (invitee, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Member");
+        var (_, invitee, token) = await InviteSomeoneWithAnAccountAsync();
         _time.Advance(TimeSpan.FromDays(7));
 
         var accepted = await AcceptAsync(invitee, token);
@@ -121,9 +101,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task A_person_without_the_invited_email_cannot_accept()
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var (_, token) = await InviteSomeoneWithAnAccountAsync(tenant.Slug, owner, "Member");
+        var (_, _, token) = await InviteSomeoneWithAnAccountAsync();
         var stranger = $"user_{Guid.NewGuid():N}";
         _api.Identity.AddAccount(stranger, $"{Guid.NewGuid():N}@example.com");
 
@@ -150,69 +128,24 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         accepted.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
-    public async Task A_member_without_the_permission_to_invite_is_forbidden()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var viewer = await _catalog.AddMemberAsync(tenant.Id, role: "Viewer");
-
-        var response = await InviteAsync(tenant.Slug, viewer, $"{Guid.NewGuid():N}@example.com", "Viewer");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task An_admin_cannot_invite_an_owner()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var admin = await _catalog.AddMemberAsync(tenant.Id, role: "Admin");
-
-        var response = await InviteAsync(tenant.Slug, admin, $"{Guid.NewGuid():N}@example.com", "Owner");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await CodeOfAsync(response)).ShouldBe("role.beyond_your_permissions");
-    }
-
-    [Fact]
-    public async Task An_invitation_needs_a_valid_email_address()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-
-        var response = await InviteAsync(tenant.Slug, owner, "not an email", "Member");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(Cancellation))!.Errors.Keys.ShouldBe(["Email"]);
-    }
-
-    [Fact]
-    public async Task A_custom_role_with_the_permission_to_invite_can_invite()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-
-        // Nobody hands out more than they hold (0030), so inviting a member takes a member's permissions as well.
-        var recruiter = await _catalog.AddCustomRoleAsync(tenant.Id, Permissions.MembersInvite, Permissions.NotificationsSchedule);
-        var member = await _catalog.AddMemberWithRoleAsync(tenant.Id, recruiter);
-
-        var response = await InviteAsync(tenant.Slug, member, $"{Guid.NewGuid():N}@example.com", "Member");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-    }
-
-    private async Task<(string Invitee, string Token)> InviteSomeoneWithAnAccountAsync(string slug, string inviter, string builtInRole)
+    // Onboarding a tenant invites its first owner, here someone who already has an account, so the link carries our token.
+    private async Task<(string Slug, string Invitee, string Token)> InviteSomeoneWithAnAccountAsync()
     {
         var invitee = $"user_{Guid.NewGuid():N}";
         var email = $"{Guid.NewGuid():N}@example.com";
         _api.Identity.AddAccount(invitee, email);
-        (await _api.WaitingForMessagesAsync(() => InviteAsync(slug, inviter, email, builtInRole))).EnsureSuccessStatusCode();
+        var slug = await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
 
-        return (invitee, _api.Sender.TokenSentTo(email));
+        return (slug, invitee, _api.Sender.TokenSentTo(email));
     }
 
-    private async Task<HttpResponseMessage> InviteAsync(string slug, string inviter, string email, string builtInRole)
+    private async Task<string> OnboardAsync(string ownerEmail)
     {
-        var roleId = await database.ScalarAsync<Guid>($"SELECT id FROM catalog.roles WHERE built_in = '{builtInRole}'");
-        return await _api.CreateClient(inviter).PostAsJsonAsync($"/v1/tenants/{slug}/invitations", new { email, roleId }, Cancellation);
+        var slug = $"tenant-{Guid.NewGuid():N}"[..20];
+        var admin = _api.CreateClient(await _catalog.AddSystemAdminAsync(), secondFactor: true);
+        (await admin.PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail }, Cancellation)).EnsureSuccessStatusCode();
+
+        return slug;
     }
 
     private Task<HttpResponseMessage> AcceptAsync(string userId, string token) =>

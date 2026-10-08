@@ -11,6 +11,9 @@ namespace Api.IntegrationTests;
 
 internal static class TestEndpoints
 {
+    // A permission no built-in role holds: no tenant capability has one yet.
+    public const string GuardedPermission = "test.guarded";
+
     // Stand-ins for host behaviour that is not about who the caller is, so they let anyone in.
     public static void Map(RouteGroupBuilder v1)
     {
@@ -57,7 +60,7 @@ internal static class TestEndpoints
         tenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
             bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
 
-        tenant.MapPost("/guarded", () => Results.Ok()).RequireAuthorization(Permissions.MembersInvite);
+        tenant.MapPost("/guarded", () => Results.Ok()).RequireAuthorization(GuardedPermission);
     }
 
     public static void MapAdmin(RouteGroupBuilder admin) => admin.MapGet("/ping", () => Results.Ok());

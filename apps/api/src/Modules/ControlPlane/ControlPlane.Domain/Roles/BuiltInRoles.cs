@@ -15,27 +15,21 @@ internal static class BuiltInRoles
 
     public static Role Member { get; } = Role.CreateBuiltIn(new("00000000-0000-7000-8000-000000000003"), BuiltInRole.Member);
 
-    public static Role Viewer { get; } = Role.CreateBuiltIn(new("00000000-0000-7000-8000-000000000004"), BuiltInRole.Viewer);
-
-    public static IReadOnlyList<Role> All { get; } = [Owner, Admin, Member, Viewer];
+    public static IReadOnlyList<Role> All { get; } = [Owner, Admin, Member];
 
     private static readonly FrozenSet<string> OwnerPermissions = Permissions.TenantPool.ToFrozenSet(StringComparer.Ordinal);
 
-    private static readonly FrozenSet<string> AdminPermissions =
-        OwnerPermissions.Except([Permissions.OwnersManage]).ToFrozenSet(StringComparer.Ordinal);
+    // Admins hold what owners hold: the tenant pool has no permission that is the owners' alone.
+    private static readonly FrozenSet<string> AdminPermissions = OwnerPermissions;
 
-    // Members and viewers get the permissions of the capabilities that modules add for them. A viewer only reads, and no module
-    // has a permission that only reads yet.
-    private static readonly FrozenSet<string> MemberPermissions = FrozenSet.Create(StringComparer.Ordinal, Permissions.NotificationsSchedule);
-
-    private static readonly FrozenSet<string> NoPermissions = FrozenSet<string>.Empty;
+    // Members get the permissions of the capabilities that modules add for them; no module has one yet.
+    private static readonly FrozenSet<string> MemberPermissions = FrozenSet<string>.Empty;
 
     public static IReadOnlySet<string> PermissionsOf(BuiltInRole role) => role switch
     {
         BuiltInRole.Owner => OwnerPermissions,
         BuiltInRole.Admin => AdminPermissions,
         BuiltInRole.Member => MemberPermissions,
-        BuiltInRole.Viewer => NoPermissions,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Every built-in role has its permissions."),
     };
 }

@@ -8,27 +8,10 @@ namespace SharedKernel;
 /// </summary>
 public static class Permissions
 {
-    public const string MembersInvite = "members.invite";
-
-    public const string MembersManage = "members.manage";
-
-    public const string OwnersManage = "owners.manage";
-
-    public const string RolesManage = "roles.manage";
-
-    public const string NotificationsSchedule = "notifications.schedule";
-
-    public const string SystemTenantsRead = "system.tenants.read";
-
-    public const string SystemTenantsEnter = "system.tenants.enter";
-
     public const string SystemTenantsCreate = "system.tenants.create";
 
-    public const string SystemMembersInvite = "system.members.invite";
+    // No tenant capability has a permission yet.
+    public static IReadOnlySet<string> TenantPool { get; } = FrozenSet<string>.Empty;
 
-    public static IReadOnlySet<string> TenantPool { get; } =
-        FrozenSet.Create(StringComparer.Ordinal, MembersInvite, MembersManage, OwnersManage, RolesManage, NotificationsSchedule);
-
-    public static IReadOnlySet<string> SystemPool { get; } =
-        FrozenSet.Create(StringComparer.Ordinal, SystemTenantsRead, SystemTenantsEnter, SystemTenantsCreate, SystemMembersInvite);
+    public static IReadOnlySet<string> SystemPool { get; } = FrozenSet.Create(StringComparer.Ordinal, SystemTenantsCreate);
 }

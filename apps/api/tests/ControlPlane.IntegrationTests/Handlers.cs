@@ -1,5 +1,4 @@
 using ControlPlane.Application.Invitations;
-using ControlPlane.Application.Members;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
@@ -14,19 +13,6 @@ internal static class Handlers
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    public static Task<(Result<InvitationDetails> Result, DeliverInvitation? Delivery)> InviteAsync(
-        IServiceProvider services,
-        Guid tenantId,
-        string actorId,
-        string email,
-        Guid roleId) =>
-        InTenant.RunAsync(services, tenantId, scope => CreateInvitationHandler.HandleAsync(
-            new CreateInvitation(actorId, email, roleId),
-            scope.GetRequiredService<ITenantCatalog>(),
-            scope.GetRequiredService<InvitationSettings>(),
-            scope.GetRequiredService<TimeProvider>(),
-            Cancellation));
-
     // The delivery runs after the invitation is saved, in the invitation's tenant, the way the outbox hands it on (0029).
     public static Task DeliverAsync(IServiceProvider services, Guid tenantId, DeliverInvitation delivery) =>
         InTenant.ProcessAsync(services, tenantId, scope => DeliverInvitationHandler.HandleAsync(
@@ -37,12 +23,27 @@ internal static class Handlers
             scope.GetRequiredService<InvitationSettings>(),
             Cancellation));
 
-    public static async Task<InvitationDetails> InviteAndDeliverAsync(IServiceProvider services, Guid tenantId, string actorId, string email, Guid roleId)
+    // A tenant's first owner invited the way onboarding does it (0026): the invitation step, then the activation, which hands on the
+    // invitation's delivery. The tenant is active afterwards, and the invitation is not delivered yet.
+    public static async Task<(Guid TenantId, string Slug, Guid InvitationId, DeliverInvitation Delivery)> InviteFirstOwnerAsync(
+        IServiceProvider services,
+        string ownerEmail)
     {
-        var (invitation, delivery) = await InviteAsync(services, tenantId, actorId, email, roleId);
-        await DeliverAsync(services, tenantId, delivery.ShouldNotBeNull());
+        var tenant = await Catalog.AddTenantAsync(services, Domain.Tenants.TenantStatus.Provisioning);
+        var admin = await Catalog.AddUserAsync(services);
+        var invitationId = Guid.CreateVersion7();
+        var activate = await InviteFirstOwnerAsync(services, tenant.Id, new CreateFirstOwnerInvitation(invitationId, ownerEmail, admin.Id));
+        var (delivery, _) = await ActivateAsync(services, tenant.Id, activate.ShouldNotBeNull());
 
-        return invitation.Value;
+        return (tenant.Id, tenant.Slug, invitationId, delivery.ShouldNotBeNull());
+    }
+
+    public static async Task<(Guid TenantId, string Slug, Guid InvitationId)> InviteAndDeliverAsync(IServiceProvider services, string ownerEmail)
+    {
+        var (tenantId, slug, invitationId, delivery) = await InviteFirstOwnerAsync(services, ownerEmail);
+        await DeliverAsync(services, tenantId, delivery);
+
+        return (tenantId, slug, invitationId);
     }
 
     // Accepting starts outside any tenant: the token leads to the tenant, the identity provider is asked for the user's verified
@@ -63,10 +64,6 @@ internal static class Handlers
             scope.GetRequiredService<TimeProvider>(),
             Cancellation));
     }
-
-    public static Task<Result> ChangeMemberRoleAsync(IServiceProvider services, Guid tenantId, string actorId, Guid userId, Guid roleId) =>
-        InTenant.RunAsync(services, tenantId, scope => ChangeMemberRoleHandler.HandleAsync(
-            new ChangeMemberRole(actorId, userId, roleId), scope.GetRequiredService<ITenantCatalog>(), Cancellation));
 
     // Onboarding runs inside the tenant it creates, whose id the endpoint chooses (0026).
     public static Task<(Result<TenantDetails> Result, CreateFirstOwnerInvitation? Next)> StartOnboardingAsync(

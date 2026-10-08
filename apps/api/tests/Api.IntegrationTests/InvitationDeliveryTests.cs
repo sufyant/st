@@ -105,13 +105,13 @@ public sealed class InvitationDeliveryTests(Database database)
             }
         });
 
+    // Onboarding a tenant invites its first owner.
     private async Task<HttpResponseMessage> InviteAsync(ApiFactory api, string email)
     {
-        var tenant = await _catalog.AddTenantAsync();
-        var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
-        var roleId = await database.ScalarAsync<Guid>("SELECT id FROM catalog.roles WHERE built_in = 'Member'");
+        var admin = await _catalog.AddSystemAdminAsync();
+        var slug = $"tenant-{Guid.NewGuid():N}"[..20];
 
-        return await api.CreateClient(owner).PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/invitations", new { email, roleId }, Cancellation);
+        return await api.CreateClient(admin, secondFactor: true).PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail = email }, Cancellation);
     }
 
     private sealed class StubResend : HttpMessageHandler

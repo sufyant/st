@@ -1,7 +1,6 @@
 using Api;
 using Api.Admin;
 using Api.Persistence;
-using Api.Tenants;
 using Audit.Api;
 using ControlPlane.Api;
 using Notifications.Api;
@@ -23,8 +22,6 @@ if (args is [MigrationStep.Command, ..])
 app.UseApiPipeline();
 
 var v1 = app.MapV1();
-var admin = v1.MapAdmin();
-var tenant = v1.MapTenant();
-v1.MapControlPlaneEndpoints(tenant, admin);
+v1.MapControlPlaneEndpoints(v1.MapAdmin());
 
 app.Run();

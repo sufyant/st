@@ -59,57 +59,10 @@ public sealed class TenantCatalogTests(Database database)
     }
 
     [Fact]
-    public async Task A_tenant_finds_the_built_in_roles_and_its_own_custom_roles()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services);
-        var own = await Catalog.AddCustomRoleAsync(database.Services, tenant);
-
-        var found = await InTenant.ReadAsync(database.Services, tenant.Id, async scope =>
-        {
-            ITenantCatalog catalog = scope.GetRequiredService<TenantCatalog>();
-            return (await catalog.FindRoleAsync(own.Id, Cancellation), await catalog.FindRoleAsync(BuiltInRoles.Owner.Id, Cancellation));
-        });
-
-        found.Item1.ShouldNotBeNull().Name.ShouldBe(own.Name);
-        found.Item2.ShouldNotBeNull().Permissions.ShouldBe(BuiltInRoles.Owner.Permissions, ignoreOrder: true);
-    }
-
-    [Fact]
-    public async Task A_tenant_does_not_find_the_custom_role_of_another_tenant()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services);
-        var other = await Catalog.AddTenantAsync(database.Services);
-        var theirs = await Catalog.AddCustomRoleAsync(database.Services, other);
-
-        var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindRoleAsync(theirs.Id, Cancellation));
-
-        found.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task A_role_of_another_tenant_cannot_be_added()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services);
-        var other = await Catalog.AddTenantAsync(database.Services);
-        var theirs = Role.CreateCustom(Guid.CreateVersion7(), other.Id, "Theirs", []).Value;
-
-        var add = () => InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-        {
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).Add(theirs);
-            return Task.FromResult(0);
-        });
-
-        await add.ShouldThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
     public async Task A_tenant_does_not_find_the_invitation_of_another_tenant()
     {
-        var other = await Catalog.AddTenantAsync(database.Services);
-        var owner = await Catalog.AddMemberAsync(database.Services, other, BuiltInRoles.Owner);
         var email = Unique.Email();
-        await Handlers.InviteAndDeliverAsync(database.Services, other.Id, owner.ExternalId, email, BuiltInRoles.Member.Id);
+        await Handlers.InviteAndDeliverAsync(database.Services, email);
         var tokenHash = InvitationToken.Hash(Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
@@ -122,13 +75,11 @@ public sealed class TenantCatalogTests(Database database)
     [Fact]
     public async Task A_tenant_does_not_find_the_invitation_of_another_tenant_by_its_id()
     {
-        var other = await Catalog.AddTenantAsync(database.Services);
-        var owner = await Catalog.AddMemberAsync(database.Services, other, BuiltInRoles.Owner);
-        var (invitation, _) = await Handlers.InviteAsync(database.Services, other.Id, owner.ExternalId, Unique.Email(), BuiltInRoles.Member.Id);
+        var (_, _, invitationId, _) = await Handlers.InviteFirstOwnerAsync(database.Services, Unique.Email());
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(invitation.Value.Id, Cancellation));
+            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(invitationId, Cancellation));
 
         found.ShouldBeNull();
     }

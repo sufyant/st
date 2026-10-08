@@ -1,7 +1,5 @@
-using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.Tenants;
 using Microsoft.Extensions.DependencyInjection;
-using SharedKernel;
 using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
@@ -18,31 +16,6 @@ public sealed class TenantDirectoryTests(Database database)
         var membership = await FindMembershipAsync(tenant.Slug, user.ExternalId);
 
         membership.ShouldNotBeNull().TenantId.ShouldBe(tenant.Id);
-    }
-
-    [Fact]
-    public async Task A_member_resolves_with_the_permissions_of_a_built_in_role()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services);
-        var admin = await Catalog.AddMemberAsync(database.Services, tenant, BuiltInRoles.Admin);
-
-        var membership = await FindMembershipAsync(tenant.Slug, admin.ExternalId);
-
-        membership.ShouldNotBeNull().Permissions.ShouldBe(
-            [Permissions.MembersInvite, Permissions.MembersManage, Permissions.RolesManage, Permissions.NotificationsSchedule], ignoreOrder: true);
-    }
-
-    // Custom roles work without code changes (0030).
-    [Fact]
-    public async Task A_member_resolves_with_the_permissions_of_a_custom_role()
-    {
-        var tenant = await Catalog.AddTenantAsync(database.Services);
-        var recruiter = await Catalog.AddCustomRoleAsync(database.Services, tenant, Permissions.MembersInvite);
-        var user = await Catalog.AddMemberAsync(database.Services, tenant, recruiter);
-
-        var membership = await FindMembershipAsync(tenant.Slug, user.ExternalId);
-
-        membership.ShouldNotBeNull().Permissions.ShouldBe([Permissions.MembersInvite]);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Tenancy;
 using Wolverine;
 using Wolverine.Tracking;
 
@@ -40,6 +41,20 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
             .GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Slug}/probes", Cancellation);
 
         probes.ShouldBeEmpty();
+    }
+
+    // Property level: a client cannot choose the tenant of a row by sending it (mass assignment).
+    [Fact]
+    public async Task A_row_is_written_in_the_tenant_of_the_request_whatever_the_body_says()
+    {
+        var tenant = await _catalog.AddTenantAsync();
+        var other = await _catalog.AddTenantAsync();
+        var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
+        var value = $"probe-{Guid.NewGuid():N}";
+
+        await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/probes", new { value, tenantId = other.Id }, Cancellation);
+
+        (await database.ScalarAsync<Guid>($"SELECT tenant_id FROM probes.probes WHERE value = '{value}'", DatabaseRoles.Owner)).ShouldBe(tenant.Id);
     }
 
     [Fact]

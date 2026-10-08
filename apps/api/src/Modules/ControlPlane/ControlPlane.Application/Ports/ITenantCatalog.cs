@@ -1,5 +1,4 @@
 using ControlPlane.Domain.Invitations;
-using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 
@@ -19,28 +18,12 @@ public interface ITenantCatalog
 {
     internal Guid TenantId { get; }
 
-    /// <summary>Locks the tenant's row for the rest of the transaction, so changes to its memberships and roles run one at a time.</summary>
-    internal Task LockAsync(CancellationToken cancellationToken);
-
     internal Task<string> FindSlugAsync(CancellationToken cancellationToken);
 
     /// <summary>The active tenant, locked for the rest of the transaction, so the steps of its onboarding run one at a time.</summary>
     internal Task<Tenant> FindTenantForUpdateAsync(CancellationToken cancellationToken);
 
-
-    /// <summary>A built-in role, or a custom role of the active tenant.</summary>
-    internal Task<Role?> FindRoleAsync(Guid roleId, CancellationToken cancellationToken);
-
-    internal Task<bool> IsRoleNameTakenAsync(string name, Guid? exceptRoleId, CancellationToken cancellationToken);
-
-    /// <summary>Whether a membership or a pending invitation is assigned the role.</summary>
-    internal Task<bool> IsRoleInUseAsync(Guid roleId, CancellationToken cancellationToken);
-
     internal Task<Membership?> FindMembershipAsync(Guid userId, CancellationToken cancellationToken);
-
-    internal Task<Membership?> FindMembershipAsync(string externalUserId, CancellationToken cancellationToken);
-
-    internal Task<int> CountOwnersAsync(CancellationToken cancellationToken);
 
     /// <summary>The invitation with this token hash, locked for the rest of the transaction so it is accepted only once.</summary>
     internal Task<Invitation?> FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken);
@@ -58,15 +41,9 @@ public interface ITenantCatalog
     /// </summary>
     internal Task<bool> TryAddAsync(Tenant tenant, CancellationToken cancellationToken);
 
-    internal void Add(Role role);
-
     internal void Add(Invitation invitation);
 
     internal void Add(User user);
-
-    internal void Remove(Role role);
-
-    internal void Remove(Membership membership);
 
     internal Task SaveChangesAsync(CancellationToken cancellationToken);
 }

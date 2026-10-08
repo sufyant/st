@@ -1,37 +1,36 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Tenancy;
 
 namespace Api.IntegrationTests;
 
 // Endpoints return the Result of their command and the host maps it (0032), so the document must describe what the client
 // actually receives, not the Result type (0036).
-public sealed class OpenApiDocumentTests(Database database) : IAsyncLifetime
+public sealed class OpenApiDocumentTests : IAsyncLifetime
 {
-    private ApiFactory _api = null!;
+    private PipelineHost _host = null!;
     private JsonElement _document;
 
     public async ValueTask InitializeAsync()
     {
-        _api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application));
-        _document = await _api.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json", TestContext.Current.CancellationToken);
+        _host = await PipelineHost.StartAsync();
+        _document = await _host.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json", TestContext.Current.CancellationToken);
     }
 
-    public async ValueTask DisposeAsync() => await _api.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
     public void A_result_with_a_value_is_described_as_the_value()
     {
-        var success = Responses("/v1/tenants/{tenantSlug}/roles", "post").GetProperty("200");
+        var success = Responses("/v1/greetings", "post").GetProperty("200");
 
         success.GetProperty("content").GetProperty("application/json").GetProperty("schema").GetProperty("$ref").GetString()
-            .ShouldBe("#/components/schemas/RoleResponse");
+            .ShouldBe("#/components/schemas/Greeting");
     }
 
     [Fact]
     public void A_result_without_a_value_is_described_as_no_content()
     {
-        var responses = Responses("/v1/tenants/{tenantSlug}/roles/{roleId}", "delete");
+        var responses = Responses("/v1/acknowledgements", "post");
 
         responses.EnumerateObject().Select(response => response.Name).ShouldContain("204");
         responses.EnumerateObject().Select(response => response.Name).ShouldNotContain("200");
@@ -44,7 +43,7 @@ public sealed class OpenApiDocumentTests(Database database) : IAsyncLifetime
     [InlineData("409")]
     public void The_failures_of_a_result_are_described_as_problem_details(string status)
     {
-        var failure = Responses("/v1/tenants/{tenantSlug}/roles", "post").GetProperty(status);
+        var failure = Responses("/v1/greetings", "post").GetProperty(status);
 
         failure.GetProperty("content").EnumerateObject().Select(content => content.Name).ShouldBe(["application/problem+json"]);
     }
