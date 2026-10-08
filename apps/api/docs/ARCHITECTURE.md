@@ -1,550 +1,360 @@
-# SaaS Template: Mimari Kararlar
+# Architecture: multi-tenant SaaS starter template (API)
 
-## Amaç ve felsefe
+Last updated: 2026-10-07
 
-Template, her yeni SaaS ürününün sıfırdan değil, hazır ve sağlam bir iskeletten başlaması için kurulur. Odak: backend API ve platformu (`apps/api/`). Web, mobil ve admin istemcileri bu API'yi tüketir; dokümanda yalnızca API'yi şekillendirdikleri yerde geçerler.
+This document is the single source of truth for the API in `apps/api/`. If the code does not agree with this document, the code changes. No other file overrides it.
 
-- **Yalın başla.** Framework'ün verdiğini yeniden kurma, ihtiyaç gerçekten çıkınca ekle.
-- **Olgun ve kanıtlanmış teknoloji.** Moda değil dayanıklılık. Yenilikçilik sadece değer kattığı yerde (Wolverine).
-- **Sınırları kodla zorla.** Kurallar doküman değil, derleyici ve mimari testlerle korunur.
-- **Güvenlik en dipte.** Tenant izolasyonu uygulama koduna güvenmez, veritabanı garanti eder.
-- **Kararlar kayıtlı.** Her mimari karar repoda ADR olarak durur; ajan talimatları kuralları kopyalamaz, ADR'lere referans verir.
+Each rule has an id (for example `R4`, `W2`). Use the id when you refer to a rule in a review, a commit message or a comment.
 
-## Teknoloji yığını
+## Purpose and scope
 
-Backend .NET 10 üzerinde modüler monolit, veritabanı Neon üzerinde tek PostgreSQL projesi.
+The purpose is a multi-tenant SaaS starter template. Every future product is built on it. The scope is the API only. Correctness, clear boundaries and tenant isolation are more important than speed.
 
-| Alan | Seçim | Not |
+### Fixed rules
+
+1. Each decision agrees with the books and with industry practice.
+2. Each deviation from the books is written down openly. A silent deviation is not permitted.
+3. There is no billing.
+4. There are no commercially licensed packages: MediatR, AutoMapper, MassTransit v9+, FluentAssertions.
+5. The architecture controls the tool. The tool does not control the architecture. If a tool does not fit the structure, the tool goes or the deviation is approved openly.
+6. The template is platform independent. Provider detail (example: Neon) does not go into the architecture. It goes into the setup notes.
+7. Infrastructure without a use does not go in. A part is added only if it catches a failure that no other control catches.
+
+### Scope of the first template
+
+The first template runs one flow from start to end: tenant creation.
+
+| In scope | Reason |
+| --- | --- |
+| `POST /v1/system/tenants` | The work itself |
+| The first system admin comes from configuration | The first person who creates a tenant cannot get on the staff list in another way |
+| Tenant onboarding process (saga, four steps) | The approved flow |
+| One handler that sends the invitation email (Notifications) | Step four of the process |
+| One handler that writes the "tenant created" record (Audit) | The only use of the Audit module |
+| The endpoint that accepts an invitation | Without it, the first Owner cannot exist |
+| `GET /v1/me/tenants` | The user sees their tenants after sign-in |
+| One read endpoint behind the tenant door. Example: `GET /v1/tenants/{tenantId}/members` | It exercises the tenant door, membership, RLS and the permission check |
+
+Out of scope: member invitation by an Owner, custom roles and role assignment, member removal, tenant suspension and deletion, support access, in-app notifications, adding a second system admin, the tenant list for the system admin.
+
+## 1. The big picture
+
+The system is one code base and one build output. This output runs as two process types: web and worker.
+
+| Decision | Source |
+| --- | --- |
+| The system is one deployment unit. The code is divided by business area | Richards and Ford, FSA 2nd ed., Chapter 11 |
+| Each module is a bounded context | Evans, Chapter 14. Khononov, Chapter 3 |
+| One artifact, two process types. Web serves HTTP requests. Worker runs background work. A setting selects the role | Twelve-Factor, Factor VIII. Nygard, Chapter 5 (Bulkheads) |
+| One PostgreSQL schema for each module. No foreign keys and no joins across modules | Evans, Chapter 14. Richardson, "Database per Service" (adapted to a monolith) |
+| The host contains no business rule. It only connects the modules | Industry practice (composition root) |
+
+In Kubernetes this is two Deployments and one image. The requirement is a separate process, not a separate machine.
+
+## 2. Module boundary and structure
+
+Each module is five projects. Another module sees only the `Contracts` project.
+
+| Project | Content | Depends on |
 | --- | --- | --- |
-| Backend | .NET 10, Minimal API | Tek host, modüller class library |
-| Veritabanı | PostgreSQL 18 (Neon), tek proje | Paylaşımlı DB + RLS; testlerde de PostgreSQL 18 (Neon projesinin ana sürümü) |
-| Veri erişimi | EF Core code-first | Gerekirse okuma için Dapper |
-| Mediator, outbox, mesajlaşma, saga | Wolverine (MIT) | Katman katman benimsenir |
-| Tekrar eden işler | Hangfire | Kendi `hangfire` şeması; dashboard şimdilik sadece yerel geliştirmede açık |
-| Gerçek zamanlı | SignalR | Redis backplane config ile açılır |
-| Kimlik doğrulama | Clerk (Invite-only mod, eski adıyla Restricted) | Sadece authentication; dışarıdan kayıt kapalı; token'ı ASP.NET Core'un JWT bearer handler'ı doğrular |
-| E-posta | Resend | Kanal arayüzünün arkasında; geliştirmede sahte kanal |
-| Doğrulama | FluentValidation | Pipeline'da |
-| Loglama, gözlem | Serilog + OpenTelemetry | OTLP ile dışa aktarım, hedef ortamdan |
-| API dokümanı | Scalar | Swagger UI yerine |
-| Dış çağrı dayanıklılığı | Microsoft.Extensions.Http.Resilience | Timeout, retry, circuit breaker |
-| Test | xUnit, Shouldly, Testcontainers, WebApplicationFactory, NetArchTest | FluentAssertions ticari olduğu için yok |
+| `X.Contracts` | Interfaces, DTOs, event types. No domain types | Nothing |
+| `X.Api` | HTTP endpoints | Application, Contracts |
+| `X.Application` | Use case handlers, contract implementations, sagas | Domain, Contracts |
+| `X.Domain` | Business rules | Nothing |
+| `X.Infrastructure` | EF Core, adapters for external services | Application, Domain |
 
-Lisans notu: MediatR, AutoMapper, MassTransit v9 ve FluentAssertions ticari lisansa geçtiği için kullanılmaz. NetArchTest'in bakımı süren fork'u (`NetArchTest.eNhancedEdition`) ve Testcontainers doğrulandı (0044). Faz 4'te eklenen JWT bearer, `Microsoft.Extensions.Http` ve FluentValidation paketleri kontrol edildi (0002); Clerk SDK'sı kullanılmaz. Faz 5'te eklenen `WolverineFx.Postgresql` ve getirdiği paketler (Weasel, NetTopologySuite, DistributedLock) kontrol edildi: MIT, PostgreSQL ve BSD-3 lisanslı (0002). Faz 6'da eklenenler kontrol edildi (0002): `Microsoft.Extensions.Http.Resilience` (MIT; Polly BSD-3), SignalR Redis backplane'i (MIT; StackExchange.Redis MIT) ve Hangfire. Hangfire.Core ve Hangfire.PostgreSql LGPL-3.0'dır; ticari değil açık kaynak lisanstır, değiştirilmemiş NuGet paketlerini kullanmak koşullarını karşılar. Hangfire.Core'un kabul ettiği Newtonsoft.Json 11 bilinen bir açık taşıdığından 13.0.4 doğrudan referans verilir.
+- Two controls enforce the boundary: project references (compilation) and architecture tests. Source: Ford, Parsons, Kua, Chapter 2.
+- The `Api` project cannot reach the `DbContext`. Source: Evans, Chapter 4.
+- A read across modules is a plain method call. The interface is in `A.Contracts`. Its implementation is an `internal sealed` class inside A. Source: Gamma et al., Chapter 4 (Facade). Evans, Chapter 14 (Open Host Service).
+- The shared kernel stays small and carries no business concept. Source: Evans, Chapter 14.
+- Test projects are next to their module. System-wide tests (architecture, end to end) stay in the top `tests` folder.
 
-## Çok kiracılık
+## 3. Messaging
 
-Model: tek veritabanı, paylaşımlı tablolar, tenant izolasyonu Postgres Row Level Security (RLS) ile. Tenant çözümleme katmanı soyut tutulur; ileride bir tenant'ı ayrı veritabanına taşımak (hibrit model) mümkün kalır.
+If a module needs data, it reads through a contract. To tell other modules that something happened, it uses an event. The outbox carries the event.
 
-**Neden bu model:** Database-per-tenant pratikte onlarca ile birkaç yüz tenant'ta tıkanır; şema-per-tenant iki modelin karmaşasını taşıyıp izolasyonunu vermez. Binlerce tenant'ta sektör paylaşımlı model + satır izolasyonu kullanır.
+### Outbox rules
 
-**Çift kat koruma** (0014). Altyapı paylaşılan Tenancy projesindedir (0048):
-
-1. Uygulama: tenant entity'si tutan modül DbContext'i `TenantDbContext`'ten türer. `ITenantEntity` işaretli her entity'ye model kurulumunda şunlar otomatik eklenir:
-   - `TenantId` shadow property'si (kolon `tenant_id`, indeksli; domain görmez).
-   - Scope'un `TenantContext`'ine bağlı global query filter. Tenant yoksa hiçbir satır eşleşmez.
-2. Veritabanı: aynı işaret, migration'a otomatik RLS yazdırır. Özel bir migration SQL üreticisi tabloya şunları ekler:
-   - `ENABLE ROW LEVEL SECURITY`.
-   - Okuma için `USING`, yazma için `WITH CHECK` içeren tek bir `tenant_isolation` policy'si.
-   - Tenant kolonunun varsayılan değeri aktif tenant ayarından gelir: `NULLIF(current_setting('app.tenant_id', true), '')::uuid`. `NULLIF` gerekir, çünkü ayar bir kez set edildikten sonra oturumda boş string olarak kalır.
-
-Kod filtreyi unutsa da Postgres yanlış satırı döndürmez ve yanlış tenant'a yazmaz. Tenant yokken okuma boş döner, yazma `WITH CHECK`'e takılır.
-
-- **`FORCE ROW LEVEL SECURITY` kapalıdır.** Açılsaydı tablo sahibi de policy'ye takılırdı. Arka plan işlerinin `SECURITY DEFINER` fonksiyonları tam da tenant'lar arası görebilmek için sahip olarak çalışır; `FORCE` altında hiçbir şey göremezlerdi. Bunu aşmanın tek yolu bütün tenant'ları gören bir policy olurdu, o da yasak. Owner kimlik bilgisi yalnızca migration adımında kullanılır.
-- **Rol kontrolü.** RLS superuser'a, `BYPASSRLS`'li role ve tablo sahibine işlemez. Bu yüzden `/health/ready` bağlandığı rolü kontrol eder: superuser olmamalı, `BYPASSRLS`'i olmamalı, hiçbir tablonun sahibi olmamalı. Aksi halde pod hazır sayılmaz ve trafik almaz.
-
-**Tenant çözümleme akışı** (0015):
-
-1. İstek gelir, Clerk token'ı doğrulanır.
-2. Middleware tenant slug'ını path'ten alır (`/v1/tenants/{slug}/...`), iç tenant id'sine çevirir ve kullanıcının o tenant'a üyeliğini catalog'dan doğrular. Aynı sorgu üyenin rolündeki izinleri de getirir (0030); çözümleme ve yetkilendirme tek sorgudur.
-   - Kullanıcı `NameIdentifier` claim'iyle, yani Clerk kullanıcı id'siyle (token'daki `sub`) tanınır.
-   - Yalnızca aktif tenant çözülür.
-   - Sorgu Tenancy'deki `ITenantDirectory` arkasındadır; host ControlPlane'i tanımaz.
-   - Tenant hiçbir zaman istemcinin beyanına güvenilerek seçilmez. İçeride her yerde id dolaşır.
-3. Çözümlenen tenant; scope'un `TenantContext`'ine, isteğin Wolverine mesaj zarfına, loglara, trace'e ve HTTP metriklerine konur.
-4. Transaction mesaja aittir (0016). Tenant taşıyan her mesaj (istekten, zincirden ya da kuyruktan gelsin) tek bir transaction içinde çalışır. Transaction başında aktif tenant transaction'a yerel olarak set edilir; RLS bu değere göre filtreler. Okumalar da bu kurala dahildir.
-   - Tenant endpoint'i modüle tek bir `InvokeAsync` ile gider; böylece isteğin transaction'ı o komutun transaction'ıdır.
-   - Transaction'ı host'taki bir Wolverine handler policy'si açar ve Wolverine'in outbox'ını bu transaction'a bağlar; handler'ın gönderdiği mesajlar işiyle birlikte yazılır, ancak commit'ten sonra gider (0024).
-   - Handler başarıyla biterse commit eder; istisna ya da başarısız Result dönerse geri alır ve handler'ın gönderdiği mesajları atar. Policy, tuple içinde mesajla birlikte dönen Result'ı da (`(Result, Mesaj)`) bulur. Faz 5'te doğrulandı.
-5. Pipeline sırası: routing → kimlik doğrulama → tenant çözümleme (kimseyi reddetmez) → rate limit → yetkilendirme.
-   - Kimlik yoksa 401.
-   - Bilinmeyen slug, üye olmayan kullanıcı ve aktif olmayan tenant 404 döner; tenant'ın varlığı açığa çıkmaz. Bu 404'ü yetkilendirme verir: çözülmemiş bir tenant rotasındaki ret "yok" olarak cevaplanır.
-   - Üyenin endpoint'in istediği izni yoksa 403.
-   - Üye olmayanlar da rate limit'ten geçer.
-   - Üye olmayan bir system admin de tenant rotalarında 404 alır; tenant'a admin rotalarından girer.
-6. Tenant rotalarının kendi segmenti (`tenants`) vardır. Bu yüzden hiçbir slug tenant dışı rotalarla (`/v1/me` gibi) çakışmaz ve yasaklı slug listesi gerekmez (0033).
-7. Slug şimdilik değiştirilemez. Yeniden adlandırma ve eski URL yönlendirmesi ihtiyaç çıkınca eklenir. Subdomain'e geçiş çözümleme katmanı değiştirilerek yapılır.
-
-Üyelik sorgusu her istekte çalışır; ölçülüp gerekli görülmeden önbelleğe alınmaz.
-
-**Arka plan işlerinde tenant:** Handler'lar, saga adımları ve zamanlanmış işler HTTP isteği dışında çalışır, yine de RLS'i atlamaz.
-
-- Her mesaj zarfı tenant id'sini taşır (Wolverine'in kendi zarf alanı). Bir handler'dan zincirlenen mesaj, işlenen mesajın tenant'ını devralır. Transaction policy'si onu transaction'a set eder. GUID olmayan bir tenant id'si mesajı başarısız kılar.
-- Saklanan mesaj tenant id'sini zarfıyla birlikte saklar; çökme sonrası kurtarılan mesaj kendi tenant'ında çalışır. Tenant'sız gönderilen saklı mesaj Wolverine'in varsayılan tenant id'siyle (`*DEFAULT*`) döner; bu hiçbir tenant'ı göstermez.
-- Tenant'lar arası iş bulan işler (Hangfire tarayıcı, sistem temizliği) vadesi gelenleri dar bir `SECURITY DEFINER` fonksiyonla sadece `(tenant_id, id)` olarak çeker ya da tenant'ları catalog'dan gezer; her kaydı kendi tenant'ı altında ayrı işler.
-- Fonksiyonu bir migration'dan `TenantScan` yazar (0017):
-  - Owner'a aittir, `search_path` sabittir.
-  - `EXECUTE` yetkisi `PUBLIC`'ten alınır, yalnızca uygulama rolüne verilir.
-- Hiçbir rol `BYPASSRLS` almaz.
-
-**Veritabanı rolleri:**
-
-| Rol | Ad | Amaç |
+| # | Rule | Source |
 | --- | --- | --- |
-| Owner | `api_owner` | Migration'ları çalıştırır, tabloların sahibidir |
-| Uygulama | `api_application` | Hiçbir tablonun sahibi değildir, `BYPASSRLS` yoktur; RLS her zaman geçerlidir |
-| Rapor (salt okunur) | `api_reporting` | Sadece system admin rapor endpoint'leri kullanır; yalnızca catalog'u okur, tenant tablolarına erişimi yoktur |
+| O1 | The event record is written in the same transaction as the business data | Richardson, Chapter 3. Kleppmann, Chapter 11 |
+| O2 | Delivery happens after the commit and separately | Richardson, Chapter 3 |
+| O3 | Each listening module runs in its own transaction | Vernon, Chapter 10 |
+| O4 | Delivery is at least once. A message that arrives again has no second effect | Hohpe and Woolf, Chapter 10 (Idempotent Receiver) |
+| O5 | There is one outbox. It is in a shared infrastructure schema | Industry practice. See the deviations list |
 
-Roller küme seviyesinde olduğu için migration'lardan önce çalışan bir bootstrap script'iyle oluşturulur (`apps/api/db/bootstrap.sql`, 0018).
-- Script tekrar çalıştırılabilir; parolalar psql değişkeni olarak verilir.
-- Hiçbir role superuser ya da `BYPASSRLS` vermez.
-- Yetkiler migration'larla verilir. Migration'lar rol adlarını düz metin olarak yazar.
+### Requirements for the messaging tool
 
-Tenant verisi üzerinden rapor ihtiyacı çıkarsa ayrı bir ADR ile eklenir.
+The tool is Wolverine. The tested version is 6.45.0. The tool is measured against these nine requirements. Each requirement is tested with real PostgreSQL.
 
-**Bağlantılar** (0019): İstekler, mesaj handler'ları ve Hangfire havuzlu (pooled) bağlantıyı kullanır (`ConnectionStrings:Pooled`, uygulama rolü). Tenant ayarı transaction'a yerel olduğu için pooler'da başka istemciye sızmaz.
+1. The event record is written in the same transaction as the business data.
+2. Each listening module runs in its own transaction.
+3. With many pods, only one pod takes a message at a time.
+4. A message that arrives again has no second effect.
+5. If a pod dies, its unfinished message is not lost. Another pod takes it.
+6. A message that always fails is moved aside. The queue does not block.
+7. The tenant travels with the message.
+8. The `Domain` and `Contracts` projects do not see the tool's types. `Api`, `Application` and `Infrastructure` can.
+9. The architecture controls the tool. We decide the module structure, the schema layout and the transaction rule.
 
-Migration'lar ve oturum seviyesi kilit veya `LISTEN/NOTIFY` gerektiren arka plan bileşenleri doğrudan (direct) bağlantıyı kullanır. Migration adımı owner rolüyle `ConnectionStrings:Migrations`'ı kullanır.
+Requirements 3 and 5 do not have a test yet. A two-pod test is part of the fix plan.
 
-- Wolverine'in kendi işleri (lider seçimi, kurtarma, düğüm kayıtları, işlenen mesajın işaretlenmesi) uygulama rolünün doğrudan bağlantısından (`ConnectionStrings:Direct`) gider. Faz 5'te doğrulandı: lider, işlem dışında boşta duran ayrı bir bağlantıda oturum seviyesi advisory kilit (`pg_try_advisory_lock`) tutar ve oturumun `application_name`'ini oturum seviyesinde değiştirir; transaction modundaki pooler ikisini de taşıyamaz.
-- Handler'ın gönderdiği mesajlar ise kendi tenant transaction'ında, havuzlu bağlantıdan yazılır (0016).
-- Hangfire doğrudan bağlantı istemez. Faz 6'da doğrulandı: oturumlarında advisory kilit, `LISTEN` ya da transaction içinde boşta bekleme yoktur; kilitleri kendi `hangfire.lock` tablosundaki satırlardır.
-- **Doğrudan bağlantı bütçesi** (Faz 6'da ölçüldü): pod başına `ConnectionStrings:Direct` içindeki `Maximum Pool Size` kadar, önerilen değer 5.
-  - Wolverine, lider pod'da boşta 3 bağlantı tutar; biri pod liderken liderlik kilidini taşır. Lider olmayan pod'da 2 bağlantı tutar.
-  - Yük altında sınırsız havuzla 5'e çıktı. Sınır 3 iken 1.000 mesajın hepsi hatasız işlendi.
-  - Hangfire 0 doğrudan bağlantı kullanır.
-  - Bütçe: `pod × 5`, artı migration adımı sürerken bir owner bağlantısı. Veritabanının bağlantı limitinin, pooler'ın kendi açtığı sunucu bağlantıları düşüldükten sonraki kısmında kalmalıdır.
-  - Havuzlu bağlantılar veritabanının değil pooler'ın istemci limitine sayılır. Boşta bir pod'da Hangfire havuzda altı kadar bağlantı açık tutar; yük altında istekler, handler'lar ve Hangfire birlikte on iki kullandı.
+### Handlers and pipeline
 
-Rapor rolünün bağlantısı (`ConnectionStrings:Reporting`) ilk rapor endpoint'iyle Faz 4'te eklendi; `Pooled` gibi ilk kullanımda kontrol edilir. Uygulama rolünün doğrudan bağlantısı Faz 5'te Wolverine'le geldi. Build, OpenAPI dokümanını yazmak için host'u bağlantısız başlattığından `Pooled` ve `Direct` açılışta kontrol edilmez; `Direct` yoksa Wolverine mesaj deposu olmadan çalışır. İki durumda da `/health/ready` başarısız olur; hazır olma kontrolü iki bağlantının rolünü de denetler.
+Wolverine is the dispatcher. An endpoint sends a command or a query through `IMessageBus`. A handler is a plain class. Shared behaviour is Wolverine middleware. Source: Fowler, PoEAA Chapter 9 (Service Layer). Hohpe and Woolf, Chapter 3 (Pipes and Filters) and Chapter 10 (Message Dispatcher).
 
-**Catalog şeması:** ControlPlane modülünün sahibi olduğu, tenant üstü tek şema. İçinde tenant'lar (slug, durum), kullanıcılar (tek kimlik, Clerk kimliğiyle eşleşir, birden çok tenant'a üye olabilir), tenant-kullanıcı üyelikleri (her biri bir rolle), roller, davetler ve system adminleri durur. RLS yoktur: Golding'e göre kontrol düzleminin kendisi çok kiracılı değildir.
+| Order | Command chain | Query chain |
+| --- | --- | --- |
+| 1 | Logging and tracing | Logging and tracing |
+| 2 | The transaction opens, the tenant is declared | The transaction opens, the tenant is declared |
+| 3 | Input validation | Input validation |
+| 4 | Authorization check | Authorization check |
+| 5 | Handler | Cache (only on marked queries) |
+| 6 | Save, commit, then outbox dispatch | Handler |
 
-- Tenant'a ait catalog satırlarına (roller, üyelikler, davetler) erişim tek bir tenant kapsamlı giriş noktasından (`TenantCatalog`) geçer ve izolasyon testleriyle korunur. Yalnızca aktif tenant'ın satırlarını (ve hiçbir tenant'a ait olmayan yerleşik rolleri) okur, eklediği üyeliklere aktif tenant'ı basar, başka tenant'ın rolünü ya da davetini eklemeyi reddeder. Tenant olarak yalnızca aktif tenant'ın kendisini ekler (onboarding onu oluşturur) ve yalnızca slug'ı başka bir tenant'ta yoksa; buna slug'ın unique index'i karar verir, diğer tenant hakkında başka bir şey açığa çıkmaz.
-- Tenant henüz bilinmeden okuyan okuyucular bilinçli olarak dar tutulur:
-  - `TenantDirectory`: tenant çözümlemesi için üyelikleri izinleriyle okur; system admin girişinde tenant'ı slug'ından bulur.
-  - `InvitationDirectory`: davet token'ından davetin tenant'ını bulur; yalnızca tenant id'sini verir.
-  - `SystemAdminDirectory`: kullanıcının system izinlerini okur.
-- Tenant dışındaki tek yazıcı `InvitationExpiry`'dir: süresi dolan davetleri kapatan sistem işi, tüm tenant'lardaki bekleyen ve süresi geçmiş davetleri tek komutla `Expired` yapar. Başka hiçbir şeyi değiştirmez ve geri okumaz.
-- Catalog ile tenant şemaları arasında foreign key kurulmaz; tutarlılık uygulama katmanındadır, böylece bir tenant'ı ileride ayrı veritabanına taşımak engellenmez. Catalog içindeki foreign key'ler serbesttir.
+- Wolverine opens and closes the transaction. We set the rule: each handler runs in its own transaction.
+- A domain event is handled inside the module and in the same transaction. An integration event leaves the module through the outbox. Source: Vernon, Chapter 8.
+- HTTP endpoints are plain ASP.NET minimal APIs. The tool's own endpoint model (Wolverine.Http) is not used.
 
-## Modüler monolit
+### Wolverine setup rules
 
-Tek deploy edilen bir host, içinde sınırları sıkı modüller. Her modül kendi verisinin, kendi DbContext'inin, kendi migration'larının ve kendi Postgres şemasının sahibidir. Bir modül gerçekten gerekirse ileride ayrı servise koparılır.
+These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRlsSpike`. The T numbers are the tests in the spike.
 
-**Template modülleri:**
-
-| Modül | Sorumluluk | Şema | RLS |
+| # | Rule | Reason | Evidence |
 | --- | --- | --- | --- |
-| ControlPlane | Tenant'lar, kullanıcılar, üyelikler, roller ve izinler, davetler, system adminleri, onboarding saga'sı | `catalog` | Yok |
-| Notifications | Bildirim kanalları, kullanıcı tanımlı zamanlanmış bildirimler | `notifications` | Var |
-| Audit | Denetim kaydı | `audit` | Var |
-| SharedKernel | Bağımlılıksız ortak zemin: entity base, `ITenantEntity`, Result ve hata tipleri | yok | yok |
-| Tenancy | Modül değil, paylaşılan altyapı (0048): tenant bağlamı, scope başına transaction, `TenantDbContext`, RLS migration üreticisi, `SECURITY DEFINER` kalıbı, `ITenantDirectory` | yok | yok |
+| W1 | Wolverine's EF Core middleware opens and closes the transaction. There is no hand-written transaction code | The saga record, the business data and the outgoing message go into one transaction (O1, S6) | T3, T4 |
+| W2 | The module's DbContext reads the tenant from the message context. An EF Core transaction interceptor runs `set_config('app.tenant_id', ..., true)` when the transaction starts | R4, R5 | T1, T2, T5, T6 |
+| W3 | A tenant endpoint uses `InvokeForTenantAsync`. The tenant goes to the following messages automatically. A message without a tenant carries the value `*DEFAULT*`. The interceptor does not treat this value as a tenant | Requirement 7, R5 | T3, T6 |
+| W4 | `MultipleHandlerBehavior.Separated` is on | O3 | T8 |
+| W5 | Local queues are durable (`UseDurableLocalQueues`). The message store is in the shared `wolverine` schema | O1, O5, Requirement 5 | T3 |
+| W6 | A saga derives from Wolverine's `Saga` class. Its record is stored with EF Core in the module's own schema. The `Version` property is mapped as a concurrency token. There is a retry policy for `SagaConcurrencyException` | S3, S8 | T7, T9 |
+| W7 | A business rule rejection returns before any data changes: in a `Validate` or `Before` method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
+| W8 | The transaction middleware is first in the chain. Validation and authorization run inside the transaction | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
+| W9 | Handler, saga, message and DbContext types are `public` | Wolverine compiles handler code in a separate assembly | Compile errors CS0051 and CS0122 |
+| W10 | The `WolverineFx.RuntimeCompilation` package is necessary | Handler code is generated at startup. Pre-generated code was not tried | The host did not start without the package |
 
-Faturalama ve abonelik template'te yoktur; ürün ihtiyaç duyarsa ayrı modül olarak eklenir.
+### Saga rules
 
-**Proje düzeni** (`apps/api/` altında; ControlPlane/DataPlane gibi gruplama klasörü yok, modüller düz dizilir):
+| # | Rule | Source |
+| --- | --- | --- |
+| S1 | The default is an event. There is no saga | Richardson, Chapter 4 |
+| S2 | A saga is built only if three conditions are true together: the process covers more than one module or an external system, it needs compensation or a timeout, and someone asks "where is the process now" | Richardson, Chapter 4. Khononov, Chapter 9 |
+| S3 | Saga state is kept in its own record. It is not hidden in a field of another entity | Hohpe and Woolf, Chapter 7 (Process Manager) |
+| S4 | The type is orchestration | Richardson, Chapter 4 |
+| S5 | There are three kinds of step: compensatable, pivot, retryable. Work that cannot be undone comes after the pivot | Richardson, Chapter 4 |
+| S6 | The saga record and the outgoing message are written in the same transaction | O1 |
+| S7 | Each step and each compensation can be repeated safely | Hohpe and Woolf, Chapter 10 |
+| S8 | Only one message is handled for the same saga at a time. The version number on the record protects this | Fowler, PoEAA Chapter 16 |
+| S9 | A transient failure is tried a limited number of times. Then compensation starts. If compensation also fails, the saga goes to the "needs attention" state and raises an alert | Nygard, Chapter 5 |
+| S10 | Each wait has a timeout | Nygard, Chapter 5 (Timeouts) |
+| S11 | Until the process ends, the related record shows the "provisioning" state | Richardson, Chapter 4 (semantic lock) |
+| S12 | The saga class is unit tested without a host. The saga does not call external services. It only decides and returns messages | Khorikov, Chapter 7 |
 
-```text
-apps/api/
-  Api.slnx
-  package.json                         # dotnet build ve dotnet test turbo görevleri olarak
-  docs/
-    ARCHITECTURE.md
-    adr/
-  src/
-    Modules/
-      ControlPlane/
-        ControlPlane.Contracts/        # diğer modüllere açılan yüz
-        ControlPlane.Domain/
-        ControlPlane.Application/
-        ControlPlane.Infrastructure/   # DbContext, migration, catalog şeması
-        ControlPlane.Api/              # endpoint'ler, request/response tipleri, AddControlPlaneModule()
-      Notifications/ ...
-      Audit/ ...
-    Shared/
-      SharedKernel/
-      Tenancy/                         # EF Core + Npgsql ile tenant izolasyon altyapısı (0048)
-    Api/                               # tek çalıştırılabilir host: Program.cs, pipeline, `migrate` komutu
-  db/
-    bootstrap.sql                      # rolleri oluşturur, migration'lardan önce çalışır
-  tests/
-    ...                                # bkz. Test stratejisi
-```
+"Tenant is provisioning" and "tenant is active" are the tenant's own business state and stay in its status. Step tracking and retry counts are not put in the status. They stay in the saga record.
 
-Her modül, içi ince olsa da beş projeyle kurulur; böylece mimari kurallar her modülde aynıdır (bkz. bilinçli gerilim 1).
+The saga class is in the `Application` project. The `Domain` project does not see Wolverine.
 
-`apps/api/package.json` API'yi workspace paketi yapar: `dotnet build` ve `dotnet test` turbo'nun `build` ve `test` görevleri olarak çalışır, böylece kök `pnpm build` ve `pnpm test` API'yi de kapsar. Kök script'te ayrıca `dotnet restore` yoktur.
+### Cache rules
 
-**Referans kuralları:**
+The rules are part of the architecture. The code is not in the first template.
 
-| Proje | Referans verebileceği |
+1. The cache runs only on queries and is off by default.
+2. The cache step comes after authorization.
+3. The step adds the tenant id to the key. A handler cannot add it and cannot forget it.
+4. Each entry has a lifetime and a memory limit.
+5. When a command changes data, the related entry is removed.
+6. With many pods, a shared cache is used or the lifetime is kept short.
+
+## 4. Tenant source and isolation
+
+The tenant id is in the API path. The id in the path does not give access. Verified identity and membership give access. The database enforces isolation.
+
+### Tenant source
+
+| # | Rule | Source |
+| --- | --- | --- |
+| T1 | The path is `/v1/tenants/{tenantId}/...`. The value is the id, not the slug. The slug is not used in the path | Azure Architecture Center, "Map requests to tenants". Google AIP-122 |
+| T2 | The tenant id is not read from the body, the query string or a header. Commands have no tenant field. A handler gets the tenant from the tenant context | Golding, Chapter 7 |
+| T3 | If there is no membership, the response is 404 | OWASP API Top 10, API1 |
+| T4 | `GET /v1/me/tenants` runs without a tenant | Industry practice |
+| T5 | Provider staff are not tenant members. Their door is the `/v1/system/...` path | Golding, Chapter 2 |
+| T6 | The token carries only the user identity. No tenant, role or permission comes from Clerk | Fixed requirement: Clerk is authentication only |
+| T7 | Membership is verified on each request in one place. No tenant endpoint can go around this filter | OWASP API Top 10, API1 |
+
+A tenant has two descriptive fields. `name` is free text, cannot be empty, has a maximum of 100 characters and does not have to be unique. `slug` is unique and is given when the tenant is created. `GET /v1/me/tenants` returns both. The path, authorization and isolation use only the id.
+
+### Row Level Security
+
+| # | Rule | Source |
+| --- | --- | --- |
+| R1 | Each table that belongs to a tenant has `tenant_id`. RLS is enabled and forced | Golding, Chapters 8 and 9 |
+| R2 | The application account is not the table owner and cannot bypass RLS | Golding, Chapter 9. OWASP (least privilege) |
+| R3 | Migrations run with a separate account. That account is not used at run time | Twelve-Factor, Factor XII |
+| R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted | PostgreSQL connection pool behaviour |
+| R5 | If the tenant is not declared, a query returns no data | Nygard, Chapter 5 (Fail Fast) |
+| R6 | Tables without a tenant are on an explicit list. A test checks every table | Ford, Parsons, Kua, Chapter 2 |
+| R7 | There are only two database accounts: migration and application. Running code has no path that bypasses RLS | Golding, Chapter 9 |
+| R8 | A background handler gets the tenant from the message and declares it in the same way | Requirement 7 |
+| R9 | Each tenant table is tested with real PostgreSQL: read, update, insert for another tenant | Khorikov, Chapter 10 |
+| R10 | At startup the application checks its own account. If the account is a table owner or can bypass RLS, the application does not start | Nygard, Chapter 5 (Fail Fast) |
+| R11 | The membership table has one more policy: a user sees their own memberships | For `GET /v1/me/tenants` |
+| R12 | The system admin sees tenant and member counts from ControlPlane's own summary data | Golding, Chapter 2 |
+
+Work across tenants goes through the tenant list and declares each tenant in turn. RLS does not protect a cache or data that leaves the database. An EF Core query filter is not added as a second layer. RLS is the single source of truth.
+
+## 5. Identity and authorization
+
+The code checks permissions, not roles. Provider staff enter through a separate door.
+
+| # | Rule | Source |
+| --- | --- | --- |
+| A1 | Authorization is permission based. The code asks for a permission, not for a role name | OWASP API Top 10, API5. Golding, Chapter 6 |
+| A2 | The built-in roles are Owner, Admin and Member. They are the same in each tenant and cannot be changed | Industry practice |
+| A3 | A tenant builds its own role (custom role) from the fixed permission list. This feature is not in the first template | Industry practice |
+| A4 | A system admin is not a tenant member. The staff list is in ControlPlane. It has its own permission list | Golding, Chapter 2 |
+| A5 | Each endpoint carries one of three explicit states: public, signed-in only, requires a permission. An endpoint without a state breaks the architecture test. Each endpoint on the tenant path requires a permission | OWASP API Top 10, API5 |
+| A6 | The system door requires a second factor. The rule is in ControlPlane. The host only translates the identity provider's field into a neutral value. Tenant users are not affected | OWASP ASVS, item 4.3.1 |
+
+Tenant users and staff sign in with the same Clerk instance. Our tables decide which door a person can use. Terms: "system admin" (Golding), "built-in roles" and "custom roles".
+
+## 6. Modules and onboarding
+
+There are three modules. A system admin creates the tenant and the first Owner comes by invitation.
+
+| Module | What it holds |
 | --- | --- |
-| `X.Domain` | .NET temel kütüphanesi ve SharedKernel; üçüncü parti paket yok |
-| `X.Contracts` | .NET temel kütüphanesi ve SharedKernel; üçüncü parti paket yok; diğer modüllere geçişli bağımlılık taşımaz |
-| `X.Application` | `X.Domain`, `X.Contracts`, diğer modüllerin `*.Contracts`'ı, SharedKernel |
-| `X.Infrastructure` | `X.Application`, `X.Domain`, `X.Contracts`, SharedKernel, Tenancy |
-| `X.Api` | `X.Application`, `X.Contracts`, `X.Infrastructure` (sadece `AddXModule()` kaydı için), SharedKernel |
-| `Api` host | Her modülün `X.Api` projesi, Result'ları Problem Details'e çevirmek için SharedKernel ve tenant pipeline'ı için Tenancy |
-| SharedKernel | Sadece .NET temel kütüphanesi |
-| Tenancy | SharedKernel ve kalıcılık paketleri (EF Core, Npgsql) |
+| ControlPlane | Tenant record, system admins, users, memberships, roles and permissions, invitations, tenant onboarding |
+| Notifications | It hears an event and sends a message to a person. In the first template, only the invitation email |
+| Audit | It hears an event and writes the record of "who did what and when" |
 
-- Bir modül başka bir modüle sadece `*.Contracts` üzerinden ulaşır.
-- Contracts SharedKernel'e referans verebilir; SharedKernel bağımlılıksız olduğu için geçişli bağımlılık kaygısı doğmaz. Böylece senkron sözleşmeler SharedKernel'deki Result tiplerini dönebilir.
-- `X.Api` içinde `X.Infrastructure`'a sadece modül kayıt sınıfı (`AddXModule()`) dokunabilir; bu tip seviyesinde bir mimari testle zorlanır.
-- Modül içi tipler varsayılan olarak `internal`. `InternalsVisibleTo` sadece aynı modülün projeleri ve test projeleri arasında serbesttir; modüller arası yasaktır ve mimari testle zorlanır.
-- **Wolverine istisnası** (0047). Wolverine internal handler'ları, handler metotlarını ve validator'ları bulmaz; internal validator'ı hatasız atlar. Bu yüzden `X.Application`'da şunlar public'tir:
-  - Handler'lar, handle ettikleri mesajlar ve FluentValidation validator'ları.
-  - Bunların imzasında geçen tipler.
-  - Wolverine'in çağırdığı host middleware'leri.
+Source: Golding, Chapter 2 (control plane). Khononov, Chapter 3 (when you are not sure, keep the boundary wide).
 
-  Gerisi internal kalır. Mimari testler handler ve validator'ların public olmasını zorlar. Onboarding saga'sı Wolverine'in `Saga` sınıfını kullanmaz; adımları ve telafisi `*Handler` adlı sıradan handler'lardır, mevcut kurallar onları da kapsar.
-- Kendi hata politikası gereken handler, onu Wolverine'in `Configure(HandlerChain)` konvansiyonuyla kendi yanında tanımlar (davet teslimi, saga adımları). Bunun için `X.Application` Wolverine paketine referans verir; referans kuralları projelerle ilgilidir ve bu referans modülleri birbirine bağlamaz (0023).
+### Tenant onboarding process
 
-  Handler'lar kalıcılığa ve dış sistemlere `X.Application`'daki port arayüzleriyle ulaşır; uygulamaları `X.Infrastructure`'dadır. Port handler imzasında geçtiği için public'tir. Üyeleri domain tiplerini konuşuyorsa üyeler `internal`'dır: domain internal kalır, Wolverine'in ürettiği kod port'u sadece geçirir. Faz 4'te doğrulandı.
-- Ortak boru hattı host'ta: auth, tenant çözümleme, hata yönetimi, loglama, validation, transaction, OpenAPI. SharedKernel bu yüzden Wolverine, EF Core veya FluentValidation'a bağımlı değildir.
-- Kurallar testte iki yoldan zorlanır, ihlal build'i kırar:
-  - Tip bağımlılıkları NetArchTest ile.
-  - Proje dosyalarındaki referanslar, test projesinin deps dosyasından okunarak. Kullanılmayan bir referans da yakalanır.
+The process is a saga. Four steps run in order.
 
-## Modüller arası iletişim ve tip katmanları
+1. ControlPlane writes two rows in one transaction: the tenant ("provisioning") and the Owner invitation. Compensatable.
+2. The identity service is told "this email can sign up". The invitation link is created here. Compensatable.
+3. The tenant becomes "active". Pivot.
+4. Notifications sends the invitation email. Retried until it succeeds.
 
-Kural: mümkünse event, mecbursa açık sözleşmeyle senkron çağrı, asla başka modülün iç koduna erişim.
+- If step 2 fails, the tenant is cancelled and the system admin sees the reason.
+- If step 4 always fails, the tenant stays active and the process goes to the "needs attention" state. The invitation is cancelled.
+- The invitation link travels to Notifications inside the message. See the deviations list.
+- Accepting an invitation needs two things: the token in the link, and a verified email address of the signed-in user that is the same as the invited address. The verified addresses come from the identity provider's server, not from the request.
+- The email handler is in `Notifications.Application`. The event type is in `ControlPlane.Contracts`. ControlPlane does not know how to send email.
+- Invitation expiry is checked when the invitation is read. There is no nightly job.
+- The first system admin comes from an email address in configuration. The application writes it only while the staff list is empty.
 
-- **Event (varsayılan):** Yayıncı modül Contracts'taki bir integration event'i outbox üzerinden yayınlar; ilki `TenantActivated`'dır (0026). Dinleyenleri bilmez; yeni dinleyici eklemek yayıncıya dokunmaz.
-- **Senkron çağrı:** Contracts'ta bir arayüz (`IControlPlaneModule` gibi), gerçek sınıf Infrastructure'da, DI ile bağlanır. Bellek içi metot çağrısıdır, HTTP yoktur.
+Source: Golding, Chapter 4. Richardson, Chapter 4.
 
-**Üç ayrı tip katmanı** (birbirine dönüşmez, ayrı tutulur ki biri değişince öteki kırılmasın):
+## 7. Side tools and configuration
 
-| Katman | Örnek | Kimin için | Nerede |
-| --- | --- | --- | --- |
-| API tipleri | `InviteMemberRequest`, `TenantResponse` | API istemcileri; OpenAPI'ye yansır | `X.Api` |
-| Uygulama tipleri | `InviteMemberCommand` | Modül içi orkestrasyon | `X.Application` |
-| Modül sözleşmesi | `TenantSummary`, `IControlPlaneModule`, integration event'ler | Diğer modüller | `X.Contracts` |
+Only email goes into the first template. Hangfire, SignalR and cache code do not.
 
-SharedKernel farkı: Contracts "modül dışarıya ne sunuyor", SharedKernel "kimsenin malı olmayan ortak zemin". SharedKernel küçük tutulur; iş kuralı içermez.
+- Notifications does not know the email service directly. Our interface is between them, and the service is an adapter. Source: Freeman and Pryce, GOOS Chapter 8.
+- Each email carries an idempotency key. Example: `invite/` and the invitation id. The same key does not produce a second email.
+- Tests send no real email. They use a hand-written fake adapter.
+- The messaging tool's own dispatcher runs the outbox. A scheduler is not used for this.
 
-## Mesajlaşma, saga ve zamanlanmış işler
+Three helper tools are in scope. The OpenAPI document and Scalar are on only in the development environment. OpenTelemetry sends logs, metrics and traces over OTLP. The target address comes from configuration. If there is no address, no data is sent. A test checks the trace id rule: the id on the request is the same in the handler of the event that the request caused.
 
-Wolverine; mediator, transactional outbox ve inbox, modüller arası mesaj ve saga için tek araçtır. Katman katman benimsendi: önce komut ve handler (Faz 2), sonra outbox ve saga (Faz 5).
+### Configuration
 
-**Outbox ve inbox** (0024): Event'ler iş verisiyle aynı transaction'da yazılır, kaybolmaz. Dayanıklı inbox ve outbox bilinçli olarak açılır; zarf tabloları tek bir `wolverine` şemasında durur. Çok pod'da Postgres satır kilidi ve kilitli satırı atlama sayesinde her mesajı tek pod alır; inbox tekrar gelen mesajı atar. İş anlamında tekrar riski olan mesajlar mantıksal deduplication kimliği taşır.
+1. Each module has its own configuration section. A module does not read another module's configuration.
+2. Configuration is validated at startup. If a required setting is missing, the application does not start and names the missing key.
+3. A value that changes between environments comes from an environment variable.
+4. Passwords and keys are not written in `appsettings.json`.
 
-- Depo `WolverineFx.Postgresql`'dir; doğrudan bağlantıdan gider (0019). Şemayı migration adımı owner olarak kurar; uygulama `AutoCreate.None` ile açılır ve şemayı değiştirmez (0020).
-- Bütün yerel kuyruklar dayanıklıdır: bir handler'ın gönderdiği mesaj işlenmeden önce inbox tablosuna yazılır, düğümü ölürse başka düğüm onu kurtarır.
-- Tenant taşıyan mesajda outbox tenant transaction'ına bağlanır: gönderilen mesaj işle birlikte yazılır, commit'ten sonra gider; istisna ya da başarısız Result onu atar.
-- Tenant'sız mesajın iş transaction'ı yoktur: her kayıt kendi başına commit edilir, gönderdikleri ise handler bitince yazılır. Bu yüzden tenant'sız bir handler hem veri yazıp hem mesaj göndermez; ikisi de gereken akış, onboarding gibi bir tenant içinde çalışır (0016).
-- `wolverine` şemasında RLS yoktur: zarf tabloları bütün tenant'ların mesajlarını tutar ve Wolverine'in ajanları onları tenant'lar arası okur. Tenant izolasyonu modül tablolarında kalır. Mesajlar bu yüzden id'ler ve adımın ihtiyaç duyduğunu taşır; token, sır ya da başka hassas veri taşımaz. Bugün kişisel veri taşıyan tek saklı mesaj, ilk sahibin e-postasını taşıyan `CreateFirstOwnerInvitation`'dır.
-- Retry'lardan sonra hâlâ başarısız olan mesaj dead letter tablosuna gider ve Wolverine onun için `Fault<T>` yayınlar. Fault yalnızca exception'ın tipini taşır; yayını en iyi çaba (best-effort) iledir.
-- Mesaj, transaction'ı commit edildikten sonra işlendi diye işaretlenir; aradaki bir çökme mesajı yeniden getirir. Faz 5 handler'ları kendi durumlarıyla idempotent'tir.
-- Mesaj gönderen istek, mesaj işlenmeden cevap döner; testler sonucu Wolverine'in tracking'iyle bekler.
+Source: Twelve-Factor, Factor III. Nygard, Chapter 5 (Fail Fast).
 
-**Saga** (0025): Koreografi değil orkestrasyon. Saga, akışın sahibi modülde yaşar. Her adımın telafisi tanımlıdır.
+## 8. Resilience and security
 
-- Saga durumu modülün kendi aggregate'lerinde ve şemasında durur; her adım onu kendi tenant transaction'ında, işi ve gönderdiği mesajlarla birlikte yazar. Elle saga tablosu tasarlanmaz.
-- Adımlar dayanıklı mesajlardır ve idempotent'tir. Hata politikası handler'ın yanında tanımlanır: birkaç retry, sonra dead letter. Adımın `Fault<T>`'si telafiyi tetikler.
-- Wolverine'in saga depolaması kullanılmaz, çünkü hiçbiri tenant transaction'ına katılamaz (Faz 5'te doğrulandı): lightweight depolama kendi bağlantısını ve transaction'ını açar, tablosunu `wolverine` şemasına koyar; EF Core depolaması DbContext'in transaction'ını kendisi açıp koşulsuz commit eder ve public DbContext ister.
+### Resilience
 
-**Onboarding saga'sı (ControlPlane, 0026):** System admin başlatır. Akış: tenant'ı `provisioning` durumunda oluştur, ilk sahip için davet kaydını oluştur, tenant'ı `active` yap, en son davet e-postasını gönder. Bir adım patlarsa telafi tenant'ı `failed` yapar. Davet e-postası son adımdır ve telafi edilmez. Saga'yı kimin tetiklediği ona fark etmez; ileride self-serve kayıt aynı saga'yı public bir endpoint'ten tetikleyerek eklenir.
+| Situation | Rule | Source |
+| --- | --- | --- |
+| An external service does not answer | Each external call has a time limit | Nygard, Chapter 5 (Timeouts) |
+| An external service is down for a long time | The gap between tries grows. When the limit is reached, the process goes to "needs attention" | Nygard, Chapter 5 |
+| The same request arrives twice | The tenant creation request carries an idempotency key. The second request does not create a new tenant | Hohpe and Woolf, Chapter 10 |
+| A pod is shutting down | The pod takes no new work and finishes the work it has | Twelve-Factor, Factor IX |
+| The health of a pod is not known | There are two check endpoints: "I am up" and "I can reach the database" | Industry practice |
+| Someone looks for a failure | The trace id stays the same in the log, in the event and in the handler | Nygard, Chapter 8. Twelve-Factor, Factor XI |
 
-- `POST /v1/admin/tenants` (slug ve ilk sahibin e-postası, `system.tenants.create`) başlatır. Tenant id'sini sunucu seçer ve onboarding baştan sona oluşturduğu tenant'ın içinde çalışır.
-- Adımlar: `StartTenantOnboarding` (istek içinde; `provisioning` cevabı, geçersiz slug 400, alınmış slug 409; aynı anda aynı slug için gelen iki istekte de slug'ın unique index'i karar verir) → `CreateFirstOwnerInvitation` (Owner rollü, token'sız davet) → `ActivateTenant` (`active`, `TenantActivated` yayınlanır) → `DeliverInvitation`.
-- Saga'nın durumu tenant'ın statüsüdür. 2. ve 3. adım üç kez denenir; sonra adım dead letter'a gider ve onun fault'u tenant'ı `failed` yapar.
+### Security
 
-**Zamanlanmış işler:**
+| Attack | Protection | OWASP |
+| --- | --- | --- |
+| Another tenant's id is put in the path | Membership check and RLS | API1 |
+| A forged or expired token | Signature, expiry and issuer are verified on each request | API2 |
+| Extra fields are added to a request | An endpoint reads only the defined fields | API3 |
+| Too many requests | A rate limit for each user. Lists are paged and the page size has a limit | API4 |
+| A tenant user calls a system endpoint | The system door checks the staff list | API5 |
+| Internal structure is read from an error message | The error response has one shape and returns no internal detail | API8 |
+| A browser request from another site | Only permitted origins can call | API8 |
 
-| Tür | Örnek | Nerede yaşar | Kim tetikler |
-| --- | --- | --- | --- |
-| Sistem tanımlı | Gece temizliği, süresi dolan davetlerin kapatılması | Kodda | Hangfire recurring job |
-| Kullanıcı tanımlı | "3 gün sonra hatırlat", "her ayın 1'inde gönder" | Sahibi modülün tenant tablosunda (RLS altında), iptal ve düzenlenebilir | Her dakika çalışan tek bir Hangfire tarayıcı işi vadesi gelenleri işler |
+All business endpoints start with `/v1`. The only exception is the two health endpoints: `/health/live` and `/health/ready`. These endpoints serve the infrastructure, need no identity and return only "healthy" or "unhealthy". No detail is given to the outside.
 
-Her iki tür de sunucuda tetiklenir; çok pod'da Hangfire'ın dağıtık kilidi işin tek kez çalışmasını sağlar. Karmaşık takvim kuralı (iş günü, tatil) gerçekten çıkarsa sadece o iş için Quartz eklenir.
+## 9. Testing
 
-**Nasıl çalışır** (0027):
+The test is written first. Tests run with real PostgreSQL. We do not fake our own database.
 
-- **Depolama.** Hangfire `hangfire` şemasında, uygulamanın havuzlu bağlantısından çalışır.
-  - Şemayı migration adımı owner olarak kurar; uygulama şemayı değiştirmez.
-  - `ConnectionStrings:Pooled` yoksa host iş çalıştırmaz.
-  - Depolama host'un kendi servisidir; Hangfire'ın statik `JobStorage.Current`'ı kullanılmaz.
-- **Sunucu.** Her pod iki worker'lı bir Hangfire sunucusu çalıştırır.
-- **İşler komuttur.** Bir iş modülün `X.Api` projesinde yaşar ve yalnızca Wolverine'e bir komut gönderir; böylece iş host pipeline'ından geçer.
-  - Modüller sistem işlerini `XModule.ScheduleJobs` ile verir. Bir hosted service onları her açılışta, Wolverine veritabanını kontrol ettikten sonra kurar.
-  - Şimdiki işler: saatlik `controlplane.close-expired-invitations` ve dakikalık, üst üste binmeyen `notifications.scan-due-notifications`.
-- **Dashboard.** `/hangfire` adresi yalnızca Development'ta vardır ve Hangfire orada yalnızca yerel isteklere izin verir.
+| Kind | Example | Runs with |
+| --- | --- | --- |
+| Unit | "A cancelled tenant cannot be activated" | Code only |
+| Integration | "An Acme user cannot read a Globex row" | Real PostgreSQL |
+| Architecture | "No module references the inside of another module", "there is no endpoint without an access state" | Compiled code |
+| End to end | A system admin creates a tenant. The Owner gets an email, accepts it and sees the tenant in the list. Another user gets 404 | The full system, real PostgreSQL |
 
-## Kimlik, rol ve izinler
+1. The end-to-end test is written first. Source: Freeman and Pryce, GOOS Chapters 4 and 5.
+2. Real PostgreSQL runs in a container. An in-memory fake database is not used. Source: Khorikov, Chapter 10.
+3. Tests connect with the application account. Migrations run with the separate account. If not, RLS tests have no meaning.
+4. Only external services are faked: the identity service and email. A fake is a hand-written implementation of our interface. Source: Khorikov, Chapter 9.
+5. Each test creates its own tenant.
 
-Clerk sadece kimliği doğrular ve **Invite-only** (eski adıyla Restricted) modda çalışır: dışarıdan kayıt kapalıdır, hesap sadece davetle açılır. Kullanıcının hangi tenant'ta olduğu, rolü ve izinleri bizim catalog şemamızdadır; böylece auth sağlayıcı değiştirilebilir kalır. Clerk Organizations kullanılmaz. Kimlik token merkezlidir; bütün istemciler aynı kapıdan girer.
+Unit test standard:
 
-Token'ı host doğrular (0028): issuer, imza, süre ve `azp`. `Clerk:AuthorizedParties` API'yi kullanabilecek istemcilerin origin'lerini listeler; Development dışında liste boşsa `/health/ready` unhealthy döner ve pod trafik almaz. Token `Authorization` header'ından gelir; yalnızca SignalR hub'ında `access_token` sorgu parametresinden de okunur, çünkü tarayıcı WebSocket açarken header gönderemez (0037).
+- Each test kind is in its own project (`.UnitTests`, `.IntegrationTests`).
+- Each project carries a `TestClassification` trait.
+- The structure is Arrange, Act, Assert.
+- A test has no `if` and no loop.
+- The name pattern is `Operation_Scenario_ExpectedOutcome`. `Operation` is the name of the work, not the method name. Example: `ActivateTenant_WhenCancelled_IsRejected`.
 
-**Davet ve kullanıcı oluşturma (invite-only):**
+The order for a fix is: first a red test that checks the rule, then the fix.
 
-1. Yetkili bir üye ya da system admin davet oluşturur. Catalog'a bir davet kaydı yazılır: e-posta, tenant, rol, token hash'i (token açık saklanmaz; davet teslim edilene kadar boştur), son geçerlilik tarihi, durum. Davet tek kullanımlıktır.
-2. Davet outbox üzerinden teslim edilir. Kişinin Clerk hesabı yoksa teslim, Clerk backend API'siyle bir Clerk daveti de oluşturur ve kendi davet id'mizi metadata olarak ekler.
-3. Kişi linkle kaydolur ya da giriş yapar ve daveti kabul eder.
-4. API daveti doğrular: token geçerli olmalı ve Clerk'teki doğrulanmış e-posta davetteki e-postayla eşleşmelidir. Token tek başına yetmez; iletilen bir link başkasını içeri almaz. Kişi catalog'da yoksa kullanıcı kaydını oluşturur ve üyeliği aynı transaction'da ekler.
+## Deviations from the books
 
-Catalog'daki kullanıcı kaydı sadece davet kabulünde oluşur; Clerk webhook'u gerekmez. Kaydın olması tek başına yetki vermez, yetki üyelikten gelir.
+These deviations were discussed openly and approved.
 
-**Davet e-postasını biz göndeririz** (Faz 4'te doğrulandı, 0029). Clerk davetleri `notify: false` ile Clerk'e e-posta göndertmeden açılır ve dönen `url` bizim e-postamıza konur.
+| Deviation | The way in the books | Reason |
+| --- | --- | --- |
+| The tenant is in the API path, not in the token | Golding, Chapter 6: the tenant comes in the token | Clerk stays authentication only. A cancelled membership takes effect immediately. The Azure guidance accepts this way |
+| The isolation unit is a schema, not a database | Richardson: a database for each service | The rule is for microservices. It is adapted to a monolith. The change back is cheap |
+| There is one shared outbox | Richardson, Chapter 3: the outbox is in the service's own database | An outbox row is a delivery record, not business data |
+| Each module is five projects | Khononov, Chapter 10 and Fowler, PoEAA Chapter 2: a simple structure for a simple module | One pattern was requested. The cost is some nearly empty projects |
+| The test name pattern is `Operation_Scenario_ExpectedOutcome` | Khorikov, Chapter 3: a plain sentence | Common in .NET. `Operation` is the name of the work |
+| The `Api` and `Application` projects see Wolverine types | Khononov, Chapter 8 (Ports and Adapters): business logic does not see the infrastructure tool, a port is between them | The only reason for our own interface was "what if the tool changes". There is no concrete limitation. `Domain` and `Contracts` stay clean |
+| Handler, saga, message and DbContext types are public | Ousterhout, Chapter 5: a module hides its internal detail | Wolverine compiles handler code in a separate assembly. Project references and the architecture test protect the module boundary |
+| The invitation link goes to Notifications inside the message | OWASP, Forgot Password Cheat Sheet: a token is stored only as a hash | The link cannot be produced again later. Protection: the verified email of the person who accepts must be the same as the invited address, the link is single use and expires, an invitation whose message goes to the dead letter queue is cancelled. If a strict audit requires it, change to a signed token |
 
-- Clerk hesabı olmayan kişi için Clerk daveti açılır: davet id'miz `public_metadata`'da, kabul linkimiz (`Invitations:AcceptUrl?token=...`) `redirect_url`'de. Kişi bu linkle kaydolur ve kabul sayfasına iner. Hesabı olan kişiye doğrudan kabul linki gider. Hesabın varlığı e-posta adresinin birebir eşleşmesiyle anlaşılır; Clerk'in bazı e-posta filtreleri kısmi eşleşir.
-- Token 256 bit rastgeledir, SHA-256 hash'i saklanır; ömrü `Invitations:Lifetime` (varsayılan yedi gün).
-- **Teslim outbox'tan** (Faz 5). Davet komutu yalnızca kaydı yazar ve aynı transaction'da bir `DeliverInvitation` mesajı gönderir; komut süreç dışına çağrı yapmaz. Teslim commit'ten sonra, davetin tenant'ında çalışır:
-  1. Daveti kilitler; token'ı zaten olan davet teslim edilmiştir, tekrar gelen teslim bir şey yapmaz.
-  2. Token'ı o anda üretir ve hash'ini davete yazar.
-  3. Gerekirse Clerk davetini açar.
-  4. E-postayı en son gönderir. Gönderim başarısızsa hash teslimin transaction'ıyla geri alınır; teslim her seferinde yeni bir token'la 1, 2 ve 4 saniye arayla yeniden denenir, sonra dead letter'a gider ve telafi edilmez.
-  - Böylece token hiçbir saklı mesajda durmaz; yalnızca gönderilen link onu taşır. Bunu bir test, saklı mesajları tarayarak doğrular.
-  - Teslim, dış çağrılar sırasında transaction'ını bilerek açık tutar: token onu gönderen adımda doğmalı, hash'i de ancak link gönderildiyse kalmalıdır. Bedeli, çağrılar süresince bir havuzlu bağlantı ve yalnızca kendi davet satırının kilididir; süreyi istemcilerin dayanıklılık ayarları sınırlar: deneme başına 10 saniye, en çok dört deneme, toplam 30 saniye (0041). Kabul ise Clerk'i transaction başlamadan önce okur.
-- Kabul (`POST /v1/invitations/accept`) tenant dışı rotadır: token davetin tenant'ını bulur. Doğrulanmış e-postalar transaction başlamadan önce Clerk Backend API'sinden okunur (session token e-posta taşımaz). Ardından kabul o tenant'ın transaction'ında, bu e-postalarla, tek komut olarak çalışır ve davet satırı kilitlenir. Böylece davet kilitliyken süreç dışına çağrı yapılmaz.
-- Hatalar: bilinmeyen token 404, kullanılmış 409, süresi dolmuş 409, e-posta uyuşmuyor 403, zaten üye 409.
-- **E-posta.** `IInvitationSender` portunun uygulaması linki düz metin e-posta olarak Notifications modülünün senkron kontratına (`INotificationsModule.SendEmailAsync`) verir.
-  - Senkrondur, böylece link ve içindeki token saklı bir mesajda durmaz.
-  - Gönderim Resend iledir. Development'ta Resend ayarı yoksa e-posta loga yazılır.
-  - Development dışında Resend ayarı olmayan pod hazır olmaz; davet ayar eksikliği yüzünden sessizce gönderilmeden kalmaz.
-  - Faz 6'dan önce Development dışında e-posta gitmiyordu.
-- **Süresi dolan davetler.** Saatlik sistem işi `CloseExpiredInvitations` gönderir; bekleyen ve süresi geçmiş davetler `Expired` olur. İş çalışmadan önce de süre karar verir; iki durumda da kabul `invitation.expired` döner.
-- Bizim token'ımız Clerk'te saklanan redirect URL'inde düz metin durur; tek başına erişim vermez, çünkü kabul doğrulanmış e-postayı da ister.
+## Deferred
 
-**Üç katman:**
+These parts are not in the first template. Each one comes in when its written condition is true.
 
-1. **İzin havuzu:** Kodda sabit tanımlı (`members.invite` gibi). Tenant izin üretemez, çünkü izin koddaki gerçek yeteneğe bağlıdır.
-2. **Roller:** Yerleşik roller (built-in: sahip, admin, üye, görüntüleyici) her tenant'ta hazır gelir; izinleri kodda sabittir, silinemez ve düzenlenemez. Tenant ayrıca havuzdan seçerek kendi custom rollerini üretir. Her tenant'ta en az bir sahip bulunur; son sahip silinemez ya da rolü düşürülemez.
-3. **Üyelik:** Rol kullanıcıya değil, kullanıcı + tenant ikilisine bağlıdır. Aynı kişi bir tenant'ta admin, ötekinde görüntüleyici olabilir.
-
-**Kod rolü değil izni kontrol eder.** "Admin mi?" yerine "Bu izni var mı?" sorulur; custom roller koda dokunmadan çalışır.
-
-**Kimse sahip olmadığını veremez.** Bir rolü vermek, değiştirmek ya da geri almak, ve bir custom rolü şekillendirmek, işe karışan rollerin bütün izinleri yapan kişide de varsa mümkündür. Böylece admin owner yapamaz ve bir owner'ı düşüremez.
-
-**Nasıl çalışır** (0030):
-
-- İzin kataloğu SharedKernel'deki `Permissions`'tadır: tenant havuzu ve system havuzu. Her modülün her katmanı ve host bunu görebilir; endpoint izni buradan adlandırır. Faz 4'te tenant izinleri: `members.invite`, `members.manage`, `owners.manage`, `roles.manage`. Faz 6 `notifications.schedule`'ı ekler: kişinin kendine bildirim kurması.
-- Yerleşik roller: owner tüm tenant havuzunu, admin `owners.manage` dışındakileri tutar; member ve viewer'ın izinleri modüller onlar için yetenek ekledikçe gelir. Member `notifications.schedule`'ı tutar. Viewer yalnızca okur ve henüz yalnızca okuyan bir izin olmadığı için hiçbir izni yoktur. Kimse sahip olmadığından fazlasını veremediği için member davet etmek member'ın bütün izinlerini ister: yalnızca `members.invite` tutan bir custom rol artık member değil, yalnızca viewer davet edebilir. Yerleşik roller `catalog.roles`'ta hiçbir tenant'a ait olmayan, sabit id'li satırlardır; izinleri koddan gelir. Custom roller tenant'ın satırlarıdır, izinleri metin dizisi olarak durur.
-- Kullanımdaki rol silinemez (üyelikler rolü `RESTRICT` ile gösterir; bekleyen daveti olan rolün silinmesi reddedilir).
-- Son sahip kuralını `Membership` aggregate'i korur. Üyelik ve rol değiştiren komutlar transaction'larının başında tenant'ın catalog satırını kilitler (`FOR UPDATE`); aynı anda birbirini düşüren iki owner birlikte geçemez.
-- Host'ta endpoint gerektirdiği izni policy adı olarak verir: `RequireAuthorization(Permissions.MembersInvite)`. Kayıtlı olmayan her policy adı izin sayılır; yanlış yazılmış bir ad kimseye izin vermez.
-- Faz 4 endpoint'leri (`/v1/tenants/{slug}` altında): `POST/PUT/DELETE /roles[/{id}]`, `PUT /members/{userId}/role`, `DELETE /members/{userId}`, `POST /invitations`. Rol, üye ve davet listeleri bir istemci ihtiyaç duyunca eklenir.
-
-Güvenlik karşılığı (OWASP API Top 10): nesne seviyesi yetkilendirmeyi RLS, fonksiyon seviyesini izin sistemi, alan seviyesini ayrı response DTO'ları kapatır. Yetkilendirme davranışı testle doğrulanır.
-
-### System adminleri
-
-System adminleri (Golding'in terimi; SaaS sağlayıcısının kendi personeli) ayrı bir kişi tipi değil, tek kimliğe eklenen ek bir yetkidir.
-
-- **Yer:** catalog şemasında ayrı bir `system_admins` tablosu (kullanıcı, system rolü, kim verdi, ne zaman verdi). `users` tablosuna bayrak konmaz.
-- **İlk system admin** kurulumda bir seed script'iyle oluşturulur.
-- **Ayrı izin havuzu:** System izinleri (`system.tenants.suspend` gibi) tenant izinlerinden ayrıdır; tenant'ın custom rolleri bunları seçemez.
-- **Tenant verisine erişim, tenant bağlamına girerek:** Admin bir tenant seçer, o tenant transaction'a set edilir, RLS normal çalışır. Her giriş audit'e yazılır.
-- **Tenant'lar arası rapor:** Sadece admin endpoint'lerinin kullandığı salt okunur rapor rolü (bkz. Veritabanı rolleri). Bu rol yalnızca catalog'u okur.
-- **Admin API:** Aynı host içinde ayrı route grubu ve ayrı yetkilendirme politikası. Hangfire dashboard şimdilik sadece yerel geliştirmede açıktır, canlıda kapalıdır; system admin konsolu yapıldığında oradan, system admin iznine bağlı olarak açılır.
-- **MFA zorunlu** ve API'de zorlanır: admin route grubu token'da ikinci faktör doğrulamasını arar. Clerk bunu session token'daki `fva` claim'iyle bildirir (Faz 4'te doğrulandı): ilk ve ikinci faktörün doğrulanmasından bu yana geçen dakikalar; ikinci değer `-1` ise ikinci faktör yoktur. Host bunu kendi claim'ine çevirir; token'ın kendisinde aynı adla gelen claim silinir, ikinci faktöre yalnızca `fva` kefil olur.
-
-**Nasıl çalışır** (0031):
-
-- Tek system rolü `Administrator`'dır ve system havuzunun tamamını tutar: `system.tenants.read`, `system.tenants.enter`, `system.tenants.create`, `system.members.invite`.
-- Seed script'i `apps/api/db/seed-system-admin.sql`'dir (`psql -v external_id=<Clerk kullanıcı id'si>`). Migration'lardan sonra çalışır, tekrar çalıştırılabilir.
-- `/v1/admin` system admin ve ikinci faktör ister. `/v1/admin/tenants/{slug}` ayrıca `system.tenants.enter` ister; tenant'ı üyelik aramadan ve durumu ne olursa olsun çözer, tenant'ı istek ve mesaj yoluna normal tenant çözümlemesi gibi koyar.
-- Her giriş, yetkilendirmeden sonra ve endpoint'ten önce iki yere kaydedilir:
-  - `Api.Security` log kategorisinde `SystemAdminTenantEntry` güvenlik olayı olarak.
-  - Girilen tenant'ın audit log'una `SystemAdminEntry` kaydı olarak. Bu kayıt ayrı saklanır, komut ne yaparsa yapsın kalır.
-- Tenant içindeki admin üye değildir; tenant'ın değil kendi rate limit'ini harcar.
-- Faz 4 endpoint'leri: `GET /v1/admin/tenants` (tenant'lar durum ve üye sayısıyla, sayfalı, rapor rolüyle) ve `POST /v1/admin/tenants/{slug}/invitations` (her rolle davet; bir tenant'ın ilk sahibi böyle davet edilir).
-- Faz 5 endpoint'i: `POST /v1/admin/tenants` (`system.tenants.create`); tenant'ı oluşturur ve ilk sahibini davet eden onboarding saga'sını başlatır (0026).
-
-## API tasarımı
-
-Bütün hatalar tek formatta döner: Problem Details (RFC 9457). İstemciler hatayı tek yerde yorumlar.
-
-- **Beklenen hatalar** ("email zaten kayıtlı", "bulunamadı", "yetki yok") exception değildir; handler bir Result döner, host onu doğru HTTP koduna ve Problem Details'e çevirir.
-- **Beklenmeyen hatalar** tek bir global exception handler'da yakalanır; kullanıcıya güvenli genel mesaj, loglara tam detay. Stack trace asla dışarı çıkmaz.
-- **Handler'larda try/catch yok.** Loglama, validation, transaction ve performans ölçümü pipeline'da bir kez yazılır, her komut otomatik geçer. Performans ölçümü: komut başına süre histogramı ve config'den gelen eşiği aşınca uyarı logu.
-- **Versiyonlama ilk günden, URL segmentiyle.** Tenant kapsamlı rotalar `/v1/tenants/{slug}/...`, tenant dışı rotalar `/v1/me`, `/v1/invitations/...` gibi, admin rotaları `/v1/admin/...`. İstemciler eski sürümde kalabileceği için API eski istemciyi kırmaz.
-- **`/v1` altında her endpoint girişli kullanıcı ister;** herkese açık bir endpoint bunu açıkça belirtir. Health check'ler, OpenAPI dokümanı ve Scalar grubun dışındadır.
-- **Verimli cevaplar:** sayfalama varsayılan, gereksiz büyük cevap yok. Sayfalama offset'iyle yapılır: `?page=1&pageSize=50`, en büyük sayfa 100; cevap `{ items, page, pageSize, totalCount }` (SharedKernel'deki `PagedList<T>`).
-- **Tenant başına rate limit:** Pod içi, bellek tabanlı limit; değerler config'den gelir, plana bağlı değildir. Tenant kovasını yalnızca üyeliği doğrulanmış istek kullanır, anahtar çözümlenmiş tenant id'sidir; route'taki slug asla anahtar olmaz (0035). Tenant'a giren system admin üye değildir, kendi limitini harcar. Diğer isteklerde anahtar, girişli kullanıcıda kullanıcı id'si, girişsiz istekte IP adresidir. Gerçek limit pod sayısıyla çarpılır; bu başlangıç için kabul edilir. Global limit Redis'le ölçeklenince gelir.
-- **OpenAPI tek kaynak:** Minimal API'den şema üretilir, XML yorumları açıklamaya girer. Arayüz Scalar. OpenAPI dokümanı `apps/api` altında commit'lenir ki API değişikliği review'da görünsün; istemci tip üretimi istemcinin işidir. `Result` dönen endpoint'lerde dokümana `Result` tipi değil gerçek cevap girer: `Result<T>` için 200 ile `T`, `Result` için 204, hatalar için Problem Details (400, 403, 404, 409). Bunu versiyon grubundaki bir convention sağlar ve test doğrular (0036).
-
-## Bildirimler ve gerçek zamanlı
-
-Notifications modülü "bildirim gönder" der, altındaki kanalı bilmez. Kanallar bir arayüzün arkasında takılabilir:
-
-- **Uygulama içi anlık:** SignalR. Redis backplane config ile açılır, varsayılan kapalıdır; çok pod'a geçerken açılır. Gerekirse aynı arayüz arkasında SSE'ye geçilebilir.
-- **E-posta:** Resend adapter'ı. Geliştirme ve testte e-postayı loga yazan sahte kanal.
-- **Push:** Şimdilik sadece arayüz ve sahte kanal. Gerçek sağlayıcı istemci belli olunca seçilir.
-
-Yeni kanal eklemek modülün iş mantığını değiştirmez.
-
-**Nasıl çalışır** (0037):
-
-- **E-posta.** Diğer modüller e-postayı senkron kontratla (`INotificationsModule.SendEmailAsync`) gönderir.
-  - `Resend:ApiKey` ve `Resend:From` varsa Resend kullanılır. Development'ta bunlar yoksa e-posta loga yazılır.
-  - Development dışında bu ayarlar olmadan pod hazır olmaz.
-  - Resend'e SDK'sız, HTTP ile gidilir. Her gönderim tüm denemelerde aynı `Idempotency-Key`'i taşır, böylece tekrar iki e-posta üretmez.
-- **Uygulama içi.** Hub `/v1/notifications/hub` adresindedir ve sadece girişli kullanıcılar bağlanır. Kullanıcının bağlantılarına kimlik sağlayıcının kullanıcı id'siyle ulaşılır.
-  - Tarayıcı WebSocket açarken header gönderemez. Bu yüzden token yalnızca hub'da `access_token` sorgu parametresinden de okunur.
-  - Request logu yolu sorgu dizesi olmadan yazar; token loga düşmez.
-  - Redis backplane `ConnectionStrings:Redis` doluysa açıktır.
-- **Zamanlanmış bildirimler.** `notifications` şemasında, RLS altındadır.
-  - Member, `notifications.schedule` izniyle `/v1/tenants/{slug}/notifications/scheduled` altında kendine bildirim kurar, listeler, gönderilene kadar değiştirir ve iptal eder. Başkasının bildirimi 404 döner.
-  - Şimdilik tek seferliktir; tekrarlayan kurallar ihtiyaç çıkınca eklenir.
-- **Tarayıcı.** Dakikalık Hangfire işi `ScanDueNotifications` gönderir.
-  - Bu komut vadesi gelenleri dar `SECURITY DEFINER` fonksiyonla sadece `(tenant_id, id)` olarak bulur (0017).
-  - Her bildirim için kendi tenant'ında bir `DispatchScheduledNotification` gönderir.
-- **Gönderim.** Dispatch bildirimi kilitler, gönderildi olarak işaretler ve commit'ten önce tüm kanallardan yollar.
-  - İkinci dispatch hiçbir şey yapmaz.
-  - Kanal hatası transaction'ı geri alır ve gönderim 1, 2 ve 4 saniye arayla yeniden denenir. Bildirim bir kanala iki kez ulaşabilir, hiç ulaşmamazlık olmaz.
-
-## Ölçeklenme, gözlemlenebilirlik, audit ve dayanıklılık
-
-Uygulama Kubernetes'te çok pod'da yatay ölçeklenecek şekilde tasarlanır; hiçbir iş iki pod tarafından çift çalıştırılmaz.
-
-| Konu | Karar |
+| What | Entry condition |
 | --- | --- |
-| Çift işleme | Hangfire dağıtık kilit; Wolverine satır kilidi + inbox deduplication; iş anlamında idempotency |
-| Durum | Pod durumsuz: dosyalar nesne deposuna, oturum token'da, önbellek Redis'te |
-| Bağlantılar | Havuzlu ve doğrudan iki bağlantı (bkz. Çok kiracılık); pod sayısı Postgres limitini patlatmaz |
-| Migration | Uygulama başlangıcından ayrı, tek seferlik adım: önce bootstrap script'i, sonra `dotnet Api.dll migrate` (her modülün migration'ları ve paylaşılan `wolverine` şeması owner rolüyle; uygulama rolü bu tabloları kullanma yetkisi alır, 0020). Uygulama açılışta Wolverine deposunu kurmaz, yoksa açılmaz |
-| Kapanma | Sağlık kontrolleri (`/health/live`, `/health/ready`: veritabanına erişim, havuzlu ve doğrudan iki bağlantının rol kontrolü; Development dışında Clerk'in izinli istemci listesinin boş olmaması ve e-posta kanalının Resend ayarları) ve zarif kapanma; pod ölmeden elindeki işi bitirir. Host açılmak için veritabanına ihtiyaç duyar: Wolverine açılırken düğümünü kaydeder ve mesaj deposunu kontrol eder (Faz 5); erişilebilir ve migrate edilmiş veritabanı yoksa pod açılmaz, açıldıktan sonra kaybedilen veritabanı pod'u hazır olmaktan çıkarır |
-| Gerçek zamanlı | SignalR Redis backplane, config ile açılır |
-| Gözlemlenebilirlik | OpenTelemetry (log, metrik, trace) + Serilog; her sinyal tenant id taşır; OTLP ile dışa aktarım hedefi ortamdan, yerelde konsol |
-| Dış çağrılar | Timeout, retry, circuit breaker (Microsoft.Extensions.Http.Resilience) |
+| Hangfire | The first recurring job tied to a clock appears and the messaging tool cannot do it |
+| SignalR | In-app notifications come into scope |
+| Cache code | There is a measured slowness. The rules are ready |
+| Circuit breaker | A request that a user waits for goes directly to an external service |
+| A separate database account for ControlPlane | A product or audit requirement asks for it |
+| Slug in addresses | The frontend wants the tenant name in the address. The slug field is ready. The API path continues to use the id |
+| Read model | A report appears that needs a join across modules |
+| Pre-generated handler code | Startup time becomes a problem or the RuntimeCompilation package is not wanted in production. Try it first |
+| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. These go into the setup list, not into the architecture |
+| Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
-**Audit log:** Normal logdan ayrıdır; iş verisidir, yıllarca saklanır. Kendi Audit modülünde tek tablo (`audit.entries`), tenant kolonlu ve RLS korumalı; uygulama rolü kayıt ekleyip okuyabilir, değiştiremez ve silemez. Komutun audit event'i komutun kendi transaction'ında outbox'a yazılır, Audit modülü tüketip kaydeder; böylece kayıt kaybolmaz ve modül sınırı korunur. Kayda geçenler: başarılı durum değiştiren komutlar, reddedilen yetki denemeleri ve system admin'in tenant'a girişi.
+## Open items
 
-- **İşaretli komutlar.** Modül, durum değiştiren komutunu SharedKernel'deki `IAuditedCommand` ile işaretler. Komut aktörünü ve kayda neyin gireceğini (`AuditDetails`) söyler; token gibi bir kimlik bilgisi asla girmez.
-  - İşaretli komut bir tenant'ta başarılı olunca, host'un transaction politikası kaydı commit'ten hemen önce aynı transaction'da yayınlar.
-  - Kayıt komutun adını, `AuditDetails`'ı ve `Result<T>` değerini tutar; oluşturulan kayıt bu değerden okunur.
-  - Onboarding adımları, teslimler ve sistem işleri işaretlenmez.
-- **Kayıt yolu.** Host yalnızca `X.Api` projelerine başvurabildiği için (0006) kayıtları `Audit.Api`'deki `AuditTrail` cephesi `RecordAuditEntry` mesajı olarak yayınlar. Mesajın id'sini gönderen seçer; iki kez gelen mesaj bir kez saklanır.
-- **Yetki reddi.** Reddin iş transaction'ı yoktur. Tenant'a girmiş bir isteğin reddini pipeline, isteğin bus'ına `Denied` kaydı olarak yayınlar; kalıcı yerel kuyruk onu kendi küçük transaction'ında saklar. Tenant bağlamı çözülemediyse (üye olmayan biri) red audit tablosuna değil güvenlik loguna düşer, çünkü audit tablosu tenant kapsamlıdır. Kayıt içeriği: kim, ne zaman, hangi tenant, hangi işlem, hangi kayıt, gerekirse önce ve sonra. Sorgular audit'lenmez. Hacim büyürse tarihe göre bölümlenir.
-
-## Test stratejisi ve TDD
-
-İlk günden test-first: kırmızı, yeşil, refactor. Her özellik dışarıdan başarısız bir kabul testiyle başlar, içeri doğru ilerler. Refactor adımı atlanmaz.
-
-**Beş ilke:**
-
-1. Davranışı test et, implementasyonu değil. Test birimi bir sınıf değil bir davranıştır; refactor testleri kırmaz.
-2. Domain saf kalır; testleri mock'suz, çok sayıda ve hızlıdır.
-3. Kendi veritabanını mock'lama. Postgres, RLS dahil, Testcontainers ile gerçek olarak teste girer. Mock sadece dış sistemlerde (Clerk, e-posta, push).
-4. Etkileşim sadece gereksinimse doğrulanır ("bildirim tam bir kez gitmeli").
-5. Test kodu üretim kodu kalitesindedir.
-
-**Test projeleri:**
-
-```text
-apps/api/tests/
-  ControlPlane.UnitTests/
-  ControlPlane.IntegrationTests/
-  Notifications.UnitTests/
-  Notifications.IntegrationTests/
-  Audit.IntegrationTests/
-  SharedKernel.UnitTests/
-  Tenancy.IntegrationTests/       # izolasyon mekanizmasının davranışı, fixture entity üzerinde
-  Api.IntegrationTests/           # host davranışı: Problem Details, versiyonlama, rate limit, tenant pipeline, izolasyon kapsaması
-  Architecture.Tests/             # modül üstü, NetArchTest
-  Onboarding.EndToEndTests/       # çok modüllü akış, yeteneğin adını taşır
-```
-
-- Test projesi katman başına değil modül başına; sadece içinde test olan proje açılır. Yukarıdaki liste hedef settir, her proje ilk testi yazıldığında açılır.
-- Ağırlık modül integration testlerinde: handler'lar gerçek veritabanıyla test edilir.
-- Tenant izolasyon paketi (0042):
-  - **Davranış.** Mekanizma `Tenancy.IntegrationTests`'te bir fixture entity üzerinde gerçek Postgres'le kanıtlanır.
-  - **Kapsama.** `Api.IntegrationTests`, host'un kaydettiği her modül DbContext'indeki her `ITenantEntity`'yi liste tutmadan bulur. Gerçek migration'lardan sonra her birinin query filter'ını, RLS'ini, tek policy'sini ve tenant kolonu varsayılanını kontrol eder.
-  - **Catalog.** Catalog'daki tenant'a ait satırların giriş noktası `ControlPlane.IntegrationTests`'te test edilir.
-- Veritabanı gerektiren her test projesi assembly başına bir PostgreSQL 18 container'ı açar; dağıtımdaki gibi önce bootstrap, sonra migration'lar çalışır.
-- Testlerde girişli kullanıcı, Clerk'inkine benzeyen ve testin kendi anahtarıyla imzalanmış session token'larıyla gelir; host Clerk'in anahtarları yerine bu anahtara güvenir, doğrulamanın geri kalanı üretim kodudur.
-- Dış sistemler (Clerk Backend API, davet e-postası) port'larında sahte uygulamalarla değiştirilir. Gerçek Clerk adapter'ı, isteklerini kaydeden sahte bir HTTP handler'ına karşı ayrıca test edilir.
-- Modül entegrasyon testleri handler'ları, host'un transaction policy'si gibi açtıkları bir tenant transaction'ında doğrudan çağırır; modül test projeleri host'u göremez. Handler gönderdiği mesajları dönüş değeri olarak verir; test onları outbox'ın yapacağı gibi kendisi iletir.
-- Mesaj gönderen istek, mesajlar işlenmeden cevap döner; testler mesajları sleep'le değil Wolverine'in tracking'iyle (`TrackActivity`) bekler.
-- Migration adımı dağıtımdaki gibi, ayrı bir süreçte `dotnet Api.dll migrate` olarak test edilir; uygulama migrate edilmemiş veritabanında açılmadığı için adım açılmış bir host'tan çalıştırılamaz.
-- Saga telafisi gerçek bir veritabanı hatasıyla test edilir: bir trigger tek bir tenant için bir adımı reddeder.
-- `Onboarding.EndToEndTests`, birleşik uygulamayı Production'da, dağıtımdaki gibi kurulmuş bir veritabanına karşı (bootstrap, migration adımı, seed script'i) çalıştırır ve onboarding akışını HTTP üzerinden sürer: system admin tenant'ı oluşturur, ilk sahip daveti kabul eder ve tenant içinde iş yapar.
-- Mimari testler ve tenant izolasyon testleri build'i kırar.
-
-**Yazım kuralları** (şirket ADR-0006'dan uyarlanan):
-
-- Arrange-Act-Assert, boş satırla ayrılmış, etiket yorumu yok.
-- Testte `if`, `switch`, döngü, beklenen sonucu üretim mantığıyla hesaplama yok.
-- `[Fact]` tek senaryo, `[Theory]` aynı davranışın açık girdileri.
-- Builder ve factory'ler taze, geçerli, deterministik nesne döner; senaryoyu belirleyen değerler testte görünür kalır (DAMP öncelikli).
-- Zaman `TimeProvider` ile, rastgelelik ve kimlik kontrol altında; sleep, `.Result`, `async void` yok.
-- Flaky test retry ile örtülmez, kökünden düzeltilir.
-- Hata düzeltmede regresyon testi önce kırmızı yandığı gösterilerek eklenir.
-- İsimlendirme davranışı anlatır; test sınıfları davranış alanına göre gruplanır.
-
-## Kaynaklara uyum analizi
-
-Kararların büyük çoğunluğu kaynaklarla doğrudan uyumlu. Altı noktada bilinçli bir gerilim var; hepsi kabul edilmiş ve dengelenmiş.
-
-**Uyumlu kararlar:**
-
-| Karar | Dayandığı kaynak |
-| --- | --- |
-| Modüler monolitle başla, gerekirse kopar | Richards ve Ford, *Fundamentals of Software Architecture* 2. baskı; Jovanović 2026 rehberleri |
-| Modül = bounded context, kendi verisi ve şeması | Evans, *Domain-Driven Design*; Vernon, Khononov |
-| Paylaşımlı DB + RLS, tenant detayı merkezde gizli | Golding, *Building Multi-Tenant SaaS Architectures*; Azure multitenant rehberi |
-| ControlPlane, system admin, catalog'da RLS yok, onboarding'i tetikleyiciden bağımsız saga | Golding, *Building Multi-Tenant SaaS Architectures*; AWS SaaS Architecture Fundamentals |
-| RLS + izin sistemi + ayrı DTO | OWASP API Security Top 10 (BOLA, BFLA, BOPLA) |
-| Davet token'ı hash'li, tek kullanımlık, süreli | OWASP Authentication ve Session Management rehberleri |
-| Son sahip invariant'ı | Evans, *Domain-Driven Design* (invariant'ı aggregate korur) |
-| Outbox, idempotent tüketici, orkestrasyon saga | Richardson, *Microservices Patterns*; Kleppmann, *DDIA* 2. baskı |
-| Mimari testler | Ford, Parsons, Kua, *Building Evolutionary Architectures* (fitness function) |
-| Problem Details | RFC 9457 |
-| Durumsuz pod, config ortamdan, zarif kapanma | Twelve-Factor App |
-| Timeout, retry, circuit breaker | Nygard, *Release It!* |
-| Audit log, güvenlik olaylarının kaydı | Fowler, Audit Log pattern; OWASP Logging rehberi |
-| Saf domain, yan etki kenarda | *Learn You a Haskell*; Khorikov (functional core, imperative shell) |
-| TDD döngüsü, dıştan içe | Beck, *TDD by Example*; Freeman ve Pryce, *GOOS* |
-| Davranış testi, DB mock'lanmaz | Khorikov, *Unit Testing Principles*; Ian Cooper |
-| Test kokuları, builder'lar, AAA | Meszaros, *xUnit Test Patterns*; Martin, *Clean Code* |
-| Kararlar ADR olarak | Harmel-Law, *Facilitating Software Architecture* |
-| İlk iş uçtan uca ince bir iskelet | Hunt ve Thomas, *The Pragmatic Programmer* (tracer bullet) |
-| Önbellek, slug değişimi, global rate limit ihtiyaç çıkınca | Hunt ve Thomas (YAGNI); Ousterhout |
-
-**Bilinçli gerilimler:**
-
-1. **Modül başına beş proje.** Jovanović ile uyumlu, ama Ousterhout'un sığ modül uyarısı ve proje şişmesi riski var. İnce modüllerde (Audit) özellikle hissedilir. Geri dönüşü kolay: gerekirse modül başına bir proje + Contracts'a inilir.
-2. **Wolverine'in konvansiyon büyüsü.** Ousterhout belirsizliği karmaşıklığın ana kaynağı sayar. Kademeli benimseme ve açık handler isimlendirmesiyle dengelenir.
-3. **ControlPlane ismi.** DDD iş dilinden isim ister; ControlPlane teknik bir terimdir. Golding'in SaaS terminolojisi olduğu için kabul edildi.
-4. **Test ağırlığı integration'da.** Şirket ADR-0006 klasik piramidi savunur; Khorikov ve honeycomb yaklaşımı orkestrasyon ağırlıklı kodda integration'ı öne alır. Template ikincisini seçer.
-5. **İki zamanlayıcı (Wolverine + Hangfire).** Kitap dayanağı yok, sadelik ilkesine hafif ters. Dashboard ve kullanıcı tanımlı işler için bilinçli seçildi.
-6. **Catalog'daki tenant'a ait satırlar.** Roller, üyelikler ve davetler tenant'a ait ama catalog RLS dışında. İzolasyon burada tek giriş noktası ve testlerle uygulama katmanında sağlanır.
-
-**Kaynak bağlantıları:** [Golding, O'Reilly](https://www.oreilly.com/library/view/building-multi-tenant-saas/9781098140632/) · [AWS SaaS Architecture Fundamentals](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html) · [Fundamentals of Software Architecture 2e, Bölüm 11](https://www.oreilly.com/library/view/fundamentals-of-software/9781098175504/ch11.html) · [Jovanović, modüler monolit adım adım](https://milanjovanovic.tech/blog/build-modular-monolith-dotnet-step-by-step) · [Kleppmann, DDIA 2e](https://martin.kleppmann.com/2026/03/24/designing-data-intensive-applications-2e.html) · [Azure tenancy models](https://learn.microsoft.com/azure/architecture/guide/multitenant/considerations/tenancy-models) · [Wolverine idempotent teslim](https://wolverinefx.net/guide/durability/idempotency.html) · [Clerk Restricted mod](https://clerk.com/changelog/2024-09-30-restricted-sign-up-mode) · [Clerk davetleri](https://clerk.com/docs/guides/users/inviting)
-
-## Kapsam dışı ve kurulumda doğrulanacaklar
-
-Aşağıdakiler kod iskeletini değiştirmediği için sonraya bırakıldı:
-
-- Faturalama ve abonelik
-- Self-serve kayıt (onboarding saga'sı buna hazır)
-- Slug değiştirme ve eski URL yönlendirmesi
-- Gerçek push sağlayıcısı
-- Tenant ayar modeli
-- İstemci tip üretimi ve istemcilerin iç yapısı; system admin konsolunun arayüzü
-- CI/CD ve Kubernetes dağıtımı
-- Sır yönetimi (ilke: config ortamdan okunur)
-- Gözlem verisinin görüntüleme aracı (Grafana yığını veya Seq)
-- Dosya ve medya yönetimi (ilke: nesne deposu, tenant bazlı ayrım)
-- E-posta şablonları
-- Arama
-
-Kurulumda ilgili fazda doğrulanır, sonuç ADR'ye işlenir. Doğrulananlar:
-
-- Wolverine'in `internal` tiplerle çalışmadığı ve internal üyeli public port'larla çalıştığı (0047).
-- NetArchTest fork'u ile Testcontainers'ın lisans ve .NET 10 uyumu (0044).
-- Davet e-postasını Resend ile bizim göndereceğimiz; Clerk davetinin `notify: false` ile e-postasız açılabildiği (0029).
-- Wolverine'in dayanıklı outbox'ının bizim tenant transaction'ımıza yazabildiği (0016, 0024) ve saga depolamasının yazamadığı (0025).
-- Wolverine'in dayanıklılık ajanının doğrudan bağlantı istediği: lider, oturum seviyesi advisory kilit tutar (0019).
-- Clerk'in ikinci faktör doğrulamasını `fva` claim'iyle bildirdiği (0031).
-- `Result` dönen endpoint'lerin OpenAPI dokümanında doğru tarif edildiği (0036).
-- Hangfire'ın havuzlu bağlantıyla çalıştığı: kilitleri tablo satırıdır, oturum durumu tutmaz (0019, 0027).
-- Hangfire PostgreSQL paketinin LGPL-3.0 lisanslı olduğu ve .NET 10'da Npgsql 10 ile çalıştığı (0002, 0027).
-- Pod başına doğrudan bağlantı bütçesi: Wolverine en çok 5, Hangfire 0 (0019).
-- Test host'larında Wolverine'in solo modu güvenli değil: host'lar `wolverine` şemasını paylaşır ve solo düğüm başkasının mesajını sahiplenir. Solo mod denemesi süreyi 37 saniyeden 29'a indirdi ama tekrar deneme testini paralel koşuda her seferinde bozdu. Host'lar normal (balanced) modda kalır (0042).
-
-Doğrulanacak bir şey kalmadı.
+- Requirements 3 and 5 for the messaging tool have no evidence yet. The two-pod test is written in the fix plan.
+- The licenses of transitive test packages are not verified yet.
