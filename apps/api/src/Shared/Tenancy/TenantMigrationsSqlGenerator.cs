@@ -40,8 +40,8 @@ internal sealed class TenantMigrationsSqlGenerator(
     private static bool IsTenantColumn(ColumnOperation column) =>
         column.Name == TenantColumn.Name && column.DefaultValueSql == TenantColumn.CurrentTenantSql;
 
-    // Not forced: tables stay visible to their owner, which runs the migrations and owns the narrow SECURITY DEFINER lookups
-    // (0017). The application role owns no table, so the policy always applies to it.
+    // Not forced: tables stay visible to their owner, which runs the migrations. The application role owns no table, so the policy
+    // always applies to it.
     private void IsolateTenants(string? schema, string table, MigrationCommandListBuilder builder)
     {
         var helper = Dependencies.SqlGenerationHelper;
