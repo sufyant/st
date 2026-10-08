@@ -13,7 +13,7 @@ using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
-// The invitation email goes through the Notifications module (0029, 0037): through Resend, or to the log in Development without
+// The invitation email goes through the Notifications module: through Resend, or to the log in Development without
 // Resend. Delivery is a message the outbox sends once the invitation is saved.
 public sealed class InvitationDeliveryTests(Database database)
 {

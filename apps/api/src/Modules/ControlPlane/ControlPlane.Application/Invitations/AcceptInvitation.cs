@@ -7,7 +7,7 @@ namespace ControlPlane.Application.Invitations;
 
 /// <summary>
 /// Accepts an invitation in its tenant: the catalog user, when new, and the membership are created in the same transaction as
-/// the invitation is used up (0029). The user's verified email addresses are read from the identity provider before that
+/// the invitation is used up. The user's verified email addresses are read from the identity provider before that
 /// transaction begins, so no call leaves the process while the invitation is locked.
 /// </summary>
 public sealed record AcceptInvitation(string Token, string UserId, IReadOnlyList<string> VerifiedEmails);

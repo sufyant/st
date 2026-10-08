@@ -28,7 +28,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Wolverine registers the node and checks its message storage while it starts, so the database must be there (0038).
+    // Wolverine registers the node and checks its message storage while it starts, so the database must be there.
     [Fact]
     public async Task Without_its_database_the_application_does_not_start()
     {
@@ -55,7 +55,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     // Row level security does not hold for a superuser, a role with BYPASSRLS or a table's owner, so a pod connected as one must
-    // never receive traffic (0014, 0018).
+    // never receive traffic.
     [Fact]
     public async Task Connected_as_the_owner_the_application_is_not_ready()
     {
@@ -82,7 +82,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
 
-    // The direct connection is the application's too: Wolverine keeps its messages over it (0019).
+    // The direct connection is the application's too: Wolverine keeps its messages over it.
     [Fact]
     public async Task Connected_as_the_owner_over_the_direct_connection_the_application_is_not_ready()
     {
@@ -94,7 +94,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     // Like the pooled one, the setting is checked once the application runs rather than on start: the build starts the host to
-    // write the OpenAPI document, without any connection (0019, 0036).
+    // write the OpenAPI document, without any connection.
     [Fact]
     public async Task Without_the_direct_connection_the_application_is_not_ready()
     {
@@ -105,7 +105,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
 
-    // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted (0028).
+    // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted.
     [Fact]
     public async Task Outside_development_the_application_is_not_ready_without_authorized_parties()
     {

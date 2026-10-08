@@ -5,13 +5,13 @@ using ControlPlane.Domain.Users;
 namespace ControlPlane.Application.Ports;
 
 /// <summary>
-/// The one way handlers reach catalog rows that belong to a tenant, bound to the active tenant (0021). The catalog has no row level
+/// The one way handlers reach catalog rows that belong to a tenant, bound to the active tenant. The catalog has no row level
 /// security, so this access point is what keeps one tenant's rows from another: it reads only the active tenant's rows and adds
 /// only rows of the active tenant. Users are not tenant-owned; they are here because accepting an invitation saves a user and its
 /// membership together.
 /// </summary>
 /// <remarks>
-/// Public only because Wolverine's generated code passes it to public handlers (0047); its members speak domain types, so they
+/// Public only because Wolverine's generated code passes it to public handlers; its members speak domain types, so they
 /// are internal to the module.
 /// </remarks>
 public interface ITenantCatalog
@@ -36,7 +36,7 @@ public interface ITenantCatalog
     internal void AddMember(Guid userId, Guid roleId);
 
     /// <summary>
-    /// Adds the active tenant itself, which its onboarding creates (0026), unless another tenant has its slug. The slug's unique index
+    /// Adds the active tenant itself, which its onboarding creates, unless another tenant has its slug. The slug's unique index
     /// decides, also between two onboardings at the same moment, and nothing else about the other tenant is revealed.
     /// </summary>
     internal Task<bool> TryAddAsync(Tenant tenant, CancellationToken cancellationToken);

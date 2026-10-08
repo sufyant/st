@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.RateLimiting;
 
-// In-memory, per-pod limits from configuration (0035).
+// In-memory, per-pod limits from configuration.
 internal static class TenantRateLimiting
 {
     public const string Policy = "per-tenant";
@@ -38,7 +38,7 @@ internal static class TenantRateLimiting
     }
 
     // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the slug in the route is
-    // never a key (0035). A system admin inside a tenant is not its member and spends their own limit.
+    // never a key. A system admin inside a tenant is not its member and spends their own limit.
     private static string PartitionKey(HttpContext context) =>
         context.RequestServices.GetRequiredService<RequestAccess>().Membership is { } membership ? $"tenant:{membership.TenantId}"
         : context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } userId ? $"user:{userId}"

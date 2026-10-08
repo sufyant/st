@@ -3,7 +3,7 @@ using Api.Persistence;
 
 namespace Api.IntegrationTests;
 
-// Runs the migration step the way a deployment does, as `dotnet Api.dll migrate` (0020). The host is built into the test's output
+// Runs the migration step the way a deployment does, as `dotnet Api.dll migrate`. The host is built into the test's output
 // folder, so the command runs from there.
 internal static class MigrateCommand
 {

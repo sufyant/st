@@ -1,7 +1,7 @@
 namespace Tenancy;
 
 /// <summary>
-/// The catalog lookups tenant resolution needs before any tenant is known (0015). Implemented by the module that owns the
+/// The catalog lookups tenant resolution needs before any tenant is known. Implemented by the module that owns the
 /// catalog, so the host never knows it.
 /// </summary>
 public interface ITenantDirectory
@@ -10,5 +10,5 @@ public interface ITenantDirectory
     Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId, CancellationToken cancellationToken);
 }
 
-/// <summary>A verified membership: the tenant and the permissions the member's role holds there (0030).</summary>
+/// <summary>A verified membership: the tenant and the permissions the member's role holds there.</summary>
 public sealed record TenantMembership(Guid TenantId, IReadOnlySet<string> Permissions);

@@ -7,7 +7,7 @@ using SharedKernel;
 namespace ControlPlane.Application.Tenants;
 
 /// <summary>
-/// A system admin starts a tenant's onboarding (0026). It runs inside the tenant it creates, whose id the caller chose, so every step
+/// A system admin starts a tenant's onboarding. It runs inside the tenant it creates, whose id the caller chose, so every step
 /// of the saga runs in that tenant's transaction and hands the tenant on to the next one.
 /// </summary>
 public sealed record StartTenantOnboarding(string AdminId, string Slug, string OwnerEmail);

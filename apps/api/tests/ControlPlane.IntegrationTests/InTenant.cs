@@ -4,7 +4,7 @@ using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
-// Runs a handler the way the host's transaction policy does (0016): in one transaction with the tenant set at its start,
+// Runs a handler the way the host's transaction policy does: in one transaction with the tenant set at its start,
 // committed only when the handler succeeds.
 internal static class InTenant
 {

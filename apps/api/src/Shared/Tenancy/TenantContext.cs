@@ -1,6 +1,6 @@
 namespace Tenancy;
 
-/// <summary>The tenant the current request or message runs under; set once by the host pipeline (0015, 0016).</summary>
+/// <summary>The tenant the current request or message runs under; set once by the host pipeline.</summary>
 public sealed class TenantContext
 {
     public Guid? TenantId { get; private set; }

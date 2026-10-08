@@ -6,7 +6,7 @@ using Npgsql;
 
 namespace Audit.IntegrationTests;
 
-// The Audit module stores the records other modules send it, under the tenant they were sent in (0040).
+// The Audit module stores the records other modules send it, under the tenant they were sent in.
 public sealed class RecordAuditEntryTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -23,7 +23,7 @@ public sealed class RecordAuditEntryTests(Database database)
         (await CountAsync(other, entry.EntryId)).ShouldBe(0);
     }
 
-    // A message may arrive twice (0024); the entry's id, chosen by its sender, keeps it from being stored twice.
+    // A message may arrive twice; the entry's id, chosen by its sender, keeps it from being stored twice.
     [Fact]
     public async Task An_entry_that_arrives_twice_is_stored_once()
     {

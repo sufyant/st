@@ -4,7 +4,7 @@ using ControlPlane.Application.Ports;
 namespace Onboarding.EndToEndTests;
 
 // Clerk, as far as the application uses it. Someone without an account signs up through the provider's invitation, which carries
-// our accept link (0029).
+// our accept link.
 internal sealed class FakeIdentityProvider : IIdentityProvider
 {
     private readonly ConcurrentDictionary<string, string[]> _verifiedEmails = new();

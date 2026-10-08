@@ -14,7 +14,7 @@ namespace ControlPlane.Infrastructure.Migrations
             migrationBuilder.EnsureSchema(
                 name: "catalog");
 
-            // Privileges come from migrations (0018): the application role works with the catalog.
+            // Privileges come from migrations: the application role works with the catalog.
             migrationBuilder.Sql("""
                 GRANT USAGE ON SCHEMA catalog TO api_application;
                 ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO api_application;

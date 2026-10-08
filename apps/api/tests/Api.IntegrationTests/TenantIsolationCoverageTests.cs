@@ -1,6 +1,6 @@
 namespace Api.IntegrationTests;
 
-// How isolation behaves is proven in Tenancy.IntegrationTests; this proves every tenant table gets it (0014, 0042).
+// How isolation behaves is proven in Tenancy.IntegrationTests; this proves every tenant table gets it.
 public sealed class TenantIsolationCoverageTests(Database database)
 {
     [Fact]

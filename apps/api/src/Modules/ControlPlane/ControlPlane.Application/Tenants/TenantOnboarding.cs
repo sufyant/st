@@ -10,7 +10,7 @@ using Wolverine.Runtime.Handlers;
 
 namespace ControlPlane.Application.Tenants;
 
-// The tenant onboarding saga (0025, 0026), orchestrated in one place. StartTenantOnboarding creates the tenant as provisioning; each
+// The tenant onboarding saga, orchestrated in one place. StartTenantOnboarding creates the tenant as provisioning; each
 // further step is a durable message handled in the new tenant's transaction, and the tenant's status is the saga's state. A step
 // that still fails after its retries goes to the dead letter queue, and the fault Wolverine publishes for it in the same tenant is
 // compensated: the tenant becomes failed. The invitation's delivery is the last step and is not compensated.
@@ -38,7 +38,7 @@ public static class TenantOnboardingHandler
             return null;
         }
 
-        // A message may arrive twice (0024).
+        // A message may arrive twice.
         if (await catalog.FindInvitationForUpdateAsync(step.InvitationId, cancellationToken) is null)
         {
             var now = time.GetUtcNow();

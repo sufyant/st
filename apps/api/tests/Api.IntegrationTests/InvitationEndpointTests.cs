@@ -7,7 +7,7 @@ using Tenancy;
 
 namespace Api.IntegrationTests;
 
-// People join a tenant only through an invitation (0029).
+// People join a tenant only through an invitation.
 public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -41,7 +41,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
             """)).ShouldBe(1);
     }
 
-    // The token travels only in the link the delivery sends; the stored messages that carried the invitation never held it (0029).
+    // The token travels only in the link the delivery sends; the stored messages that carried the invitation never held it.
     [Fact]
     public async Task No_stored_message_holds_an_invitation_token()
     {

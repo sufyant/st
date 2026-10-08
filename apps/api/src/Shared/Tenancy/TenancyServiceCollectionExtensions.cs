@@ -7,7 +7,7 @@ namespace Tenancy;
 
 public static class TenancyServiceCollectionExtensions
 {
-    /// <summary>The host's part: the pooled data source, the tenant context and the per-scope transaction (0016, 0019).</summary>
+    /// <summary>The host's part: the pooled data source, the tenant context and the per-scope transaction.</summary>
     public static IServiceCollection AddTenancy(this IServiceCollection services, Func<IServiceProvider, string> pooledConnectionString)
     {
         services.AddSingleton(provider => NpgsqlDataSource.Create(pooledConnectionString(provider)));
@@ -17,7 +17,7 @@ public static class TenancyServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>A module's part: its DbContext on the scope's connection, in its own schema, and its migrations (0008).</summary>
+    /// <summary>A module's part: its DbContext on the scope's connection, in its own schema, and its migrations.</summary>
     public static IServiceCollection AddModuleDbContext<TContext>(this IServiceCollection services, string schema)
         where TContext : DbContext
     {

@@ -1,6 +1,6 @@
 namespace Tenancy;
 
-/// <summary>The roles the bootstrap script creates (0018); migrations grant privileges to them by name.</summary>
+/// <summary>The roles the bootstrap script creates; migrations grant privileges to them by name.</summary>
 public static class DatabaseRoles
 {
     public const string Owner = "api_owner";

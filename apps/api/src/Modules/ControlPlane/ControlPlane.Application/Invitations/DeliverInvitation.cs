@@ -6,7 +6,7 @@ using Wolverine.Runtime.Handlers;
 namespace ControlPlane.Application.Invitations;
 
 /// <summary>
-/// Sends a saved invitation to the invited person (0029). It travels through the outbox, so it runs only once the invitation is
+/// Sends a saved invitation to the invited person. It travels through the outbox, so it runs only once the invitation is
 /// committed, and it carries no token: the token is born here.
 /// </summary>
 public sealed record DeliverInvitation(Guid InvitationId);
@@ -15,7 +15,7 @@ public static class DeliverInvitationHandler
 {
     // Clerk and the email channel are systems we do not own, and may be down for a moment: a failure is tried again after a pause
     // that doubles each time, and then the message goes to the dead letter queue. Delivery is the last step of any flow and is not
-    // compensated (0026).
+    // compensated.
     public static void Configure(HandlerChain chain) =>
         chain.OnAnyException().RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4));
 
@@ -30,7 +30,7 @@ public static class DeliverInvitationHandler
         var invitation = await catalog.FindInvitationForUpdateAsync(message.InvitationId, cancellationToken)
             ?? throw new InvalidOperationException("An invitation is delivered only after it is saved.");
 
-        // A message may arrive twice (0024): an invitation that already has its token was delivered.
+        // A message may arrive twice: an invitation that already has its token was delivered.
         var token = InvitationToken.Generate();
         if (!invitation.IssueToken(token))
         {

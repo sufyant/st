@@ -5,7 +5,7 @@ namespace Tenancy;
 /// <summary>
 /// The one connection and transaction of a request or message. Every module DbContext in the scope runs on this connection,
 /// and a tenant-scoped transaction sets the tenant at its start, local to the transaction so a pooled connection never carries
-/// it to the next user (0016).
+/// it to the next user.
 /// </summary>
 public sealed class TenantTransaction(NpgsqlDataSource dataSource, TenantContext tenant) : IAsyncDisposable, IDisposable
 {

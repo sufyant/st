@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ControlPlane.Infrastructure;
 
 // The other catalog reader that is not bound to a tenant: an invitation is accepted outside any tenant, and its token leads to
-// the tenant it is then accepted in (0021, 0029). It reveals only the tenant id.
+// the tenant it is then accepted in. It reveals only the tenant id.
 internal sealed class InvitationDirectory(CatalogDbContext catalog) : IInvitationDirectory
 {
     public Task<Guid?> FindTenantAsync(string token, CancellationToken cancellationToken)

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ControlPlane.Infrastructure;
 
-/// <summary>The <c>catalog</c> schema: the control plane's data above tenants, without row level security (0021).</summary>
+/// <summary>The <c>catalog</c> schema: the control plane's data above tenants, without row level security.</summary>
 internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbContext(options)
 {
     public const string Schema = "catalog";
@@ -50,7 +50,7 @@ internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> option
             role.Property(r => r.BuiltIn).HasConversion<string>().HasMaxLength(20);
             role.Ignore(r => r.Permissions);
 
-            // Built-in roles are shared by every tenant; their permissions come from code, so their rows hold none (0030).
+            // Built-in roles are shared by every tenant; their permissions come from code, so their rows hold none.
             role.HasData(BuiltInRoles.All.Select(builtIn => new { builtIn.Id, builtIn.Name, builtIn.BuiltIn }));
         });
 

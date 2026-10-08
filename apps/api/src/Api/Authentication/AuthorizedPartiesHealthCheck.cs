@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Authentication;
 
-// Without a list of authorized parties the API accepts a session token issued to any origin of the Clerk instance (0028). That
+// Without a list of authorized parties the API accepts a session token issued to any origin of the Clerk instance. That
 // is convenient in Development; anywhere else the pod is not ready until the list names the clients allowed to use the API.
 internal sealed class AuthorizedPartiesHealthCheck(IHostEnvironment environment, IOptions<ClerkAuthenticationOptions> clerk) : IHealthCheck
 {

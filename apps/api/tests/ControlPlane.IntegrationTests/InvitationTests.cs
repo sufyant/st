@@ -37,7 +37,7 @@ public sealed class InvitationTests(Database database)
         database.Sender.LinkSentTo(email).GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl);
     }
 
-    // The token is born in the delivery and only its SHA-256 hash is stored (0029).
+    // The token is born in the delivery and only its SHA-256 hash is stored.
     [Fact]
     public async Task Delivery_stores_the_hash_of_the_token_it_sends()
     {
@@ -50,7 +50,7 @@ public sealed class InvitationTests(Database database)
         (await ScalarAsync<string>($"SELECT token_hash FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe(Sha256(token));
     }
 
-    // A message may arrive twice (0024); the second delivery must not send another link.
+    // A message may arrive twice; the second delivery must not send another link.
     [Fact]
     public async Task An_invitation_is_delivered_only_once()
     {

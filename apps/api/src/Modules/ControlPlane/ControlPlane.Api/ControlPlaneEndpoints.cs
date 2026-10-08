@@ -10,7 +10,8 @@ using Wolverine;
 namespace ControlPlane.Api;
 
 /// <summary>
-/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the admin routes (0031). Each endpoint names the permission it needs (0030) and sends one command; the host maps its result (0032).
+/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the admin routes. Each endpoint names the
+/// permission it needs and sends one command; the host maps its result.
 /// </summary>
 public static class ControlPlaneEndpoints
 {
@@ -20,7 +21,7 @@ public static class ControlPlaneEndpoints
         this RouteGroupBuilder v1,
         RouteGroupBuilder admin)
     {
-        // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there (0029). The
+        // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there. The
         // identity provider is asked first, so its call never runs while the acceptance holds the invitation locked.
         v1.MapPost("/invitations/accept", async (
             AcceptInvitationRequest request,
@@ -41,7 +42,7 @@ public static class ControlPlaneEndpoints
             return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
         });
 
-        // Onboarding runs inside the tenant it creates (0026). The tenant's id is chosen here, by the server, never by the client.
+        // Onboarding runs inside the tenant it creates. The tenant's id is chosen here, by the server, never by the client.
         admin.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
                 (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
                     Guid.CreateVersion7(time.GetUtcNow()).ToString(),
@@ -51,7 +52,7 @@ public static class ControlPlaneEndpoints
             .RequireAuthorization(Permissions.SystemTenantsCreate);
     }
 
-    // The version group lets only signed-in users through, so the identity provider's user id is always there (0015).
+    // The version group lets only signed-in users through, so the identity provider's user id is always there.
     private static string Id(this ClaimsPrincipal user) =>
         user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("The request has no signed-in user.");
 }

@@ -3,7 +3,7 @@ using Tenancy;
 
 namespace Api.Persistence;
 
-// The separate migration step (0020): `dotnet Api.dll migrate` applies every module's migrations and creates the message storage
+// The separate migration step: `dotnet Api.dll migrate` applies every module's migrations and creates the message storage
 // as the owner, over the direct connection, and exits. Starting the application never migrates.
 internal static class MigrationStep
 {

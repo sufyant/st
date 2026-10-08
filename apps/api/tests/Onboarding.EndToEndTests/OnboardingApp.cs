@@ -11,7 +11,7 @@ using Wolverine.Tracking;
 namespace Onboarding.EndToEndTests;
 
 // The application as Program composes it, running in Production against the database the deployment steps prepared. Clerk and the
-// email channel are fakes at their ports (0042).
+// email channel are fakes at their ports.
 internal sealed class OnboardingApp(Database database) : WebApplicationFactory<Program>
 {
     public FakeIdentityProvider Identity { get; } = new();
@@ -26,7 +26,7 @@ internal sealed class OnboardingApp(Database database) : WebApplicationFactory<P
     }
 
     // Runs the action and waits until every message it caused has been handled: the steps of the onboarding saga and the
-    // invitation's delivery run after the request, through the outbox (0024, 0026).
+    // invitation's delivery run after the request, through the outbox.
     public async Task<T> WaitingForMessagesAsync<T>(Func<Task<T>> action)
     {
         var result = default(T)!;

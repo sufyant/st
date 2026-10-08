@@ -2,7 +2,7 @@ using System.Net;
 
 namespace Api.IntegrationTests;
 
-// Function level authorization: code checks permissions, never roles (0030).
+// Function level authorization: code checks permissions, never roles.
 public sealed class AuthorizationTests(Database database) : IAsyncLifetime
 {
     private readonly Catalog _catalog = new(database);
@@ -24,7 +24,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
-    // A tenant the user cannot enter looks the same as one that does not exist, also behind a permission (0015).
+    // A tenant the user cannot enter looks the same as one that does not exist, also behind a permission.
     [Fact]
     public async Task A_user_who_is_not_a_member_does_not_find_the_tenant()
     {
@@ -37,7 +37,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
-    // System admins enter tenants through the admin routes only (0031).
+    // System admins enter tenants through the admin routes only.
     [Fact]
     public async Task A_system_admin_who_is_not_a_member_does_not_find_the_tenant()
     {

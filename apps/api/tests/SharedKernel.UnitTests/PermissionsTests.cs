@@ -2,7 +2,7 @@ namespace SharedKernel.UnitTests;
 
 public class PermissionsTests
 {
-    // A tenant's custom roles choose from the tenant pool, so a system permission must never be part of it (0030, 0031).
+    // A tenant's custom roles choose from the tenant pool, so a system permission must never be part of it.
     [Fact]
     public void The_tenant_and_system_pools_share_no_permission()
     {

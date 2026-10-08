@@ -7,7 +7,7 @@ using Wolverine;
 namespace Api.IntegrationTests;
 
 // A stand-in for a module's tenant entity and its handlers, to drive the host's tenant pipeline end to end.
-// Wolverine discovers only public handlers, messages and the types in their signatures (0047).
+// Wolverine discovers only public handlers, messages and the types in their signatures.
 public sealed class Probe : ITenantEntity
 {
     public Guid Id { get; init; } = Guid.CreateVersion7();
@@ -130,7 +130,7 @@ public static class PublishAndCountStoredHandler
     }
 }
 
-// Write a probe and announce it in one handler, which reports success or rejects the probe afterwards (0032).
+// Write a probe and announce it in one handler, which reports success or rejects the probe afterwards.
 public sealed record WriteProbeAndAnnounce(string Value);
 
 public static class WriteProbeAndAnnounceHandler
@@ -194,7 +194,7 @@ public static class ProbeAnnouncedHandler
     }
 }
 
-// The envelopes Wolverine has stored whose body carries the marker (0024).
+// The envelopes Wolverine has stored whose body carries the marker.
 public static class StoredMessages
 {
     public static async Task<long> CountAsync(NpgsqlConnection connection, string marker, CancellationToken cancellationToken)

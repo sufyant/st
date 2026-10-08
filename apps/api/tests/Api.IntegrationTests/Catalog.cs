@@ -1,6 +1,6 @@
 namespace Api.IntegrationTests;
 
-// Writes catalog rows with plain SQL: the host's tests may not see ControlPlane's internals (0007). Built-in roles are found by
+// Writes catalog rows with plain SQL: the host's tests may not see ControlPlane's internals. Built-in roles are found by
 // name, the way the catalog stores them.
 internal sealed class Catalog(Database database)
 {

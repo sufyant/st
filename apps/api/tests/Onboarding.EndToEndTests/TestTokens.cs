@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Onboarding.EndToEndTests;
 
-// Clerk is a system we do not own. The test signs session tokens shaped like Clerk's (0028) with a key of its own, and the host
+// Clerk is a system we do not own. The test signs session tokens shaped like Clerk's with a key of its own, and the host
 // trusts that key in place of the keys it would fetch from Clerk; everything else about validation is the host's own.
 internal static class TestTokens
 {
@@ -25,7 +25,7 @@ internal static class TestTokens
             options.Configuration.SigningKeys.Add(Key);
         });
 
-    // fva holds the minutes since the first and the second factor were verified; -1 means no second factor (0031).
+    // fva holds the minutes since the first and the second factor were verified; -1 means no second factor.
     public static string For(string userId, bool secondFactor)
     {
         var now = DateTime.UtcNow;

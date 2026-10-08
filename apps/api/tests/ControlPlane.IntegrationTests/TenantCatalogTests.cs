@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.IntegrationTests;
 
-// The catalog has no row level security; tenant-owned catalog rows are isolated by the one access point that reaches them (0021).
+// The catalog has no row level security; tenant-owned catalog rows are isolated by the one access point that reaches them.
 public sealed class TenantCatalogTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -84,7 +84,7 @@ public sealed class TenantCatalogTests(Database database)
         found.ShouldBeNull();
     }
 
-    // Onboarding adds the tenant it runs in, and only that one (0026).
+    // Onboarding adds the tenant it runs in, and only that one.
     [Fact]
     public async Task A_tenant_cannot_add_another_tenant()
     {

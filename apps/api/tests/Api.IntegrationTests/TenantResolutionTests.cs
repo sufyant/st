@@ -22,7 +22,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Tenant routes have a segment of their own, so no slug needs to be reserved for the routes outside a tenant (0033).
+    // Tenant routes have a segment of their own, so no slug needs to be reserved for the routes outside a tenant.
     [Fact]
     public async Task A_slug_may_be_the_name_of_a_route_outside_tenants()
     {

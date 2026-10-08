@@ -4,7 +4,7 @@ using SharedKernel;
 namespace ControlPlane.Domain.Invitations;
 
 /// <summary>
-/// An invitation to join a tenant with a role (0029). It is single-use and expires. Its token is issued when it is delivered, so no
+/// An invitation to join a tenant with a role. It is single-use and expires. Its token is issued when it is delivered, so no
 /// stored message ever carries one. Accepting it needs both the token and a verified email address of the accepting user that
 /// matches the invited one, so a forwarded link does not let someone else in.
 /// </summary>

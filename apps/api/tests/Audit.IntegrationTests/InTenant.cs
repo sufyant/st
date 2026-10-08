@@ -4,7 +4,7 @@ using Tenancy;
 
 namespace Audit.IntegrationTests;
 
-// Runs work the way the host's transaction policy does (0016): in one transaction with the tenant set at its start, committed
+// Runs work the way the host's transaction policy does: in one transaction with the tenant set at its start, committed
 // unless it throws.
 internal static class InTenant
 {

@@ -10,7 +10,7 @@ namespace ControlPlane.Infrastructure;
 /// <summary>
 /// The one way to reach catalog rows that belong to a tenant. The catalog has no row level security, so this access point,
 /// bound to the active tenant, is what keeps one tenant's rows from another: it reads only the active tenant's rows and adds
-/// only rows of the active tenant (0021).
+/// only rows of the active tenant.
 /// </summary>
 internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tenant) : ITenantCatalog
 {

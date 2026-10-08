@@ -4,7 +4,7 @@ using Tenancy;
 
 namespace Audit.Infrastructure;
 
-/// <summary>The <c>audit</c> schema: one table of audit entries with a tenant column, under row level security (0040).</summary>
+/// <summary>The <c>audit</c> schema: one table of audit entries with a tenant column, under row level security.</summary>
 internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options, TenantContext tenant) : TenantDbContext(options, tenant)
 {
     public const string Schema = "audit";

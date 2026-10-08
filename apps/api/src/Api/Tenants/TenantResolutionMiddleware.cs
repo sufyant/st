@@ -10,10 +10,10 @@ using Wolverine;
 
 namespace Api.Tenants;
 
-// Resolves the tenant of a request and what the caller may do there, never from the client's word alone (0015). On a tenant
-// route the tenant comes from the slug and the user's membership, with the permissions of the member's role (0030); on an admin
-// route the user's system permissions are read (0031).
-// It rejects nothing: the rate limiter runs next and limits the others by user or address (0035), and authorization turns them
+// Resolves the tenant of a request and what the caller may do there, never from the client's word alone. On a tenant
+// route the tenant comes from the slug and the user's membership, with the permissions of the member's role; on an admin
+// route the user's system permissions are read.
+// It rejects nothing: the rate limiter runs next and limits the others by user or address, and authorization turns them
 // away afterwards.
 internal sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
@@ -55,10 +55,10 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         tenant.Set(resolved);
 
-        // Commands sent from the request carry the tenant in their envelope; the transaction middleware sets it there (0016).
+        // Commands sent from the request carry the tenant in their envelope; the transaction middleware sets it there.
         bus.TenantId = resolved.ToString();
 
-        // Every signal carries the tenant (0039).
+        // Every signal carries the tenant.
         var id = resolved.ToString();
         diagnostics.Set("TenantId", id);
         Activity.Current?.SetTag(TenantTag, id);

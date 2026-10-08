@@ -2,9 +2,9 @@ using Audit.Domain;
 
 namespace Audit.Application.Ports;
 
-/// <summary>The audit log of the active tenant (0040).</summary>
+/// <summary>The audit log of the active tenant.</summary>
 /// <remarks>
-/// Public only because Wolverine's generated code passes it to public handlers (0047); its members speak domain types, so they
+/// Public only because Wolverine's generated code passes it to public handlers; its members speak domain types, so they
 /// are internal to the module.
 /// </remarks>
 public interface IAuditLog

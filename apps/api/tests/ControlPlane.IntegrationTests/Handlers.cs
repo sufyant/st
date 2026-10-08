@@ -13,7 +13,7 @@ internal static class Handlers
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    // The delivery runs after the invitation is saved, in the invitation's tenant, the way the outbox hands it on (0029).
+    // The delivery runs after the invitation is saved, in the invitation's tenant, the way the outbox hands it on.
     public static Task DeliverAsync(IServiceProvider services, Guid tenantId, DeliverInvitation delivery) =>
         InTenant.ProcessAsync(services, tenantId, scope => DeliverInvitationHandler.HandleAsync(
             delivery,
@@ -23,7 +23,7 @@ internal static class Handlers
             scope.GetRequiredService<InvitationSettings>(),
             Cancellation));
 
-    // A tenant's first owner invited the way onboarding does it (0026): the invitation step, then the activation, which hands on the
+    // A tenant's first owner invited the way onboarding does it: the invitation step, then the activation, which hands on the
     // invitation's delivery. The tenant is active afterwards, and the invitation is not delivered yet.
     public static async Task<(Guid TenantId, string Slug, Guid InvitationId, DeliverInvitation Delivery)> InviteFirstOwnerAsync(
         IServiceProvider services,
@@ -65,7 +65,7 @@ internal static class Handlers
             Cancellation));
     }
 
-    // Onboarding runs inside the tenant it creates, whose id the endpoint chooses (0026).
+    // Onboarding runs inside the tenant it creates, whose id the endpoint chooses.
     public static Task<(Result<TenantDetails> Result, CreateFirstOwnerInvitation? Next)> StartOnboardingAsync(
         IServiceProvider services,
         Guid tenantId,

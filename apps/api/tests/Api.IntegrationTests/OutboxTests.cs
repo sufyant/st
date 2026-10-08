@@ -4,8 +4,8 @@ using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
-// A tenant command's messages are stored in its own transaction, so they commit and roll back with its work (0016, 0024). An
-// expected failure undoes the work and discards the messages, just as an exception does (0032).
+// A tenant command's messages are stored in its own transaction, so they commit and roll back with its work. An
+// expected failure undoes the work and discards the messages, just as an exception does.
 public sealed class OutboxTests(Database database) : IAsyncLifetime
 {
     private PipelineHost _host = null!;
@@ -92,7 +92,7 @@ public sealed class OutboxTests(Database database) : IAsyncLifetime
         (await StoredCountAsync(value)).ShouldBe(0);
     }
 
-    // A handler without a tenant sends its messages with Wolverine's default tenant id, which names no tenant (0017).
+    // A handler without a tenant sends its messages with Wolverine's default tenant id, which names no tenant.
     [Fact]
     public async Task A_message_cascaded_without_a_tenant_is_handled_without_one()
     {

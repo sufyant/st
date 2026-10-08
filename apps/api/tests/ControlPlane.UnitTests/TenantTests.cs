@@ -57,7 +57,7 @@ public class TenantTests
         tenant.Status.ShouldBe(TenantStatus.Active);
     }
 
-    // A tenant's onboarding ends active or failed, never both (0026).
+    // A tenant's onboarding ends active or failed, never both.
     [Fact]
     public void Only_a_provisioning_tenant_is_activated()
     {

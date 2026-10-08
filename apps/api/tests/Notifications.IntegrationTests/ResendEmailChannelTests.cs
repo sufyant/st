@@ -9,7 +9,7 @@ using Notifications.Contracts;
 
 namespace Notifications.IntegrationTests;
 
-// Resend is a system we do not own; these tests pin down the requests the email channel makes (0037).
+// Resend is a system we do not own; these tests pin down the requests the email channel makes.
 public sealed class ResendEmailChannelTests : IDisposable
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;

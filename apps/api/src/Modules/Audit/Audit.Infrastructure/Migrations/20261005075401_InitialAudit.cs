@@ -14,7 +14,7 @@ namespace Audit.Infrastructure.Migrations
             migrationBuilder.EnsureSchema(
                 name: "audit");
 
-            // Privileges come from migrations (0018). Audit entries are never changed once written (0040), so the application role
+            // Privileges come from migrations. Audit entries are never changed once written, so the application role
             // may only add and read them.
             migrationBuilder.Sql("""
                 GRANT USAGE ON SCHEMA audit TO api_application;

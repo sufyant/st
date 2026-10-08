@@ -4,7 +4,7 @@ using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 
-// Reads memberships before any tenant is known, so it is one of the catalog readers that are not bound to a tenant (0015, 0021).
+// Reads memberships before any tenant is known, so it is one of the catalog readers that are not bound to a tenant.
 // The membership comes with its role's permissions, so resolving a request stays one query.
 internal sealed class TenantDirectory(CatalogDbContext catalog) : ITenantDirectory
 {

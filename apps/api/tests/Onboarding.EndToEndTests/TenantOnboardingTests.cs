@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Onboarding.EndToEndTests;
 
-// The tracer bullet (0042): the whole onboarding flow through HTTP against the composed application. A system admin creates a
+// The tracer bullet: the whole onboarding flow through HTTP against the composed application. A system admin creates a
 // tenant, and its first owner signs up through the invitation and accepts it.
 public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
 {

@@ -5,13 +5,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Api.Authentication;
 
-// Clerk only authenticates (0028). Its session tokens are JWTs signed with keys published by the instance's Frontend API, which
+// Clerk only authenticates. Its session tokens are JWTs signed with keys published by the instance's Frontend API, which
 // is also their issuer. They carry no audience; the authorized party (azp) is checked instead, as Clerk recommends.
 internal static class ClerkAuthentication
 {
     public const string Section = "Clerk";
 
-    // Set only by the host, when the token's fva shows a second factor verified in the session (0031).
+    // Set only by the host, when the token's fva shows a second factor verified in the session.
     public const string SecondFactorClaim = "second_factor_verified";
 
     public static WebApplicationBuilder AddClerkAuthentication(this WebApplicationBuilder builder)
@@ -69,7 +69,7 @@ internal static class ClerkAuthentication
             return Task.CompletedTask;
         }
 
-        // fva holds the minutes since the first and the second factor were verified; -1 means never (0031).
+        // fva holds the minutes since the first and the second factor were verified; -1 means never.
         if (token.TryGetPayloadValue<int[]>("fva", out var verificationAge) && verificationAge is [_, >= 0])
         {
             context.Principal?.Identities.First().AddClaim(new(SecondFactorClaim, "true"));

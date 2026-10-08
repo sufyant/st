@@ -14,7 +14,7 @@ namespace Notifications.Infrastructure.Migrations
             migrationBuilder.EnsureSchema(
                 name: "notifications");
 
-            // Privileges come from migrations (0018).
+            // Privileges come from migrations.
             migrationBuilder.Sql("""
                 GRANT USAGE ON SCHEMA notifications TO api_application;
                 ALTER DEFAULT PRIVILEGES IN SCHEMA notifications GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO api_application;
@@ -58,7 +58,7 @@ namespace Notifications.Infrastructure.Migrations
                 table: "scheduled_notifications",
                 column: "tenant_id");
 
-            // The scanner's narrow lookup across tenants: the tenant and id of every due notification, nothing else (0017).
+            // The scanner's narrow lookup across tenants: the tenant and id of every due notification, nothing else.
             migrationBuilder.Sql("""
                 CREATE FUNCTION "notifications"."due_scheduled_notifications"(due_at_or_before timestamptz)
                 RETURNS TABLE (tenant_id uuid, id uuid)

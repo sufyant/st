@@ -1,8 +1,7 @@
 namespace ControlPlane.Domain.Tenants;
 
 /// <summary>
-/// A user's membership in a tenant, with the role it is assigned; authorization comes from here, not from the user record
-/// (0029, 0030).
+/// A user's membership in a tenant, with the role it is assigned; authorization comes from here, not from the user record.
 /// </summary>
 internal sealed class Membership(Guid tenantId, Guid userId, Guid roleId)
 {

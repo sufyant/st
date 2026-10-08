@@ -66,7 +66,7 @@ internal static class TestEndpoints
     public static void MapAdmin(RouteGroupBuilder admin) => admin.MapGet("/ping", () => Results.Ok());
 }
 
-// Wolverine only discovers public handlers, messages and validators (0047).
+// Wolverine only discovers public handlers, messages and validators.
 public sealed record Greet(string Name);
 
 public sealed record Greeting(string Text);

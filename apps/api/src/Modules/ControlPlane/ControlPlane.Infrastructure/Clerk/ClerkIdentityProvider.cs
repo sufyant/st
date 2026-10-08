@@ -4,7 +4,7 @@ using ControlPlane.Application.Ports;
 
 namespace ControlPlane.Infrastructure.Clerk;
 
-// Clerk's Backend API, as far as invitations need it (0028, 0029). A call that fails or runs out of time fails the command.
+// Clerk's Backend API, as far as invitations need it. A call that fails or runs out of time fails the command.
 internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
 {
     // Clerk matches some of its email filters partially, so only a user who owns exactly this address counts as an account.
@@ -14,7 +14,7 @@ internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
         return users!.Any(user => user.EmailAddresses.Any(address => string.Equals(address.EmailAddress, email, StringComparison.OrdinalIgnoreCase)));
     }
 
-    // Clerk does not send its own email (notify: false): we send the link ourselves (0029). ignore_existing lets a person be
+    // Clerk does not send its own email (notify: false): we send the link ourselves. ignore_existing lets a person be
     // invited again while an earlier Clerk invitation is still pending.
     public async Task<Uri> InviteAsync(string email, Guid invitationId, Uri acceptLink, CancellationToken cancellationToken)
     {

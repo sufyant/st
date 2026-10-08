@@ -4,7 +4,7 @@ using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
-// The first system admin is created by a seed script during setup (0031).
+// The first system admin is created by a seed script during setup.
 public sealed class SystemAdminTests(Database database)
 {
     [Fact]

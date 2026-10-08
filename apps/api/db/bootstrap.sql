@@ -1,4 +1,4 @@
--- Creates the database roles (0018). Runs before the migrations (0020), as a role allowed to create roles: a superuser
+-- Creates the database roles. Runs before the migrations, as a role allowed to create roles: a superuser
 -- locally, a member of neon_superuser on Neon. Safe to run again; a rerun sets the passwords given.
 --
 --   psql "$DATABASE_URL" -v owner_password=... -v application_password=... -f bootstrap.sql
@@ -8,7 +8,7 @@
 SELECT 'CREATE ROLE api_owner' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'api_owner') \gexec
 SELECT 'CREATE ROLE api_application' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'api_application') \gexec
 
--- No role bypasses row level security (0017).
+-- No role bypasses row level security.
 SELECT format('ALTER ROLE api_owner LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD %L', :'owner_password') \gexec
 SELECT format('ALTER ROLE api_application LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD %L', :'application_password') \gexec
 

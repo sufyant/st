@@ -1,8 +1,8 @@
 namespace Audit.Contracts;
 
 /// <summary>
-/// An audit record to store (0040). It is sent through the outbox in the tenant where the audited event happened, and the Audit
-/// module stores it under that tenant. The sender chooses the entry's id, so a message that arrives twice is stored once (0024).
+/// An audit record to store. It is sent through the outbox in the tenant where the audited event happened, and the Audit
+/// module stores it under that tenant. The sender chooses the entry's id, so a message that arrives twice is stored once.
 /// </summary>
 /// <param name="ActorId">The identity provider's id of the user who acted.</param>
 /// <param name="Operation">What was done: a command's name.</param>

@@ -2,7 +2,7 @@ using System.Net;
 
 namespace Api.IntegrationTests;
 
-// The admin API is a separate route group with its own authorization, and needs a second factor (0031).
+// The admin API is a separate route group with its own authorization, and needs a second factor.
 public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;

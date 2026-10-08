@@ -11,8 +11,8 @@ using Testcontainers.PostgreSql;
 
 namespace ControlPlane.IntegrationTests;
 
-// One PostgreSQL 18 server for the test assembly (0011), set up the way a deployment is: the bootstrap script creates the
-// roles, then the module's migrations run as the owner (0018, 0020). Tests connect as the application role. The identity
+// One PostgreSQL 18 server for the test assembly, set up the way a deployment is: the bootstrap script creates the
+// roles, then the module's migrations run as the owner. Tests connect as the application role. The identity
 // provider and the invitation email are systems we do not own, so they are fakes.
 public sealed class Database : IAsyncLifetime
 {

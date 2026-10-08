@@ -3,7 +3,7 @@ using SharedKernel;
 namespace Audit.Domain;
 
 /// <summary>
-/// One record of the audit log: who did what, when, in which tenant (0040). Records are business data kept for years, and they are
+/// One record of the audit log: who did what, when, in which tenant. Records are business data kept for years, and they are
 /// never changed once written.
 /// </summary>
 internal sealed class AuditEntry(Guid id, DateTimeOffset occurredAt, string actorId, AuditEntryKind kind, string operation, string? details)

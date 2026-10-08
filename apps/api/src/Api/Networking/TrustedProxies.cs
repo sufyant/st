@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 namespace Api.Networking;
 
 // Behind a reverse proxy the connection's address is the proxy's; the client's arrives in X-Forwarded-For. Only proxies named
-// in configuration are believed (0035).
+// in configuration are believed.
 internal static class TrustedProxies
 {
     private const string Section = "ForwardedHeaders";

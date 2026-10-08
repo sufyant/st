@@ -4,9 +4,9 @@ using SharedKernel;
 
 namespace Api.ErrorHandling;
 
-// Endpoints return the Result of their command, and ResultEndpointFilter maps it (0032). The response type inferred from the
+// Endpoints return the Result of their command, and ResultEndpointFilter maps it. The response type inferred from the
 // handler is therefore Result itself, which no client ever receives. This convention replaces it with what the filter sends, so
-// the OpenAPI document describes the real responses (0036).
+// the OpenAPI document describes the real responses.
 internal static class ResultResponses
 {
     private static readonly int[] FailureStatuses =

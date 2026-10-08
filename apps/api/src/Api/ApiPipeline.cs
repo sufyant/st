@@ -18,7 +18,7 @@ using Wolverine.FluentValidation;
 
 namespace Api;
 
-// The shared pipeline every request and command passes through (0022). Program composes it with the modules;
+// The shared pipeline every request and command passes through. Program composes it with the modules;
 // the integration tests compose it with test endpoints.
 internal static class ApiPipeline
 {
@@ -50,7 +50,7 @@ internal static class ApiPipeline
                 options.Discovery.IncludeAssembly(assembly);
             }
 
-            // Module DbContexts are built by factories on the scope's tenant connection (0016), which Wolverine can only resolve
+            // Module DbContexts are built by factories on the scope's tenant connection, which Wolverine can only resolve
             // from the message's scope.
             options.ServiceLocationPolicy = ServiceLocationPolicy.AlwaysAllowed;
 
@@ -63,7 +63,7 @@ internal static class ApiPipeline
             }
 
             // A message that fails for good goes to the dead letter queue, and its fault is published for a flow that has to react,
-            // such as a saga's compensation (0025). Faults are stored messages, so they carry only the exception's type (0029).
+            // such as a saga's compensation. Faults are stored messages, so they carry only the exception's type.
             options.PublishFaultEvents(includeExceptionMessage: false, includeStackTrace: false);
 
             options.UseFluentValidation();
@@ -92,7 +92,7 @@ internal static class ApiPipeline
         app.UseStatusCodePages();
 
         // Routing runs first so tenant resolution sees the slug, and the rate limiter the resolved tenant. Authorization comes
-        // last, so callers it turns away have been rate limited too (0015, 0035).
+        // last, so callers it turns away have been rate limited too.
         app.UseRouting();
         app.UseAuthentication();
         app.UseMiddleware<TenantResolutionMiddleware>();
@@ -111,8 +111,8 @@ internal static class ApiPipeline
         return app;
     }
 
-    // Every API route lives under a version segment (0033); expected failures returned as results become Problem Details here.
-    // Every endpoint in it needs a signed-in user unless it says otherwise (0028).
+    // Every API route lives under a version segment; expected failures returned as results become Problem Details here.
+    // Every endpoint in it needs a signed-in user unless it says otherwise.
     public static RouteGroupBuilder MapV1(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()

@@ -4,7 +4,7 @@ using SharedKernel;
 namespace ControlPlane.Domain.Roles;
 
 /// <summary>
-/// The roles every tenant has (0030). Their permissions are fixed here and they cannot be changed or deleted. They are stored once,
+/// The roles every tenant has. Their permissions are fixed here and they cannot be changed or deleted. They are stored once,
 /// with these ids, as catalog rows that belong to no tenant, so memberships and invitations reference every role the same way.
 /// </summary>
 internal static class BuiltInRoles

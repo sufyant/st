@@ -2,7 +2,7 @@ using Tenancy;
 
 namespace Api.Authorization;
 
-// What the caller of this request may do, resolved once per request with the tenant (0015, 0030, 0031): their membership on a
+// What the caller of this request may do, resolved once per request with the tenant: their membership on a
 // tenant route, their system permissions on an admin route.
 internal sealed class RequestAccess
 {

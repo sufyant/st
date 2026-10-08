@@ -37,7 +37,7 @@ internal sealed class ApiFactory(
         return client;
     }
 
-    // Runs the action and waits until every message it caused has been handled, such as the delivery of an invitation (0029).
+    // Runs the action and waits until every message it caused has been handled, such as the delivery of an invitation.
     public async Task<T> WaitingForMessagesAsync<T>(Func<Task<T>> action)
     {
         var result = default(T)!;

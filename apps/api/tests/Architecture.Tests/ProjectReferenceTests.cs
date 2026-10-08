@@ -1,6 +1,6 @@
 namespace Architecture.Tests;
 
-// The reference table (0006) checked on the project files themselves. The type rules in ReferenceRuleTests see only references
+// The reference table checked on the project files themselves. The type rules in ReferenceRuleTests see only references
 // that some type uses; an unused project reference still lets the next change use it without anyone noticing.
 public class ProjectReferenceTests
 {

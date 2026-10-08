@@ -1,6 +1,6 @@
 namespace ControlPlane.Application.Invitations;
 
-/// <summary>Configuration of invitations (section <c>Invitations</c>); public because handlers take it as a parameter (0047).</summary>
+/// <summary>Configuration of invitations (section <c>Invitations</c>); public because handlers take it as a parameter.</summary>
 public sealed class InvitationSettings
 {
     public const string Section = "Invitations";

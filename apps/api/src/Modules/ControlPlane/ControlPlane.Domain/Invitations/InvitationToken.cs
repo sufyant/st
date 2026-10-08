@@ -5,7 +5,7 @@ using System.Text;
 namespace ControlPlane.Domain.Invitations;
 
 /// <summary>
-/// The secret an invitation link carries. Only its hash is stored (0029); 256 random bits make a fast hash enough, since there is
+/// The secret an invitation link carries. Only its hash is stored; 256 random bits make a fast hash enough, since there is
 /// nothing to guess.
 /// </summary>
 internal static class InvitationToken

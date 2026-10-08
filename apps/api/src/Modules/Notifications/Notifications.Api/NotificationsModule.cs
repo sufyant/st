@@ -7,7 +7,7 @@ namespace Notifications.Api;
 
 public static class NotificationsModule
 {
-    /// <summary>The assembly with the module's handlers and validators, for the host to give Wolverine (0023).</summary>
+    /// <summary>The assembly with the module's handlers and validators, for the host to give Wolverine.</summary>
     public static Assembly HandlerAssembly => typeof(IEmailChannel).Assembly;
 
     public static IServiceCollection AddNotificationsModule(this IServiceCollection services) =>

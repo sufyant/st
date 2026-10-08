@@ -8,7 +8,7 @@ using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
-// The steps of the tenant onboarding saga (0025, 0026), each in the new tenant's transaction the way the outbox hands it on. The
+// The steps of the tenant onboarding saga, each in the new tenant's transaction the way the outbox hands it on. The
 // tenant's status is the saga's state.
 public sealed class TenantOnboardingTests(Database database)
 {
@@ -77,7 +77,7 @@ public sealed class TenantOnboardingTests(Database database)
             """)).ShouldBe(1);
     }
 
-    // A message may arrive twice (0024).
+    // A message may arrive twice.
     [Fact]
     public async Task A_repeated_invitation_step_invites_the_first_owner_once()
     {

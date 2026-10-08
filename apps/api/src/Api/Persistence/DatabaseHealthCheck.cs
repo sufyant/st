@@ -5,9 +5,9 @@ using Wolverine.Runtime;
 
 namespace Api.Persistence;
 
-// A pod is ready only while it reaches its database (0038), and only as a role that row level security binds (0014, 0018): not
+// A pod is ready only while it reaches its database, and only as a role that row level security binds: not
 // a superuser, without BYPASSRLS, and owner of no table, since an owner is not subject to the policies of its tables. Both of the
-// application's connections are checked: the pooled one requests use, and the direct one Wolverine keeps its messages over (0019).
+// application's connections are checked: the pooled one requests use, and the direct one Wolverine keeps its messages over.
 // A connection failure throws, and the health check service reports it unhealthy.
 internal sealed class DatabaseHealthCheck(NpgsqlDataSource pooled, IWolverineRuntime messaging) : IHealthCheck
 {

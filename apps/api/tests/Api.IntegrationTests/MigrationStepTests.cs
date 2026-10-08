@@ -4,13 +4,13 @@ using Tenancy;
 
 namespace Api.IntegrationTests;
 
-// Migrations run as a separate step after the bootstrap script, never on application start (0020).
+// Migrations run as a separate step after the bootstrap script, never on application start.
 public sealed class MigrationStepTests(Database database)
 {
     private const string CatalogExists = "SELECT to_regclass('catalog.tenants') IS NOT NULL";
     private const string MessageStorageExists = "SELECT to_regclass('wolverine.wolverine_incoming_envelopes') IS NOT NULL";
 
-    // Wolverine checks its message storage while it starts, so an application whose database was not migrated does not start (0038),
+    // Wolverine checks its message storage while it starts, so an application whose database was not migrated does not start,
     // and it creates nothing on the way.
     [Fact]
     public async Task Starting_the_application_on_a_database_that_was_not_migrated_fails_and_migrates_nothing()

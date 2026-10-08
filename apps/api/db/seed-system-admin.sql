@@ -1,9 +1,9 @@
--- Makes a user the first system admin (0031). Runs once during setup, after the migrations (0020), as the owner or any role
+-- Makes a user the first system admin. Runs once during setup, after the migrations, as the owner or any role
 -- allowed to write the catalog. Safe to run again: an existing user or grant is left as it is.
 --
 --   psql "$DATABASE_URL" -v external_id=user_... -f seed-system-admin.sql
 --
--- external_id is the identity provider's user id (Clerk), the value the API sees as the user's NameIdentifier claim (0015).
+-- external_id is the identity provider's user id (Clerk), the value the API sees as the user's NameIdentifier claim.
 
 \set ON_ERROR_STOP on
 

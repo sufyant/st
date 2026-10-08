@@ -9,7 +9,7 @@ using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
-// A system admin creates a tenant through the admin API, and the onboarding saga runs through the outbox (0026, 0031).
+// A system admin creates a tenant through the admin API, and the onboarding saga runs through the outbox.
 public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -76,7 +76,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         created.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
-    // The database refuses to activate this one tenant, as a real failure would; the step is retried, then compensated (0026).
+    // The database refuses to activate this one tenant, as a real failure would; the step is retried, then compensated.
     [Fact]
     public async Task When_a_step_keeps_failing_the_tenant_is_left_failed_and_no_one_is_invited()
     {

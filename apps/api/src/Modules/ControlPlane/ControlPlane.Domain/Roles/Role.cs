@@ -1,7 +1,7 @@
 namespace ControlPlane.Domain.Roles;
 
 /// <summary>
-/// A set of permissions a membership is assigned (0030). Roles are built in: they belong to no tenant and their permissions come
+/// A set of permissions a membership is assigned. Roles are built in: they belong to no tenant and their permissions come
 /// from code.
 /// </summary>
 internal sealed class Role

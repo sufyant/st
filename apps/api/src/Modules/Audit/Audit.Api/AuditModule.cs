@@ -7,7 +7,7 @@ namespace Audit.Api;
 
 public static class AuditModule
 {
-    /// <summary>The assembly with the module's handlers, for the host to give Wolverine (0023).</summary>
+    /// <summary>The assembly with the module's handlers, for the host to give Wolverine.</summary>
     public static Assembly HandlerAssembly => typeof(RecordAuditEntryHandler).Assembly;
 
     public static IServiceCollection AddAuditModule(this IServiceCollection services) =>

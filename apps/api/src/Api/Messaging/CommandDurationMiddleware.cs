@@ -3,7 +3,7 @@ using Wolverine;
 
 namespace Api.Messaging;
 
-// The duration histogram itself is Wolverine's own (wolverine-execution-time); this adds the configured warning threshold (0022).
+// The duration histogram itself is Wolverine's own (wolverine-execution-time); this adds the configured warning threshold.
 // Wolverine's generated code calls it, so it must be public.
 public static partial class CommandDurationMiddleware
 {

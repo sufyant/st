@@ -9,7 +9,7 @@ using Serilog;
 namespace Api.Observability;
 
 // Serilog writes to the console and forwards every event to the OpenTelemetry logger; logs, metrics and traces are exported
-// over OTLP only when the environment names a target (0039).
+// over OTLP only when the environment names a target.
 internal static class ObservabilityExtensions
 {
     private const string WolverineActivitySource = "Wolverine";

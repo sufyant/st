@@ -15,15 +15,15 @@ using Testcontainers.PostgreSql;
 
 namespace Api.IntegrationTests;
 
-// One PostgreSQL 18 server for the test assembly (0011). Its main database is set up the way a deployment is: the bootstrap
-// script, then every module's migrations and the message storage as the owner (0018, 0020). The probe tables stand in for a
+// One PostgreSQL 18 server for the test assembly. Its main database is set up the way a deployment is: the bootstrap
+// script, then every module's migrations and the message storage as the owner. The probe tables stand in for a
 // module's tenant entity.
 public sealed class Database : IAsyncLifetime
 {
     private const string Password = "test-password";
     private const string MainDatabase = "api";
 
-    // The tests run the application in many hosts at once, each with its own pools for requests, messages and jobs (0019); together
+    // The tests run the application in many hosts at once, each with its own pools for requests, messages and jobs; together
     // they need more connections than PostgreSQL's default of 100.
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18")
         .WithDatabase(MainDatabase)

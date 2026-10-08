@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Api.Authorization;
 
-// Authorization asks for permissions, never roles (0030). An endpoint names the permission it needs as its policy; the route
+// Authorization asks for permissions, never roles. An endpoint names the permission it needs as its policy; the route
 // groups add who may reach them at all.
 internal static class AccessPolicies
 {
@@ -36,7 +36,7 @@ internal static class AccessPolicies
             ?? new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(policyName)).Build();
     }
 
-    // A tenant route the caller cannot enter answers 404, so it looks the same as a tenant that does not exist (0015).
+    // A tenant route the caller cannot enter answers 404, so it looks the same as a tenant that does not exist.
     private sealed class AccessDeniedHandler : IAuthorizationMiddlewareResultHandler
     {
         private readonly AuthorizationMiddlewareResultHandler _default = new();

@@ -7,7 +7,7 @@ namespace ControlPlane.Api;
 
 public static class ControlPlaneModule
 {
-    /// <summary>The assembly with the module's handlers and validators, for the host to give Wolverine (0023).</summary>
+    /// <summary>The assembly with the module's handlers and validators, for the host to give Wolverine.</summary>
     public static Assembly HandlerAssembly => typeof(AcceptInvitationHandler).Assembly;
 
     public static IServiceCollection AddControlPlaneModule(this IServiceCollection services) =>

@@ -13,7 +13,7 @@ public class InvitationTests
     private static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
     private const string Token = "the-invitation-token";
 
-    // The token is born when the invitation is delivered, so no stored message ever carries it (0029).
+    // The token is born when the invitation is delivered, so no stored message ever carries it.
     [Fact]
     public void A_new_invitation_has_no_token_yet()
     {
@@ -112,7 +112,7 @@ public class InvitationTests
         invitation.Status.ShouldBe(InvitationStatus.Pending);
     }
 
-    // The token alone is not enough: a forwarded link does not let someone else in (0029).
+    // The token alone is not enough: a forwarded link does not let someone else in.
     [Fact]
     public void An_invitation_cannot_be_accepted_by_a_user_without_the_invited_email()
     {

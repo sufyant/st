@@ -8,7 +8,7 @@ using Wolverine.Runtime;
 namespace Api.Messaging;
 
 // Runs every message that carries a tenant in one transaction with the tenant set at its start, whether it comes from a request,
-// a cascade or a queue (0016, 0017). Messages without a tenant, such as catalog work, run without one. The transaction commits
+// a cascade or a queue. Messages without a tenant, such as catalog work, run without one. The transaction commits
 // when the handler succeeds; an exception, or a Result that reports a failure, leaves it uncommitted, and disposing the
 // message's scope rolls it back. TenantTransactionPolicy places these calls; Wolverine's generated code makes them, so the class
 // is public.
@@ -28,14 +28,14 @@ public static class TenantTransactionMiddleware
 
         await transaction.BeginAsync(Guid.Parse(envelope.TenantId), cancellationToken);
 
-        // The messages the handler sends are stored in the same transaction, so they are kept or lost with its work (0024).
+        // The messages the handler sends are stored in the same transaction, so they are kept or lost with its work.
         await context.EnlistInOutboxAsync(new DatabaseEnvelopeTransaction((IMessageDatabase)context.Storage, transaction.Current!));
     }
 
     public static Task CommitAsync(TenantTransaction transaction, CancellationToken cancellationToken) =>
         transaction.Current is null ? Task.CompletedTask : transaction.CommitAsync(cancellationToken);
 
-    // An expected failure undoes the handler's work just as an exception does (0032), and the messages it sent are dropped with it,
+    // An expected failure undoes the handler's work just as an exception does, and the messages it sent are dropped with it,
     // whether or not the message carries a tenant.
     public static Task CommitIfSucceededAsync(
         Result result,

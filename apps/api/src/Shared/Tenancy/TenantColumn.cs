@@ -1,6 +1,6 @@
 namespace Tenancy;
 
-// The tenant column every ITenantEntity gets, and the setting that row level security and the column default read (0014).
+// The tenant column every ITenantEntity gets, and the setting that row level security and the column default read.
 internal static class TenantColumn
 {
     public const string Property = "TenantId";

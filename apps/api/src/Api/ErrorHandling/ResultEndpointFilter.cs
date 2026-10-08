@@ -2,7 +2,7 @@ using SharedKernel;
 
 namespace Api.ErrorHandling;
 
-// Endpoints return the Result of their command; this maps it to HTTP once for every endpoint (0032).
+// Endpoints return the Result of their command; this maps it to HTTP once for every endpoint.
 internal sealed class ResultEndpointFilter : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)

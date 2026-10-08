@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 
 namespace Api.IntegrationTests;
 
-// Clerk only authenticates (0028): the host accepts its session tokens and nothing else.
+// Clerk only authenticates: the host accepts its session tokens and nothing else.
 public sealed class AuthenticationTests : IAsyncLifetime
 {
     private PipelineHost _host = null!;

@@ -7,7 +7,7 @@ namespace Tenancy;
 /// <summary>
 /// Base for a module DbContext that holds tenant entities. Every <see cref="ITenantEntity"/> gets a shadow tenant column that
 /// defaults to the active tenant setting and a query filter on the active tenant; the migrations add the matching row level
-/// security policy (0014).
+/// security policy.
 /// </summary>
 public abstract class TenantDbContext(DbContextOptions options, TenantContext tenant) : DbContext(options)
 {

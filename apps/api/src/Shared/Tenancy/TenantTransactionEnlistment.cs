@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace Tenancy;
 
 // EF Core would begin a transaction of its own when saving; inside a tenant transaction the save joins it instead, so the work
-// commits or rolls back with the request or message (0016).
+// commits or rolls back with the request or message.
 internal sealed class TenantTransactionEnlistment(TenantTransaction transaction) : SaveChangesInterceptor
 {
     public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(

@@ -7,8 +7,8 @@ using Testcontainers.PostgreSql;
 
 namespace Onboarding.EndToEndTests;
 
-// One PostgreSQL 18 server (0011), set up the way a deployment is: the bootstrap script creates the roles (0018), the migration step
-// runs as `dotnet Api.dll migrate` (0020), and the seed script makes the first system admin (0031).
+// One PostgreSQL 18 server, set up the way a deployment is: the bootstrap script creates the roles, the migration step
+// runs as `dotnet Api.dll migrate`, and the seed script makes the first system admin.
 public sealed class Database : IAsyncLifetime
 {
     public const string SystemAdmin = "user_e2e_system_admin";

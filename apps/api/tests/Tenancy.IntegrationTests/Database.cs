@@ -8,8 +8,8 @@ using Testcontainers.PostgreSql;
 
 namespace Tenancy.IntegrationTests;
 
-// One PostgreSQL 18 server for the test assembly, the version of the Neon project (0011), set up the way a deployment is:
-// the bootstrap script creates the roles, then the owner creates the tables (0018, 0020).
+// One PostgreSQL 18 server for the test assembly, the version of the Neon project, set up the way a deployment is:
+// the bootstrap script creates the roles, then the owner creates the tables.
 public sealed class Database : IAsyncLifetime
 {
     private const string Password = "test-password";
