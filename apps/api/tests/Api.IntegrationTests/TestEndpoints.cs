@@ -22,6 +22,9 @@ internal static class TestEndpoints
 
         // Every other endpoint of the version group needs a signed-in user.
         v1.MapGet("/whoami", (ClaimsPrincipal user) => Results.Ok(user.FindFirstValue(ClaimTypes.NameIdentifier)));
+
+        // An endpoint that states no access at all (A5).
+        v1.MapGet("/unstated", () => Results.Ok());
     }
 
     private static void MapOpen(RouteGroupBuilder v1)
