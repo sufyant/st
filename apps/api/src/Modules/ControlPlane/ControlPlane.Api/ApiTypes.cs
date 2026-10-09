@@ -15,3 +15,6 @@ public sealed record TenantResponse(Guid Id, string Name, string Slug, string St
 
 /// <summary>A member of the tenant: the user's id and their role, Owner, Admin or Member.</summary>
 public sealed record MemberResponse(Guid UserId, string Role);
+
+/// <summary>A tenant the signed-in user belongs to.</summary>
+public sealed record TenantSummaryResponse(Guid Id, string Name, string Slug);

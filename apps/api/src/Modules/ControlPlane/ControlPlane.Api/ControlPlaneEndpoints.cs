@@ -44,6 +44,19 @@ public static class ControlPlaneEndpoints
             return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
         });
 
+        // T4: the user's own tenants, read without a tenant.
+        v1.MapGet("/me/tenants", async (int? page, int? pageSize, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
+        {
+            var paging = PageRequest.Create(page, pageSize);
+            if (!paging.IsSuccess)
+            {
+                return (Result<ListPage<TenantSummaryResponse>>)paging.Error;
+            }
+
+            var tenants = await bus.InvokeAsync<Result<ListPage<TenantSummary>>>(new ListMyTenants(user.Id(), paging.Value), cancellationToken);
+            return tenants.Map(list => list.Map(tenant => new TenantSummaryResponse(tenant.Id, tenant.Name, tenant.Slug)));
+        });
+
         // Onboarding runs inside the tenant it creates. The tenant's id is chosen here, by the server, never by the client.
         system.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
                 (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
