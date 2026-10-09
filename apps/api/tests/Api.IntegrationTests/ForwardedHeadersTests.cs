@@ -7,7 +7,7 @@ namespace Api.IntegrationTests;
 public sealed class ForwardedHeadersTests
 {
     [Fact]
-    public async Task Without_trusted_proxies_a_forwarded_address_is_ignored()
+    public async Task ForwardAddress_NoTrustedProxies_IsIgnored()
     {
         await using var host = await StartAsync(new Dictionary<string, string?>());
         await GetAsync(host, from: "198.51.100.1", forwardedFor: "203.0.113.1");
@@ -18,7 +18,7 @@ public sealed class ForwardedHeadersTests
     }
 
     [Fact]
-    public async Task A_trusted_proxy_forwards_the_client_address()
+    public async Task ForwardAddress_FromATrustedProxy_IsTheClientAddress()
     {
         await using var host = await StartAsync(new Dictionary<string, string?> { ["ForwardedHeaders:KnownProxies:0"] = "10.0.0.1" });
         await GetAsync(host, from: "10.0.0.1", forwardedFor: "203.0.113.1");
@@ -29,7 +29,7 @@ public sealed class ForwardedHeadersTests
     }
 
     [Fact]
-    public async Task A_proxy_in_a_trusted_network_forwards_the_client_address()
+    public async Task ForwardAddress_FromATrustedNetwork_IsTheClientAddress()
     {
         await using var host = await StartAsync(new Dictionary<string, string?> { ["ForwardedHeaders:KnownNetworks:0"] = "10.0.0.0/8" });
         await GetAsync(host, from: "10.1.2.3", forwardedFor: "203.0.113.1");
@@ -40,7 +40,7 @@ public sealed class ForwardedHeadersTests
     }
 
     [Fact]
-    public async Task An_untrusted_sender_cannot_forward_an_address_when_proxies_are_trusted()
+    public async Task ForwardAddress_FromAnUntrustedSender_IsIgnored()
     {
         await using var host = await StartAsync(new Dictionary<string, string?> { ["ForwardedHeaders:KnownProxies:0"] = "10.0.0.1" });
         await GetAsync(host, from: "198.51.100.1", forwardedFor: "203.0.113.1");

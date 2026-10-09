@@ -18,7 +18,7 @@ public sealed class OutboxTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_command_that_succeeds_with_an_event_publishes_it_under_its_tenant_after_the_commit()
+    public async Task RunCommand_SucceedsWithAnEvent_PublishesItUnderItsTenantAfterTheCommit()
     {
         var tenant = Guid.NewGuid();
         var value = $"written-{Guid.NewGuid():N}";
@@ -76,7 +76,7 @@ public sealed class OutboxTests(Database database) : IAsyncLifetime
 
     // A handler without a tenant sends its messages with Wolverine's default tenant id, which names no tenant.
     [Fact]
-    public async Task A_message_cascaded_without_a_tenant_is_handled_without_one()
+    public async Task CascadeMessage_WithoutATenant_IsHandledWithoutOne()
     {
         var session = await _host.Host.TrackActivity().ExecuteAndWaitAsync(context => context.InvokeAsync(new ReadProbesLater()));
 

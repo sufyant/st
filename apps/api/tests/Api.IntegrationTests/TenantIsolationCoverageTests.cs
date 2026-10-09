@@ -4,7 +4,7 @@ namespace Api.IntegrationTests;
 public sealed class TenantIsolationCoverageTests(Database database)
 {
     [Fact]
-    public async Task Every_tenant_entity_of_the_application_is_isolated()
+    public async Task CheckIsolation_EveryTenantEntityOfTheApplication_IsIsolated()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString);
 
@@ -14,7 +14,7 @@ public sealed class TenantIsolationCoverageTests(Database database)
     }
 
     [Fact]
-    public async Task The_check_covers_the_tenant_entities_of_every_module_database()
+    public async Task CheckIsolation_EveryModuleDatabase_IsCovered()
     {
         await using var host = await PipelineHost.StartAsync();
 
@@ -53,7 +53,7 @@ public sealed class TenantIsolationCoverageTests(Database database)
     }
 
     [Fact]
-    public async Task The_application_role_owns_no_table()
+    public async Task ReadTableOwners_ApplicationRole_OwnsNoTable()
     {
         var owned = await database.ScalarAsync<long>("SELECT count(*) FROM pg_tables WHERE tableowner = 'api_application'");
 

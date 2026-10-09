@@ -19,7 +19,7 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task An_api_request_is_logged()
+    public async Task LogRequest_ApiRequest_IsLogged()
     {
         await _client.GetAsync("/v1/ping", TestContext.Current.CancellationToken);
 
@@ -27,7 +27,7 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_tenant_request_is_logged_with_its_tenant()
+    public async Task LogRequest_TenantRequest_IsLoggedWithItsTenant()
     {
         var catalog = new Catalog(database);
         var tenant = await catalog.AddTenantAsync();
@@ -39,7 +39,7 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_query_string_is_not_logged()
+    public async Task LogRequest_WithAQueryString_LeavesTheQueryStringOut()
     {
         await _client.GetAsync("/v1/ping?access_token=secret-token", TestContext.Current.CancellationToken);
 
@@ -49,7 +49,7 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
-    public async Task A_health_check_is_not_logged(string path)
+    public async Task LogRequest_HealthCheck_IsNotLogged(string path)
     {
         await _client.GetAsync(path, TestContext.Current.CancellationToken);
 

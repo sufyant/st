@@ -13,7 +13,7 @@ public sealed class MigrationStepTests(Database database)
     // Wolverine checks its message storage while it starts, so an application whose database was not migrated does not start,
     // and it creates nothing on the way.
     [Fact]
-    public async Task Starting_the_application_on_a_database_that_was_not_migrated_fails_and_migrates_nothing()
+    public async Task StartApplication_OnADatabaseNotMigrated_FailsAndMigratesNothing()
     {
         var empty = await database.CreateEmptyDatabaseAsync();
         await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, empty));
@@ -26,7 +26,7 @@ public sealed class MigrationStepTests(Database database)
     }
 
     [Fact]
-    public async Task The_migration_step_migrates_every_module_and_the_message_storage_as_the_owner()
+    public async Task Migrate_EmptyDatabase_CreatesEveryModuleAndTheMessageStorageAsTheOwner()
     {
         var empty = await database.CreateEmptyDatabaseAsync();
 
@@ -41,7 +41,7 @@ public sealed class MigrationStepTests(Database database)
 
     // The application role owns nothing the migration step creates, yet it can use all of it, the message storage included.
     [Fact]
-    public async Task The_application_is_ready_on_a_database_the_migration_step_prepared()
+    public async Task StartApplication_OnAMigratedDatabase_IsReady()
     {
         var empty = await database.CreateEmptyDatabaseAsync();
         (await MigrateCommand.RunAsync(database.ConnectionStringFor(DatabaseRoles.Owner, empty))).ExitCode.ShouldBe(0);
@@ -53,7 +53,7 @@ public sealed class MigrationStepTests(Database database)
     }
 
     [Fact]
-    public async Task The_migration_step_needs_its_own_connection_string()
+    public async Task Migrate_WithoutItsOwnConnectionString_Fails()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString);
 

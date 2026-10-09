@@ -22,7 +22,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     [Theory]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
-    public async Task Health_endpoints_report_healthy(string path)
+    public async Task CheckHealth_RunningApplication_ReportsHealthy(string path)
     {
         var response = await _client.GetAsync(path, TestContext.Current.CancellationToken);
 
@@ -31,7 +31,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
     // The account check connects first while the application starts, so the database must be there.
     [Fact]
-    public async Task Without_its_database_the_application_does_not_start()
+    public async Task StartApplication_WithoutItsDatabase_Fails()
     {
         await using var api = new ApiFactory("Host=127.0.0.1;Port=1;Username=nobody;Password=none;Timeout=1");
 
@@ -41,7 +41,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task When_its_database_goes_away_the_application_is_live_but_not_ready()
+    public async Task CheckHealth_DatabaseGoesAway_IsLiveButNotReady()
     {
         var name = await database.CreateMigratedDatabaseAsync();
         await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, name));
@@ -136,7 +136,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
     // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted.
     [Fact]
-    public async Task Outside_development_the_application_does_not_start_without_authorized_parties()
+    public async Task StartApplication_OutsideDevelopmentWithoutAuthorizedParties_Fails()
     {
         await using var api = new ApiFactory(
             database.ApplicationConnectionString, environment: Environments.Production, authorizedParties: [], settings: Resend);
@@ -147,7 +147,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Outside_development_the_application_is_ready_with_authorized_parties()
+    public async Task StartApplication_OutsideDevelopmentWithAuthorizedParties_IsReady()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production, settings: Resend);
 
@@ -157,7 +157,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task In_development_the_application_is_ready_without_authorized_parties()
+    public async Task StartApplication_InDevelopmentWithoutAuthorizedParties_IsReady()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString, authorizedParties: []);
 
@@ -167,7 +167,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_unknown_route_returns_problem_details()
+    public async Task CallEndpoint_UnknownRoute_ReturnsProblemDetails()
     {
         var response = await _client.GetAsync("/v1/no-such-route", TestContext.Current.CancellationToken);
 
@@ -176,7 +176,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_openapi_document_is_served_in_development()
+    public async Task ServeOpenApiDocument_InDevelopment_IsServed()
     {
         var response = await _client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
 
@@ -190,7 +190,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     };
 
     [Fact]
-    public async Task The_scalar_reference_is_served_in_development()
+    public async Task ServeScalarReference_InDevelopment_IsServed()
     {
         var response = await _client.GetAsync("/scalar/v1", TestContext.Current.CancellationToken);
 

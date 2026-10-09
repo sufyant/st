@@ -26,7 +26,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _api.DisposeAsync();
 
     [Fact]
-    public async Task An_invited_person_accepts_and_becomes_a_member_of_the_tenant()
+    public async Task AcceptInvitation_InvitedPerson_BecomesAMemberOfTheTenant()
     {
         var (slug, invitee, code) = await InviteSomeoneWithAnAccountAsync();
 
@@ -67,7 +67,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
 
     // Clerk is asked before the acceptance locks the invitation, never while its transaction holds the lock.
     [Fact]
-    public async Task Accepting_asks_the_identity_provider_before_locking_the_invitation()
+    public async Task AcceptInvitation_AskingTheIdentityProvider_HappensBeforeTheInvitationIsLocked()
     {
         var (slug, invitee, code) = await InviteSomeoneWithAnAccountAsync();
         var tenantId = await database.ScalarAsync<Guid>($"SELECT id FROM catalog.tenants WHERE slug = '{slug}'");
@@ -82,7 +82,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_invitation_token_cannot_be_used_twice()
+    public async Task AcceptInvitation_CodeUsedTwice_IsRejected()
     {
         var (_, invitee, code) = await InviteSomeoneWithAnAccountAsync();
         var sameEmail = $"user_{Guid.NewGuid():N}";
@@ -96,7 +96,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_invitation_token_cannot_be_used_after_the_invitation_expires()
+    public async Task AcceptInvitation_AfterItExpires_IsAConflict()
     {
         var (_, invitee, code) = await InviteSomeoneWithAnAccountAsync();
         _time.Advance(TimeSpan.FromDays(7));
@@ -108,7 +108,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_person_without_the_invited_email_cannot_accept()
+    public async Task AcceptInvitation_WithoutTheInvitedEmail_IsForbidden()
     {
         var (_, _, code) = await InviteSomeoneWithAnAccountAsync();
         var stranger = $"user_{Guid.NewGuid():N}";
@@ -121,7 +121,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_unknown_code_is_not_found()
+    public async Task AcceptInvitation_UnknownCode_IsNotFound()
     {
         var (tenantId, _) = await _catalog.AddTenantAsync();
 
@@ -204,7 +204,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Accepting_needs_a_signed_in_user()
+    public async Task AcceptInvitation_WithoutASignedInUser_IsUnauthorized()
     {
         var accepted = await _api.CreateClient().PostAsJsonAsync("/v1/invitations/accept", new { code = "any" }, Cancellation);
 

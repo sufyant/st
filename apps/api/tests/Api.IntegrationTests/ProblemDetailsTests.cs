@@ -18,7 +18,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_successful_result_with_a_value_returns_the_value()
+    public async Task AnswerResult_SuccessWithAValue_ReturnsTheValue()
     {
         var response = await _client.PostAsJsonAsync("/v1/greetings", new { name = "Ada" }, TestContext.Current.CancellationToken);
 
@@ -28,7 +28,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_successful_result_without_a_value_returns_no_content()
+    public async Task AnswerResult_SuccessWithoutAValue_ReturnsNoContent()
     {
         var response = await _client.PostAsJsonAsync("/v1/acknowledgements", new { }, TestContext.Current.CancellationToken);
 
@@ -41,7 +41,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     [InlineData("Conflict", HttpStatusCode.Conflict)]
     [InlineData("Forbidden", HttpStatusCode.Forbidden)]
     [InlineData("Unprocessable", HttpStatusCode.UnprocessableEntity)]
-    public async Task An_expected_failure_returns_problem_details_with_its_status_and_code(string errorType, HttpStatusCode status)
+    public async Task AnswerResult_ExpectedFailure_ReturnsProblemDetailsWithItsStatusAndCode(string errorType, HttpStatusCode status)
     {
         var response = await _client.PostAsync($"/v1/failures/{errorType}", null, TestContext.Current.CancellationToken);
 
@@ -55,7 +55,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_invalid_command_returns_validation_problem_details_listing_the_invalid_fields()
+    public async Task AnswerResult_InvalidCommand_ReturnsValidationProblemDetailsListingTheFields()
     {
         var response = await _client.PostAsJsonAsync("/v1/greetings", new { name = "" }, TestContext.Current.CancellationToken);
 
@@ -66,7 +66,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_unexpected_exception_returns_a_generic_server_error()
+    public async Task AnswerResult_UnexpectedException_ReturnsAGenericServerError()
     {
         var response = await _client.PostAsync("/v1/explosions", null, TestContext.Current.CancellationToken);
 
@@ -78,7 +78,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_unexpected_exception_does_not_leak_its_message_or_stack_trace()
+    public async Task AnswerResult_UnexpectedException_LeaksNoMessageOrStackTrace()
     {
         var response = await _client.PostAsync("/v1/explosions", null, TestContext.Current.CancellationToken);
 
