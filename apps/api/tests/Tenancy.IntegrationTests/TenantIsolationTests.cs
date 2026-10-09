@@ -46,6 +46,35 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         after.ShouldBeNullOrEmpty();
     }
 
+    // R4: the two policies combine with OR, so a transaction that declared both would read the user's memberships in other tenants.
+    [Fact]
+    public async Task DeclareUser_AfterATenant_IsRefused()
+    {
+        var declare = () => _notes.WithoutTenantAsync(async notes =>
+        {
+            await using var transaction = await notes.Database.BeginTransactionAsync(Cancellation);
+            await notes.DeclareTenantAsync(Tenants.New(), Cancellation);
+            await notes.DeclareUserAsync(Guid.NewGuid(), Cancellation);
+            return true;
+        });
+
+        (await declare.ShouldThrowAsync<InvalidOperationException>()).Message.ShouldContain("a tenant or a user, never both");
+    }
+
+    [Fact]
+    public async Task DeclareTenant_AfterAUser_IsRefused()
+    {
+        var declare = () => _notes.WithoutTenantAsync(async notes =>
+        {
+            await using var transaction = await notes.Database.BeginTransactionAsync(Cancellation);
+            await notes.DeclareUserAsync(Guid.NewGuid(), Cancellation);
+            await notes.DeclareTenantAsync(Tenants.New(), Cancellation);
+            return true;
+        });
+
+        (await declare.ShouldThrowAsync<InvalidOperationException>()).Message.ShouldContain("a tenant or a user, never both");
+    }
+
     [Fact]
     public async Task A_tenant_sees_its_own_rows()
     {
