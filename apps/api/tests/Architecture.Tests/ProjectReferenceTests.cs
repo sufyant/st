@@ -11,7 +11,7 @@ public class ProjectReferenceTests
     public static TheoryData<string> ProductionProjects => [.. Solution.ProductionProjects];
 
     [Fact]
-    public void SharedKernel_references_no_project()
+    public void ReferenceProjects_SharedKernel_ReferencesNone()
     {
         var references = Solution.ReadProjectFile(Solution.SharedKernel).ProjectReferences;
 
@@ -19,7 +19,7 @@ public class ProjectReferenceTests
     }
 
     [Fact]
-    public void Tenancy_references_only_SharedKernel()
+    public void ReferenceProjects_Tenancy_ReferencesOnlySharedKernel()
     {
         var references = Solution.ReadProjectFile(Solution.Tenancy).ProjectReferences;
 

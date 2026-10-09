@@ -10,7 +10,7 @@ public class WolverineVisibilityTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Handlers_in_Application_are_public(string module)
+    public void DiscoverHandlers_InApplication_ArePublic(string module)
     {
         var hidden = NonPublicTypesIn($"{module}.Application")
             .Where(IsHandlerType)
@@ -22,7 +22,7 @@ public class WolverineVisibilityTests
     // Wolverine finds handler methods by these names and, like handler types, skips the non-public ones.
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Handler_methods_in_Application_are_public(string module)
+    public void DiscoverHandlerMethods_InApplication_ArePublic(string module)
     {
         string[] handlerMethodNames =
             ["Handle", "Handles", "HandleAsync", "HandlesAsync", "Consume", "Consumes", "ConsumeAsync", "ConsumesAsync"];
@@ -38,7 +38,7 @@ public class WolverineVisibilityTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Validators_in_Application_are_public(string module)
+    public void DiscoverValidators_InApplication_ArePublic(string module)
     {
         var hidden = NonPublicTypesIn($"{module}.Application")
             .Where(type => type.GetInterfaces().Any(IsValidatorInterface))

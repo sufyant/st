@@ -13,7 +13,7 @@ public class ReferenceRuleTests
         [.. Solution.LayerOfEveryModule("Domain"), .. Solution.LayerOfEveryModule("Contracts")];
 
     [Fact]
-    public void SharedKernel_references_only_the_base_library()
+    public void ReferenceAssemblies_SharedKernel_OnlyTheBaseLibrary()
     {
         var violations = AssembliesReferencedOutsideTheBaseLibrary(Solution.SharedKernel, []);
 
@@ -21,7 +21,7 @@ public class ReferenceRuleTests
     }
 
     [Fact]
-    public void Tenancy_depends_only_on_SharedKernel()
+    public void DependOnProjects_Tenancy_OnlySharedKernel()
     {
         var violations = TypesDependingOnProjectsOtherThan(Solution.Tenancy, [Solution.SharedKernel]);
 
@@ -30,7 +30,7 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Contracts_reference_only_the_base_library_and_SharedKernel(string module)
+    public void ReferenceAssemblies_Contracts_OnlyTheBaseLibraryAndSharedKernel(string module)
     {
         var violations = AssembliesReferencedOutsideTheBaseLibrary($"{module}.Contracts", [Solution.SharedKernel]);
 
@@ -39,7 +39,7 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Domain_references_only_the_base_library_and_SharedKernel(string module)
+    public void ReferenceAssemblies_Domain_OnlyTheBaseLibraryAndSharedKernel(string module)
     {
         var violations = AssembliesReferencedOutsideTheBaseLibrary($"{module}.Domain", [Solution.SharedKernel]);
 
@@ -48,7 +48,7 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Application_depends_only_on_its_Domain_any_Contracts_and_SharedKernel(string module)
+    public void DependOnProjects_Application_OnlyItsDomainAnyContractsAndSharedKernel(string module)
     {
         var violations = TypesDependingOnProjectsOtherThan(
             $"{module}.Application",
@@ -59,7 +59,7 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Infrastructure_depends_only_on_its_Application_Domain_Contracts_SharedKernel_and_Tenancy(string module)
+    public void DependOnProjects_Infrastructure_OnlyItsOwnLayersSharedKernelAndTenancy(string module)
     {
         var violations = TypesDependingOnProjectsOtherThan(
             $"{module}.Infrastructure",
@@ -70,7 +70,7 @@ public class ReferenceRuleTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Api_depends_only_on_its_Application_Contracts_and_SharedKernel(string module)
+    public void DependOnProjects_Api_OnlyItsApplicationContractsAndSharedKernel(string module)
     {
         var violations = TypesDependingOnProjectsOtherThan(
             $"{module}.Api",
@@ -112,7 +112,7 @@ public class ReferenceRuleTests
     // The host references every module's Api and Infrastructure. Through them it also sees each module's Contracts, which is
     // how it reads ControlPlane's tenant and system admin directories.
     [Fact]
-    public void Host_depends_only_on_module_Api_Infrastructure_and_Contracts_projects_SharedKernel_and_Tenancy()
+    public void DependOnProjects_Host_OnlyModuleApiInfrastructureContractsSharedKernelAndTenancy()
     {
         var violations = TypesDependingOnProjectsOtherThan(
             Solution.Host,
