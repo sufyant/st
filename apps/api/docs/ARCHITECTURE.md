@@ -241,7 +241,8 @@ The process is a saga. Four steps run in order.
 - If step 2 fails, the tenant is cancelled and the system admin sees the reason.
 - If step 4 always fails, the tenant stays active and the process goes to the "needs attention" state. The invitation is cancelled.
 - The invitation link travels to Notifications inside the message. See the deviations list.
-- Accepting an invitation needs two things: the token in the link, and a verified email address of the signed-in user that is the same as the invited address. The verified addresses come from the identity provider's server, not from the request.
+- The invitation link carries one invitation code: the tenant id and a secret, `<tenantId>.<secret>`. Only the hash of the secret is stored. Accepting declares the tenant from the code, then finds the invitation by the hash in that tenant. A wrong tenant, a wrong secret and a malformed code all answer 404. This is the only place where a request names its tenant outside the path. The secret gives the right, not the tenant id.
+- Accepting an invitation needs two things: the secret in the code, and a verified email address of the signed-in user that is the same as the invited address. The verified addresses come from the identity provider's server, not from the request.
 - The email handler is in `Notifications.Application`. The event type is in `ControlPlane.Contracts`. ControlPlane does not know how to send email.
 - Invitation expiry is checked when the invitation is read. There is no nightly job.
 - The first system admin comes from an email address in configuration. The application writes it only while the staff list is empty.

@@ -6,11 +6,12 @@ using SharedKernel;
 namespace ControlPlane.Application.Invitations;
 
 /// <summary>
-/// Accepts an invitation in its tenant: the catalog user, when new, and the membership are created in the same transaction as
-/// the invitation is used up. The user's verified email addresses are read from the identity provider before that
-/// transaction begins, so no call leaves the process while the invitation is locked.
+/// Accepts an invitation in its tenant, the one its invitation code names: the invitation is found by the hash of the code's
+/// secret, and the catalog user, when new, and the membership are created in the same transaction as the invitation is used up.
+/// The user's verified email addresses are read from the identity provider before that transaction begins, so no call leaves
+/// the process while the invitation is locked.
 /// </summary>
-public sealed record AcceptInvitation(string Token, string UserId, IReadOnlyList<string> VerifiedEmails);
+public sealed record AcceptInvitation(string Secret, string UserId, IReadOnlyList<string> VerifiedEmails);
 
 public sealed record InvitationAccepted(string TenantSlug);
 
@@ -22,7 +23,7 @@ public static class AcceptInvitationHandler
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        if (await catalog.FindInvitationForUpdateAsync(InvitationToken.Hash(command.Token), cancellationToken) is not { } invitation)
+        if (await catalog.FindInvitationForUpdateAsync(InvitationToken.Hash(command.Secret), cancellationToken) is not { } invitation)
         {
             return Errors.InvitationNotFound;
         }

@@ -21,24 +21,24 @@ public static class ControlPlaneEndpoints
         this RouteGroupBuilder v1,
         RouteGroupBuilder admin)
     {
-        // Accepting starts outside any tenant; the token leads to the tenant, and the invitation is accepted there. The
-        // identity provider is asked first, so its call never runs while the acceptance holds the invitation locked.
+        // Accepting starts outside any tenant. The invitation code names the tenant, which is declared before the invitation is
+        // looked up by its secret, so a wrong tenant, a wrong secret and a malformed code all answer the same 404. The identity
+        // provider is asked first, so its call never runs while the acceptance holds the invitation locked.
         v1.MapPost("/invitations/accept", async (
             AcceptInvitationRequest request,
             ClaimsPrincipal user,
-            IInvitationDirectory invitations,
             IIdentityProvider identity,
             IMessageBus bus,
             CancellationToken cancellationToken) =>
         {
-            if (await invitations.FindTenantAsync(request.Token, cancellationToken) is not { } tenantId)
+            if (InvitationCode.Parse(request.Code) is not { } code)
             {
                 return (Result<AcceptedInvitationResponse>)InvitationNotFound;
             }
 
             var verifiedEmails = await identity.FindVerifiedEmailsAsync(user.Id(), cancellationToken);
             var accepted = await bus.InvokeForTenantAsync<Result<InvitationAccepted>>(
-                tenantId.ToString(), new AcceptInvitation(request.Token, user.Id(), verifiedEmails), cancellationToken);
+                code.TenantId.ToString(), new AcceptInvitation(code.Secret, user.Id(), verifiedEmails), cancellationToken);
             return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
         });
 

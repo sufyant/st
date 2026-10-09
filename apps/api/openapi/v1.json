@@ -159,15 +159,15 @@
       },
       "AcceptInvitationRequest": {
         "required": [
-          "token"
+          "code"
         ],
         "type": "object",
         "properties": {
-          "token": {
+          "code": {
             "type": "string"
           }
         },
-        "description": "The token from the invitation link."
+        "description": "The invitation code from the invitation link."
       },
       "CreateTenantRequest": {
         "required": [
