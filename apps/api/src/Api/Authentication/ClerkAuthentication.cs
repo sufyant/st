@@ -10,18 +10,23 @@ namespace Api.Authentication;
 // is also their issuer. They carry no audience; the authorized party (azp) is checked instead, as Clerk recommends.
 internal static class ClerkAuthentication
 {
-    public const string Section = "Clerk";
+    public const string Section = "Authentication:Clerk";
 
     // Set only by the host, when the token's fva shows a second factor verified in the session.
     public const string SecondFactorClaim = "second_factor_verified";
 
     public static WebApplicationBuilder AddClerkAuthentication(this WebApplicationBuilder builder)
     {
-        builder.Services.AddOptions<ClerkAuthenticationOptions>().BindConfiguration(Section);
-        builder.Services.AddHealthChecks().AddCheck<AuthorizedPartiesHealthCheck>("clerk-authorized-parties", tags: ["ready"]);
+        // Without a list of authorized parties the API accepts a session token issued to any origin of the Clerk instance. That is
+        // convenient in Development; anywhere else the application does not start without the list of the clients allowed to use it.
+        builder.Services.AddOptions<ClerkAuthenticationOptions>()
+            .BindConfiguration(Section)
+            .Validate(clerk => Uri.TryCreate(clerk.Issuer, UriKind.Absolute, out _), $"{Section}:Issuer must be the Frontend API URL of the Clerk instance.")
+            .Validate<IHostEnvironment>(
+                (clerk, environment) => environment.IsDevelopment() || clerk.AuthorizedParties.Any(party => !string.IsNullOrWhiteSpace(party)),
+                $"{Section}:AuthorizedParties must list the origins of the clients allowed to use the API outside Development.")
+            .ValidateOnStart();
 
-        // Checked on first use rather than on start, like the connection strings: the build starts the host without
-        // configuration to write the OpenAPI document. Without an issuer no token validates, so every request stays anonymous.
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
         builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<ClerkAuthenticationOptions>>((options, clerk) =>

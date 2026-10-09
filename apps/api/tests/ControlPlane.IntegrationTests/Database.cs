@@ -20,9 +20,13 @@ public sealed class Database : IAsyncLifetime
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
 
+    public const string FirstSystemAdminEmail = "first-admin@app.test";
+
     private const string Password = "test-password";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18").Build();
+
+    private readonly SemaphoreSlim _scripts = new(1, 1);
 
     private ServiceProvider _services = null!;
 
@@ -68,7 +72,9 @@ public sealed class Database : IAsyncLifetime
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Invitations:AcceptUrl"] = AcceptUrl,
+                ["ControlPlane:Invitations:AcceptUrl"] = AcceptUrl,
+                ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
+                ["ControlPlane:FirstSystemAdminEmail"] = FirstSystemAdminEmail,
             })
             .AddInMemoryCollection(settings ?? [])
             .Build();
@@ -91,6 +97,18 @@ public sealed class Database : IAsyncLifetime
     }
 
     public Task RunScriptAsync(string script, params string[] variables) => RunScriptInAsync(MainDatabase, script, variables);
+
+    // A database set up the way a deployment is, for a test that needs the catalog as it starts, without the rows other tests write.
+    public async Task<string> CreateMigratedDatabaseAsync()
+    {
+        var name = await CreateEmptyDatabaseAsync();
+        foreach (var migrator in _services.GetServices<IModuleMigrator>())
+        {
+            await migrator.MigrateAsync(_services, ConnectionStringFor(DatabaseRoles.Owner, name), CancellationToken.None);
+        }
+
+        return name;
+    }
 
     // A database with the roles but no migrations, for a test that migrates it step by step.
     public async Task<string> CreateEmptyDatabaseAsync()
@@ -123,12 +141,22 @@ public sealed class Database : IAsyncLifetime
     private string SuperuserConnectionStringFor(string? database) =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = database ?? MainDatabase }.ConnectionString;
 
+    // One script at a time: the bootstrap script alters the shared roles, and two ALTER ROLE at once fail with "tuple concurrently
+    // updated". Tests that need a database of their own create them in parallel.
     private async Task RunScriptInAsync(string database, string script, params string[] variables)
     {
-        await _container.CopyAsync(await File.ReadAllBytesAsync(script), $"/tmp/{script}");
+        await _scripts.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await _container.CopyAsync(await File.ReadAllBytesAsync(script), $"/tmp/{script}");
 
-        var result = await _container.ExecAsync(["psql", "--username", "postgres", "--dbname", database, .. variables, "--file", $"/tmp/{script}"]);
+            var result = await _container.ExecAsync(["psql", "--username", "postgres", "--dbname", database, .. variables, "--file", $"/tmp/{script}"]);
 
-        result.ExitCode.ShouldBe(0, result.Stderr);
+            result.ExitCode.ShouldBe(0, result.Stderr);
+        }
+        finally
+        {
+            _scripts.Release();
+        }
     }
 }

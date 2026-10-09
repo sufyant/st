@@ -3,12 +3,15 @@ using System.Reflection;
 using Api.Authentication;
 using Api.Authorization;
 using Api.ErrorHandling;
+using Api.Hosting;
 using Api.Messaging;
 using Api.Networking;
 using Api.Observability;
 using Api.Persistence;
 using Api.RateLimiting;
 using Api.Tenants;
+using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -25,15 +28,32 @@ internal static class ApiPipeline
 {
     private const string HealthPath = "/health";
 
+    private const string IdempotencyKeyHeader = "Idempotency-Key";
+
     // FluentValidation validators are found only in the handler assemblies known when validation is switched on, so they are
-    // passed here rather than added to Wolverine's discovery afterwards.
-    public static WebApplicationBuilder AddApiPipeline(this WebApplicationBuilder builder, params Assembly[] handlerAssemblies)
+    // passed here rather than added to Wolverine's discovery afterwards. Returns the role the host runs as, or null when the setting
+    // is wrong and the host will not start.
+    public static HostRole? AddApiPipeline(this WebApplicationBuilder builder, params Assembly[] handlerAssemblies)
     {
+        // The OpenAPI document build only describes the API: it has no configuration and no database, so it registers no database
+        // and checks nothing while it starts. Every other start checks every setting first (section 7).
+        var openApiBuild = OpenApiDocumentBuild.IsRunning;
+        if (openApiBuild)
+        {
+            builder.Services.AddSingleton<IStartupValidator, OpenApiDocumentBuild.NothingToCheck>();
+        }
+        else
+        {
+            builder.AddPersistence();
+        }
+
+        var host = builder.AddHostSettings();
+        var role = openApiBuild ? HostRole.All : host.RoleOrNull;
         builder.Services.AddSingleton(TimeProvider.System);
 
         builder.AddObservability();
-        builder.AddPersistence();
         builder.AddClerkAuthentication();
+        builder.Services.AddTrustedProxies();
         builder.Services.AddAccessAuthorization();
 
         builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
@@ -55,13 +75,15 @@ internal static class ApiPipeline
                 options.Discovery.IncludeAssembly(assembly);
             }
 
-            // Wolverine takes its data source while it is configured. The build writes the OpenAPI document, and the migration step
-            // runs, from a host without the setting; a host that runs without it keeps no messages and is never ready
-            // (DatabaseHealthCheck).
-            if (builder.Configuration.GetConnectionString(PersistenceExtensions.DirectConnection) is { Length: > 0 } direct)
+            // Wolverine takes its data source while it is configured. The migration step composes the host without the setting and
+            // never starts it; any other host without it does not start (PersistenceExtensions).
+            if (!openApiBuild && PersistenceExtensions.MessagingConnectionOf(builder.Configuration) is { ConnectionString: var messaging })
             {
-                MessageStorage.Configure(options, NpgsqlDataSource.Create(direct));
+                MessageStorage.Configure(options, NpgsqlDataSource.Create(messaging), role);
             }
+
+            // A stopping host stops taking messages and finishes the ones it has, within the host's shutdown time.
+            options.Durability.DrainTimeout = host.ShutdownTimeout;
 
             // A message that fails for good goes to the dead letter queue, and its fault is published for a flow that has to react,
             // such as a saga's compensation. Faults are stored messages, so they carry only the exception's type.
@@ -81,11 +103,18 @@ internal static class ApiPipeline
             options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));
         });
 
-        builder.Services.AddTenantRateLimiting();
+        // API8: only the configured browser origins may call, with the methods and headers the API uses, and without credentials
+        // mode: the API reads its caller from the Authorization header, never from a cookie.
+        builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
+            .WithOrigins(host.Cors.AllowedOrigins)
+            .WithMethods(HttpMethods.Get, HttpMethods.Post)
+            .WithHeaders(HeaderNames.Authorization, HeaderNames.ContentType, IdempotencyKeyHeader)));
+
+        builder.Services.AddUserRateLimiting();
         builder.Services.AddHealthChecks();
         builder.Services.AddOpenApi();
 
-        return builder;
+        return role;
     }
 
     public static WebApplication UseApiPipeline(this WebApplication app)
@@ -101,17 +130,25 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so tenant resolution sees the tenant id, and the rate limiter the resolved tenant. Authorization comes
+        // Routing runs first so tenant resolution sees the tenant id. A browser's preflight is answered before anything asks who the
+        // caller is. The rate limiter needs only the user, so a caller over their limit costs no membership lookup. Authorization comes
         // last, so callers it turns away have been rate limited too.
         app.UseRouting();
+        app.UseCors();
         app.UseAuthentication();
-        app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseRateLimiter();
+        app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseAuthorization();
 
         app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks($"{HealthPath}/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
 
+        return app;
+    }
+
+    // The API's documents, in Development only, on a host that serves the API.
+    public static WebApplication MapApiDocuments(this WebApplication app)
+    {
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi().AllowAnonymous();
@@ -127,7 +164,7 @@ internal static class ApiPipeline
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()
             .DescribeResults()
-            .RequireRateLimiting(TenantRateLimiting.Policy);
+            .RequireRateLimiting(UserRateLimiting.Policy);
 
     // The endpoints of the version group that any signed-in user may call, without a permission (A5).
     public static RouteGroupBuilder MapSignedIn(this RouteGroupBuilder v1) => v1.MapGroup("").RequireSignedIn();

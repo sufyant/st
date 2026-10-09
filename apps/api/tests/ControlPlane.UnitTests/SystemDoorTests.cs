@@ -29,4 +29,30 @@ public class SystemDoorTests
 
         permissions.ShouldBeNull();
     }
+
+    // Section 6: while the staff list is empty, the person with the configured email address verified and a second factor becomes
+    // the first system admin.
+    [Fact]
+    public void BecomeFirstSystemAdmin_TheConfiguredEmailIsVerifiedWithASecondFactor_Qualifies()
+    {
+        var qualifies = SystemDoor.IsFirstSystemAdmin("Admin@Example.com", secondFactorVerified: true, ["other@example.com", "admin@example.com"]);
+
+        qualifies.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void BecomeFirstSystemAdmin_WithoutASecondFactor_DoesNotQualify()
+    {
+        var qualifies = SystemDoor.IsFirstSystemAdmin("admin@example.com", secondFactorVerified: false, ["admin@example.com"]);
+
+        qualifies.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void BecomeFirstSystemAdmin_AnotherEmailIsVerified_DoesNotQualify()
+    {
+        var qualifies = SystemDoor.IsFirstSystemAdmin("admin@example.com", secondFactorVerified: true, ["admin@example.org"]);
+
+        qualifies.ShouldBeFalse();
+    }
 }

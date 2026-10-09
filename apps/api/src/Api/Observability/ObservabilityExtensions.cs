@@ -17,6 +17,9 @@ internal static class ObservabilityExtensions
     // Wolverine names its meter "Wolverine:{service name}".
     private const string WolverineMeters = "Wolverine*";
 
+    // The OpenTelemetry SDK reads its other settings from the environment by these names, too.
+    private const string OtlpEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT";
+
     // A module names its meter "Modules.{module}".
     private const string ModuleMeters = "Modules.*";
 
@@ -40,8 +43,13 @@ internal static class ObservabilityExtensions
             .WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddMeter(WolverineMeters, ModuleMeters))
             .WithLogging();
 
-        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        if (builder.Configuration[OtlpEndpoint] is { Length: > 0 } endpoint)
         {
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out _))
+            {
+                throw new InvalidOperationException($"{OtlpEndpoint} must be the absolute URL of the OTLP collector.");
+            }
+
             telemetry.UseOtlpExporter();
         }
 

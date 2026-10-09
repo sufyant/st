@@ -14,8 +14,7 @@ namespace Api.Tenants;
 // Resolves the tenant of a request and what the caller may do there, never from the client's word alone. On a tenant
 // route the tenant comes from the id in the path and the user's membership, with the permissions of the member's role; on a system
 // route ControlPlane answers with the user's system permissions, given whether the session verified a second factor (A6).
-// It rejects nothing: the rate limiter runs next and limits the others by user or address, and authorization turns them
-// away afterwards.
+// It rejects nothing: authorization turns away the callers it finds no access for.
 internal sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
     private const string TenantTag = "tenant.id";

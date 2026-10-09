@@ -23,8 +23,19 @@ public static class NotificationsInfrastructure
             TenancyServiceCollectionExtensions.MessageSchema);
         services.AddModuleMigrations<NotificationsDbContext>(NotificationsDbContext.Schema);
 
-        services.AddOptions<ResendOptions>().BindConfiguration(ResendOptions.Section);
-        services.AddHealthChecks().AddCheck<EmailChannelHealthCheck>("email", tags: ["ready"]);
+        // Outside Development email goes only through Resend. Without its settings no email could leave, invitations included, so the
+        // application does not start.
+        services.AddOptions<ResendOptions>()
+            .BindConfiguration(ResendOptions.Section)
+            .Validate<IHostEnvironment>(
+                (resend, environment) => environment.IsDevelopment() || !string.IsNullOrWhiteSpace(resend.ApiKey),
+                $"{ResendOptions.Section}:ApiKey must be set outside Development, or no email is sent.")
+            .Validate<IHostEnvironment>(
+                (resend, environment) => environment.IsDevelopment() || !string.IsNullOrWhiteSpace(resend.From),
+                $"{ResendOptions.Section}:From must be set outside Development, or no email is sent.")
+            .Validate(resend => resend.ApiUrl.IsAbsoluteUri, $"{ResendOptions.Section}:ApiUrl must be an absolute URL.")
+            .Validate(resend => resend.Timeout > TimeSpan.Zero, $"{ResendOptions.Section}:Timeout must be positive.")
+            .ValidateOnStart();
 
         services.AddHttpClient<ResendEmailChannel>((provider, http) =>
         {
@@ -34,8 +45,7 @@ public static class NotificationsInfrastructure
             http.Timeout = resend.Timeout;
         });
 
-        // Development without Resend writes email to the log; anywhere else email goes through Resend, and the readiness check
-        // keeps the pod out of traffic until Resend is configured.
+        // Development without Resend writes email to the log; anywhere else email goes through Resend.
         services.AddTransient<IEmailChannel>(provider =>
             provider.GetRequiredService<IOptions<ResendOptions>>().Value.IsConfigured
             || !provider.GetRequiredService<IHostEnvironment>().IsDevelopment()

@@ -50,15 +50,15 @@ public sealed class InvitationDeliveryTests(Database database)
         body.GetProperty("text").GetString()!.ShouldContain($"https://clerk.test/invitations/{invitationId}");
     }
 
-    // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email gets no traffic.
+    // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email does not start.
     [Fact]
-    public async Task Outside_development_the_application_is_not_ready_without_resend()
+    public async Task Outside_development_the_application_does_not_start_without_resend()
     {
         await using var api = Api(Environments.Production);
 
-        var ready = await api.CreateClient().GetAsync("/health/ready", Cancellation);
+        var start = () => api.CreateClient();
 
-        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        start.ShouldThrow<Exception>().Message.ShouldContain("Notifications:Resend:ApiKey");
     }
 
     // The email service may be down for a while: a failed email is tried again, each time after a longer pause.
@@ -88,11 +88,60 @@ public sealed class InvitationDeliveryTests(Database database)
         api.Email.Sent.ShouldHaveSingleItem().To.ShouldBe(email);
     }
 
+    // A pause of a minute or more is a scheduled retry, not a wait inside the handler, so the queue goes on with the next invitation.
+    [Fact]
+    public async Task SendInvitation_TheNextTryIsAMinuteAway_IsScheduledWhileTheQueueHandlesTheNextInvitation()
+    {
+        await using var api = new ApiFactory(
+            database.ConnectionStringFor(DatabaseRoles.Application),
+            settings: new Dictionary<string, string?>
+            {
+                ["Notifications:InvitationEmailRetryDelays:0"] = "00:01:00",
+                ["Notifications:InvitationEmailRetryDelays:1"] = "00:02:00",
+                ["Notifications:InvitationEmailRetryDelays:2"] = "00:03:00",
+            });
+        var refused = $"{Guid.NewGuid():N}@example.com";
+        var next = $"{Guid.NewGuid():N}@example.com";
+        api.Email.Refuses = refused;
+
+        var startedAt = DateTimeOffset.UtcNow;
+
+        var messages = await api.TrackMessagesAsync(
+            async () =>
+            {
+                await InviteAsync(api, refused);
+                await InviteAsync(api, next);
+            },
+            until: new SentAndRescheduled(sent: next, rescheduled: refused));
+
+        api.Email.Sent.ShouldHaveSingleItem().To.ShouldBe(next);
+        messages.Requeued.Envelopes().Where(envelope => envelope.Message is OwnerInvitationReady { Email: var email } && email == refused)
+            .ShouldHaveSingleItem().ScheduledTime.ShouldNotBeNull().ShouldBeGreaterThanOrEqualTo(startedAt.AddMinutes(1));
+    }
+
+    // The session ends once the next invitation is sent and the refused one is put back to wait for its next try.
+    private sealed class SentAndRescheduled(string sent, string rescheduled) : ITrackedCondition
+    {
+        private bool _sent;
+        private bool _rescheduled;
+
+        public void Record(EnvelopeRecord record)
+        {
+            if (record.Message is OwnerInvitationReady ready)
+            {
+                _sent |= record.MessageEventType == MessageEventType.MessageSucceeded && ready.Email == sent;
+                _rescheduled |= record.MessageEventType == MessageEventType.Requeued && ready.Email == rescheduled;
+            }
+        }
+
+        public bool IsCompleted() => _sent && _rescheduled;
+    }
+
     private static readonly Dictionary<string, string?> Resend = new()
     {
-        ["Resend:ApiKey"] = "re_test_key",
-        ["Resend:From"] = "App <no-reply@app.test>",
-        ["Resend:ApiUrl"] = "https://api.resend.test/",
+        ["Notifications:Resend:ApiKey"] = "re_test_key",
+        ["Notifications:Resend:From"] = "App <no-reply@app.test>",
+        ["Notifications:Resend:ApiUrl"] = "https://api.resend.test/",
     };
 
     // The application's own email channel, with Resend replaced at the HTTP boundary when it is configured.
@@ -116,7 +165,7 @@ public sealed class InvitationDeliveryTests(Database database)
         var admin = await _catalog.AddSystemAdminAsync();
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];
 
-        return await api.CreateClient(admin, secondFactor: true).PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail = email }, Cancellation);
+        return await api.CreateClient(admin, secondFactor: true).CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail = email });
     }
 
     private sealed class StubResend : HttpMessageHandler

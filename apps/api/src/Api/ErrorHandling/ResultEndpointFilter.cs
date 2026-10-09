@@ -35,6 +35,7 @@ internal sealed class ResultEndpointFilter : IEndpointFilter
         ErrorType.NotFound => StatusCodes.Status404NotFound,
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+        ErrorType.Unprocessable => StatusCodes.Status422UnprocessableEntity,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Every error type maps to a status code."),
     };
 }

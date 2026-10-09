@@ -25,18 +25,24 @@ public static class ControlPlaneInfrastructure
         services.AddModuleMigrations<CatalogDbContext>(CatalogDbContext.Schema);
         services.AddScoped<ITenantDirectory, TenantDirectory>();
         services.AddScoped<ISystemAdminDirectory, SystemAdminDirectory>();
+        services.AddOptions<SystemAdminSettings>().BindConfiguration(SystemAdminSettings.Section).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SystemAdminSettings>, SystemAdminSettings.Validation>();
 
         // Registered by type, so Wolverine builds them in its generated code on the handler's own DbContext, and sees that the
         // handler needs its transaction (W1).
         services.AddScoped<ITenantCatalog, TenantCatalog>();
         services.AddScoped<IUserTenants, UserTenants>();
 
-        services.AddOptions<InvitationSettings>().BindConfiguration(InvitationSettings.Section);
+        services.AddOptions<InvitationSettings>()
+            .BindConfiguration(InvitationSettings.Section)
+            .Validate(settings => settings.AcceptUrl is { IsAbsoluteUri: true }, $"{InvitationSettings.Section}:AcceptUrl must be the absolute URL of the page that accepts invitations.")
+            .Validate(settings => settings.Lifetime > TimeSpan.Zero, $"{InvitationSettings.Section}:Lifetime must be positive.")
+            .ValidateOnStart();
         services.AddSingleton(provider => provider.GetRequiredService<IOptions<InvitationSettings>>().Value);
 
         services.AddOptions<OnboardingSettings>()
             .BindConfiguration(OnboardingSettings.Section)
-            .Validate(settings => !settings.Problems().Any(), $"{OnboardingSettings.Section} is not valid: check its timeouts and retry delays.")
+            .Validate(settings => !settings.Problems().Any(), $"{OnboardingSettings.Section}:RegistrationTimeout, InvitationEmailTimeout and IdentityProviderRetryDelays must be positive, and the timeouts longer than the retry delays together.")
             .ValidateOnStart();
         services.AddSingleton(provider => provider.GetRequiredService<IOptions<OnboardingSettings>>().Value);
         services.AddSingleton<IWolverineExtension, IdentityProviderRetries>();
@@ -46,7 +52,12 @@ public static class ControlPlaneInfrastructure
         // resolves it from the message's scope. It reaches no DbContext.
         services.ConfigureWolverine(options => options.CodeGeneration.AlwaysUseServiceLocationFor<IIdentityProvider>());
 
-        services.AddOptions<ClerkOptions>().BindConfiguration(ClerkOptions.Section);
+        services.AddOptions<ClerkOptions>()
+            .BindConfiguration(ClerkOptions.Section)
+            .Validate(clerk => !string.IsNullOrWhiteSpace(clerk.SecretKey), $"{ClerkOptions.Section}:SecretKey must be the secret key of the Clerk instance.")
+            .Validate(clerk => clerk.BackendApiUrl.IsAbsoluteUri, $"{ClerkOptions.Section}:BackendApiUrl must be an absolute URL.")
+            .Validate(clerk => clerk.Timeout > TimeSpan.Zero, $"{ClerkOptions.Section}:Timeout must be positive.")
+            .ValidateOnStart();
         services.AddHttpClient<IIdentityProvider, ClerkIdentityProvider>((provider, http) =>
         {
             var clerk = provider.GetRequiredService<IOptions<ClerkOptions>>().Value;

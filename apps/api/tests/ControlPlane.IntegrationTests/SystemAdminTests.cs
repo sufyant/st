@@ -4,57 +4,123 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.IntegrationTests;
 
-// The first system admin is created by a seed script during setup.
+// Section 6: the first system admin comes from configuration. While the staff list is empty, the person who reaches the system door
+// with a second factor and a verified email address equal to ControlPlane:FirstSystemAdminEmail becomes a system admin. Each test
+// has a database of its own, so its staff list starts empty.
 public sealed class SystemAdminTests(Database database)
 {
+    private const string FirstAdminEmail = "First.Admin@Example.com";
+
+    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+
     [Fact]
-    public async Task The_seed_script_makes_a_user_a_system_admin()
+    public async Task VisitTheSystemDoor_TheConfiguredPersonOnTheirFirstVisit_BecomesTheFirstSystemAdmin()
     {
-        var externalId = Unique.ExternalId();
+        await using var services = await StaffWithoutAdminsAsync();
+        var person = Person("first.admin@example.com");
 
-        await SeedAsync(externalId);
+        var permissions = await VisitAsync(services, person);
 
-        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(PermissionPools.SystemPool, ignoreOrder: true);
+        permissions.ShouldNotBeNull().ShouldBe(PermissionPools.SystemPool, ignoreOrder: true);
+        (await StaffAsync(services)).ShouldBe(1);
     }
 
     [Fact]
-    public async Task The_seed_script_grants_an_existing_user()
+    public async Task VisitTheSystemDoor_APersonWithAnotherEmail_DoesNotBecomeASystemAdmin()
     {
-        var user = await Catalog.AddUserAsync(database.Services);
+        await using var services = await StaffWithoutAdminsAsync();
 
-        await SeedAsync(user.ExternalId);
-
-        (await FindSystemPermissionsAsync(user.ExternalId)).ShouldNotBeNull();
-    }
-
-    [Fact]
-    public async Task Running_the_seed_script_again_changes_nothing()
-    {
-        var externalId = Unique.ExternalId();
-        await SeedAsync(externalId);
-
-        await SeedAsync(externalId);
-
-        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(PermissionPools.SystemPool, ignoreOrder: true);
-    }
-
-    [Fact]
-    public async Task A_user_who_is_not_a_system_admin_has_no_system_permissions()
-    {
-        var user = await Catalog.AddUserAsync(database.Services);
-
-        var permissions = await FindSystemPermissionsAsync(user.ExternalId);
+        var permissions = await VisitAsync(services, Person("someone.else@example.com"));
 
         permissions.ShouldBeNull();
+        (await StaffAsync(services)).ShouldBe(0);
     }
 
-    private Task SeedAsync(string externalId) => database.RunScriptAsync("seed-system-admin.sql", "-v", $"external_id={externalId}");
-
-    private async Task<IReadOnlySet<string>?> FindSystemPermissionsAsync(string externalId)
+    [Fact]
+    public async Task VisitTheSystemDoor_TheConfiguredPersonWithoutASecondFactor_DoesNotBecomeASystemAdmin()
     {
-        await using var scope = database.Services.CreateAsyncScope();
+        await using var services = await StaffWithoutAdminsAsync();
+
+        var permissions = await VisitAsync(services, Person("first.admin@example.com"), secondFactorVerified: false);
+
+        permissions.ShouldBeNull();
+        (await StaffAsync(services)).ShouldBe(0);
+    }
+
+    // Only the provider's verified addresses count: one the person typed, or one waiting for verification, proves nothing.
+    [Fact]
+    public async Task VisitTheSystemDoor_TheConfiguredEmailIsNotVerified_DoesNotBecomeASystemAdmin()
+    {
+        await using var services = await StaffWithoutAdminsAsync();
+
+        var permissions = await VisitAsync(services, Person());
+
+        permissions.ShouldBeNull();
+        (await StaffAsync(services)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task VisitTheSystemDoor_AfterTheFirstSystemAdminExists_TheSettingMakesNobodyElseOne()
+    {
+        await using var services = await StaffWithoutAdminsAsync();
+        await VisitAsync(services, Person("first.admin@example.com"));
+        var second = Person("first.admin@example.com");
+
+        var permissions = await VisitAsync(services, second);
+
+        permissions.ShouldBeNull();
+        (await StaffAsync(services)).ShouldBe(1);
+    }
+
+    // Two pods may let the same person in at the same moment; the staff list is checked in the statement that writes it.
+    [Fact]
+    public async Task VisitTheSystemDoor_TwoFirstVisitsAtOnce_CreateOneSystemAdmin()
+    {
+        await using var services = await StaffWithoutAdminsAsync();
+        var person = Person("first.admin@example.com");
+
+        var visits = await Task.WhenAll(VisitAsync(services, person), VisitAsync(services, person));
+
+        visits.ShouldAllBe(permissions => permissions != null);
+        (await StaffAsync(services)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task VisitTheSystemDoor_AUserTheCatalogKnows_BecomesTheFirstSystemAdminWithTheSameId()
+    {
+        await using var services = await StaffWithoutAdminsAsync();
+        var user = await Catalog.AddUserAsync(services);
+        database.Identity.AddAccount(user.ExternalId, "first.admin@example.com");
+
+        await VisitAsync(services, user.ExternalId);
+
+        (await database.ScalarAsSuperuserAsync<Guid>("SELECT user_id FROM catalog.system_admins", _database)).ShouldBe(user.Id);
+    }
+
+    private string _database = null!;
+
+    private async Task<ServiceProvider> StaffWithoutAdminsAsync()
+    {
+        _database = await database.CreateMigratedDatabaseAsync();
+        return database.BuildServices(database: _database, settings: new() { ["ControlPlane:FirstSystemAdminEmail"] = FirstAdminEmail });
+    }
+
+    // A person the identity provider knows, with the verified email addresses given.
+    private string Person(params string[] verifiedEmails)
+    {
+        var externalId = Unique.ExternalId();
+        database.Identity.AddAccount(externalId, verifiedEmails);
+        return externalId;
+    }
+
+    private static async Task<IReadOnlySet<string>?> VisitAsync(IServiceProvider services, string externalId, bool secondFactorVerified = true)
+    {
+        await using var scope = services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ISystemAdminDirectory>()
-            .FindSystemPermissionsAsync(externalId, secondFactorVerified: true, TestContext.Current.CancellationToken);
+            .FindSystemPermissionsAsync(externalId, secondFactorVerified, Cancellation);
     }
+
+    private Task<long> StaffAsync(IServiceProvider services) =>
+        database.ScalarAsSuperuserAsync<long>("SELECT count(*) FROM catalog.system_admins", _database);
 }

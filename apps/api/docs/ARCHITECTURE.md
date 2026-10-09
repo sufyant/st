@@ -129,7 +129,7 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 | W2 | The module's DbContext reads the tenant from the message context. An EF Core transaction interceptor runs `set_config('app.tenant_id', ..., true)` when the transaction starts | R4, R5 | T1, T2, T5, T6 |
 | W3 | A tenant endpoint uses `InvokeForTenantAsync`. The tenant goes to the following messages automatically. A message without a tenant carries the value `*DEFAULT*`. The interceptor does not treat this value as a tenant | Requirement 7, R5 | T3, T6 |
 | W4 | `MultipleHandlerBehavior.Separated` is on | O3 | T8 |
-| W5 | Local queues are durable (`UseDurableLocalQueues`). The message store is in the shared `wolverine` schema | O1, O5, Requirement 5 | T3 |
+| W5 | Messages wait in durable queues, and the message store is in the shared `wolverine` schema. In the role `all`, a message goes to a durable local queue (`UseDurableLocalQueues`). In the roles `web` and `worker`, every message goes through the outbox to one PostgreSQL queue in the same schema (Wolverine's PostgreSQL transport). Only a worker listens to that queue, and it hands an event with several handlers on to durable local queues, one for each handler (W4). A web host runs no durability agent (`DurabilityAgentEnabled = false`): outbox and inbox recovery run in a worker | O1, O5, Requirement 5, section 1 | T3, `HostRoleTests` |
 | W6 | A saga derives from Wolverine's `Saga` class. Its record is stored with EF Core in the module's own schema. The `Version` property is mapped as a concurrency token. There is a retry policy for `SagaConcurrencyException` | S3, S8 | T7, T9 |
 | W7 | A business rule rejection returns before any data changes: in a `Validate` or `Before` method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
 | W8 | The transaction middleware is first in the Wolverine chain. Validation runs inside the transaction. Authorization runs before, in ASP.NET Core | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
@@ -375,7 +375,7 @@ These parts are not in the first template. Each one comes in when its written co
 | Slug in addresses | The frontend wants the tenant name in the address. The slug field is ready. The API path continues to use the id |
 | Read model | A report appears that needs a join across modules |
 | Pre-generated handler code | Startup time becomes a problem or the RuntimeCompilation package is not wanted in production. Try it first |
-| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. These go into the setup list, not into the architecture |
+| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. `ConnectionStrings:Messaging` is needed when `ConnectionStrings:Database` goes through a pooler in transaction mode (example: Neon's pooled endpoint), because Wolverine's message store holds session-level advisory locks; it then names a direct or session-mode connection. These go into the setup list, not into the architecture |
 | Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
 ## Open items

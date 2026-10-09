@@ -35,7 +35,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
         var tenantId = Guid.NewGuid();
 
         var (result, session) = await InvokeForTenantAsync<Result<TenantDetails>>(
-            tenantId, new StartTenantOnboarding(admin, " ", Slug(), Email()));
+            tenantId, new StartTenantOnboarding(admin, " ", Slug(), Email(), Guid.NewGuid().ToString()));
 
         result.Error.Code.ShouldBe("tenant.name_invalid");
         (await _catalog.CountAsync($"SELECT count(*) FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe(0);
@@ -50,7 +50,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
         var tenantId = Guid.NewGuid();
 
         var (result, session) = await InvokeForTenantAsync<Result<TenantDetails>>(
-            tenantId, new StartTenantOnboarding(admin, "Acme Ltd", existing.Slug, Email()));
+            tenantId, new StartTenantOnboarding(admin, "Acme Ltd", existing.Slug, Email(), Guid.NewGuid().ToString()));
 
         result.Error.Code.ShouldBe("tenant.slug_taken");
         (await _catalog.CountAsync($"SELECT count(*) FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe(0);
@@ -149,7 +149,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
         var slug = Slug();
         var admin = _api.CreateClient(await _catalog.AddSystemAdminAsync(), secondFactor: true);
         await _api.WaitingForMessagesAsync(async () =>
-            (await admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation)).EnsureSuccessStatusCode());
+            (await admin.CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail })).EnsureSuccessStatusCode());
         var code = _api.Email.CodeSentTo(ownerEmail);
 
         return (Guid.Parse(code[..code.IndexOf('.', StringComparison.Ordinal)]), code[(code.IndexOf('.', StringComparison.Ordinal) + 1)..]);

@@ -28,7 +28,7 @@ internal static class Handlers
         InTenant.RunAsync(services, tenantId, async scope =>
         {
             var (result, onboarding, register, timeout) = await StartTenantOnboardingHandler.HandleAsync(
-                new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail),
+                new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail, Guid.NewGuid().ToString()),
                 scope.GetRequiredService<ITenantCatalog>(),
                 scope.GetRequiredService<InvitationSettings>(),
                 scope.GetRequiredService<OnboardingSettings>(),

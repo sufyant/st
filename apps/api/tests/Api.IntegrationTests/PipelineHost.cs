@@ -24,6 +24,10 @@ internal sealed class PipelineHost : IAsyncDisposable
         ["RateLimiting:PermitLimit"] = "1000",
         ["RateLimiting:Window"] = "00:01:00",
         ["Pipeline:SlowCommandThreshold"] = "00:00:01",
+        ["Host:Role"] = "all",
+        ["ControlPlane:Invitations:AcceptUrl"] = ApiFactory.AcceptUrl,
+        ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
+        ["ControlPlane:FirstSystemAdminEmail"] = ApiFactory.FirstSystemAdminEmail,
     };
 
     private readonly WebApplication _app;
@@ -49,8 +53,7 @@ internal sealed class PipelineHost : IAsyncDisposable
         builder.Configuration.AddInMemoryCollection(TestTokens.Settings);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:Pooled"] = database.ApplicationConnectionString,
-            ["ConnectionStrings:Direct"] = database.ApplicationConnectionString,
+            ["ConnectionStrings:Database"] = database.ApplicationConnectionString,
         });
         builder.Configuration.AddInMemoryCollection(settings ?? new Dictionary<string, string?>());
 
@@ -66,6 +69,7 @@ internal sealed class PipelineHost : IAsyncDisposable
 
         var app = builder.Build();
         app.UseApiPipeline();
+        app.MapApiDocuments();
         var v1 = app.MapV1();
         var system = v1.MapSystem();
         TestEndpoints.Map(v1);

@@ -21,6 +21,15 @@ public interface ITenantCatalog
 
     internal Task<Tenant> FindTenantAsync(CancellationToken cancellationToken);
 
+    /// <summary>A tenant by its id, outside the active tenant: the one an earlier request under the same idempotency key created.</summary>
+    internal Task<Tenant> FindTenantAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The system admin's earlier request under this idempotency key, or null. The key is locked for the rest of the transaction, so a
+    /// second request under it waits until the first has committed, and then finds it.
+    /// </summary>
+    internal Task<TenantCreationRequest?> FindCreationRequestAsync(Guid systemAdminId, string idempotencyKey, CancellationToken cancellationToken);
+
     /// <summary>The active tenant, locked for the rest of the transaction, so the steps of its onboarding run one at a time.</summary>
     internal Task<Tenant> FindTenantForUpdateAsync(CancellationToken cancellationToken);
 
@@ -46,6 +55,8 @@ public interface ITenantCatalog
     internal Task<bool> TryAddAsync(Tenant tenant, CancellationToken cancellationToken);
 
     internal void Add(Invitation invitation);
+
+    internal void Add(TenantCreationRequest request);
 
     internal void Add(User user);
 

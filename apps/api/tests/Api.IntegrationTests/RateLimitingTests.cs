@@ -12,8 +12,9 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
 
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
+    // API4: the bucket is the signed-in user, never the tenant, so one member cannot use up the others' requests.
     [Fact]
-    public async Task A_tenant_over_its_limit_is_rejected_with_problem_details_and_a_retry_hint()
+    public async Task CallTheApi_AUserOverTheirLimit_IsRejectedWithProblemDetailsAndARetryHint()
     {
         var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
@@ -27,45 +28,34 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Members_of_a_tenant_share_its_limit()
+    public async Task CallTheApi_TwoMembersOfOneTenant_HaveABucketEach()
     {
         var tenant = await _catalog.AddTenantAsync();
         var first = await _catalog.AddMemberAsync(tenant.Id);
         var second = await _catalog.AddMemberAsync(tenant.Id);
         await GetAsync($"/v1/tenants/{tenant.Id}/ping", first);
 
-        var rejected = await GetAsync($"/v1/tenants/{tenant.Id}/ping", second);
+        var limited = await GetAsync($"/v1/tenants/{tenant.Id}/ping", first);
+        var other = await GetAsync($"/v1/tenants/{tenant.Id}/ping", second);
 
-        rejected.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        limited.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        limited.Headers.RetryAfter.ShouldNotBeNull();
+        other.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    // The user is limited wherever they call, in every tenant they belong to and outside any tenant.
     [Fact]
-    public async Task A_tenant_over_its_limit_does_not_limit_another_tenant()
+    public async Task CallTheApi_AUserOverTheirLimitInOneTenant_IsLimitedInTheirOtherTenant()
     {
         var tenant = await _catalog.AddTenantAsync();
         var other = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
         await _catalog.AddMemberAsync(other.Id, member);
         await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
-        await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
 
         var response = await GetAsync($"/v1/tenants/{other.Id}/ping", member);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-    }
-
-    // The slug in the route is never a key: a non-member spends their own limit, not the tenant's.
-    [Fact]
-    public async Task A_user_who_is_not_a_member_does_not_spend_the_tenant_limit()
-    {
-        var tenant = await _catalog.AddTenantAsync();
-        var member = await _catalog.AddMemberAsync(tenant.Id);
-        var outsider = await _catalog.AddUserAsync();
-        await GetAsync($"/v1/tenants/{tenant.Id}/ping", outsider);
-
-        var response = await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
     }
 
     [Fact]

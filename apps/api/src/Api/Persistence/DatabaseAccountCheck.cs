@@ -1,18 +1,13 @@
-using System.Reflection;
 using Npgsql;
 
 namespace Api.Persistence;
 
 // R10: the application does not start as a role that row level security does not bind: a superuser, a role that bypasses it, or
-// the owner of a table, who can switch it off. Both of the application's connections are checked: the pooled one requests use,
-// and the direct one Wolverine keeps its messages over. It runs before Wolverine starts. The migration step never starts the
-// host, so it runs as the owner without this check.
+// the owner of a table, who can switch it off. Both of the application's connections are checked: the one requests use, and the
+// one Wolverine keeps its messages over, when it has one of its own. It runs before Wolverine starts. The migration step never starts
+// the host, so it runs as the owner without this check.
 internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHostedService
 {
-    // The build writes the OpenAPI document with the GetDocument.Insider tool, which runs Program and starts the host without any
-    // configuration and on a server that serves no request. That process is the only one this check lets through.
-    private const string OpenApiDocumentTool = "GetDocument.Insider";
-
     private const string RoleQuery =
         """
         SELECT
@@ -25,15 +20,12 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHost
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (Assembly.GetEntryAssembly()?.GetName().Name == OpenApiDocumentTool)
-        {
-            return;
-        }
-
         string[] problems =
         [
-            .. await ProblemsAsync(PersistenceExtensions.PooledConnection, cancellationToken),
-            .. await ProblemsAsync(PersistenceExtensions.DirectConnection, cancellationToken),
+            .. await ProblemsAsync(PersistenceExtensions.DatabaseKey, configuration.GetConnectionString(PersistenceExtensions.DatabaseConnection)!, cancellationToken),
+            .. PersistenceExtensions.MessagingConnectionOf(configuration) is { Key: var key, ConnectionString: var messaging } && key != PersistenceExtensions.DatabaseKey
+                ? await ProblemsAsync(key, messaging, cancellationToken)
+                : [],
         ];
 
         if (problems.Length > 0)
@@ -59,15 +51,9 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHost
         ];
     }
 
-    private async Task<string[]> ProblemsAsync(string connection, CancellationToken cancellationToken)
+    private static async Task<string[]> ProblemsAsync(string key, string connectionString, CancellationToken cancellationToken)
     {
-        var setting = $"ConnectionStrings:{connection}";
-        if (configuration.GetConnectionString(connection) is not { Length: > 0 } connectionString)
-        {
-            return [$"{setting} must name the application role's connection"];
-        }
-
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
-        return await ProblemsAsync(dataSource, setting, cancellationToken);
+        return await ProblemsAsync(dataSource, key, cancellationToken);
     }
 }

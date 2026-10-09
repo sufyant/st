@@ -12,21 +12,25 @@ using Wolverine.Tracking;
 namespace Api.IntegrationTests;
 
 // The composed application, as Program builds it, in development unless a test names another environment, and against the
-// given database. Clerk and the email service are systems we do not own, so they are fakes unless a test exercises the
-// application's own email channel; the session tokens are signed with the test key. The onboarding's retries are short, so a step
-// that fails for good reaches the dead letter queue within a test.
+// given database, in the role that serves requests and handles messages. Clerk and the email service are systems we do not own, so
+// they are fakes unless a test exercises the application's own email channel; the session tokens are signed with the test key. The
+// onboarding's retries are short, so a step that fails for good reaches the dead letter queue within a test. A setting a test gives
+// as null is left out.
 internal sealed class ApiFactory(
-    string pooledConnectionString,
+    string databaseConnectionString,
     string? migrationsConnectionString = null,
     TimeProvider? time = null,
     string? environment = null,
     IReadOnlyList<string>? authorizedParties = null,
     bool fakeEmailChannel = true,
     Action<IServiceCollection>? configureServices = null,
-    string? directConnectionString = null,
+    string? messagingConnectionString = null,
     IReadOnlyDictionary<string, string?>? settings = null) : WebApplicationFactory<Program>
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
+
+    // No account of the fake identity provider has this address, so nobody becomes the first system admin by accident.
+    public const string FirstSystemAdminEmail = "first-admin@app.test";
 
     public FakeIdentityProvider Identity { get; } = new();
 
@@ -67,22 +71,43 @@ internal sealed class ApiFactory(
         Task RunAsync(IMessageContext _) => action();
     }
 
+    // The same, until the condition holds, for a test that ends while messages still wait, such as a retry scheduled for later.
+    public Task<ITrackedSession> TrackMessagesAsync(Func<Task> action, ITrackedCondition until)
+    {
+        return Tracking().DoNotAssertOnExceptionsDetected().WaitForCondition(until).ExecuteAndWaitAsync(RunAsync);
+
+        Task RunAsync(IMessageContext _) => action();
+    }
+
     private TrackedSessionConfiguration Tracking() => Services.GetRequiredService<IHost>().TrackActivity().Timeout(TimeSpan.FromSeconds(30));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment ?? Environments.Development);
-        builder.UseSetting("ConnectionStrings:Pooled", pooledConnectionString);
-        builder.UseSetting("ConnectionStrings:Direct", directConnectionString ?? pooledConnectionString);
-        builder.UseSetting("ConnectionStrings:Migrations", migrationsConnectionString);
-        builder.UseSetting("Invitations:AcceptUrl", AcceptUrl);
-        builder.UseSetting("Clerk:Issuer", TestTokens.Issuer);
+
+        Dictionary<string, string?> configuration = new()
+        {
+            ["Host:Role"] = "all",
+            ["ConnectionStrings:Database"] = databaseConnectionString,
+            ["ConnectionStrings:Messaging"] = messagingConnectionString,
+            ["ConnectionStrings:Migrations"] = migrationsConnectionString,
+            ["ControlPlane:Invitations:AcceptUrl"] = AcceptUrl,
+            ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
+            ["ControlPlane:FirstSystemAdminEmail"] = FirstSystemAdminEmail,
+            ["Authentication:Clerk:Issuer"] = TestTokens.Issuer,
+        };
         foreach (var (party, index) in (authorizedParties ?? [TestTokens.AuthorizedParty]).Select((party, index) => (party, index)))
         {
-            builder.UseSetting($"Clerk:AuthorizedParties:{index}", party);
+            configuration[$"Authentication:Clerk:AuthorizedParties:{index}"] = party;
         }
 
         foreach (var (key, value) in ShortRetries.Concat(settings ?? new Dictionary<string, string?>()))
+        {
+            configuration[key] = value;
+        }
+
+        // A host setting given as null would read as an empty value, not as a missing one.
+        foreach (var (key, value) in configuration.Where(setting => setting.Value is not null))
         {
             builder.UseSetting(key, value);
         }

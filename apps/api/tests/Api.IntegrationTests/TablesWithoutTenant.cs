@@ -11,6 +11,7 @@ internal static class TablesWithoutTenant
         "catalog.users",
         "catalog.roles",
         "catalog.system_admins",
+        "catalog.tenant_creation_requests",
     };
 
     // Every table in these schemas: Wolverine's message storage.

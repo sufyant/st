@@ -40,6 +40,7 @@ public sealed class ProblemDetailsTests : IAsyncLifetime
     [InlineData("NotFound", HttpStatusCode.NotFound)]
     [InlineData("Conflict", HttpStatusCode.Conflict)]
     [InlineData("Forbidden", HttpStatusCode.Forbidden)]
+    [InlineData("Unprocessable", HttpStatusCode.UnprocessableEntity)]
     public async Task An_expected_failure_returns_problem_details_with_its_status_and_code(string errorType, HttpStatusCode status)
     {
         var response = await _client.PostAsync($"/v1/failures/{errorType}", null, TestContext.Current.CancellationToken);

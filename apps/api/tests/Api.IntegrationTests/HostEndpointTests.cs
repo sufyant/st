@@ -56,58 +56,58 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
     }
 
     // R10: row level security does not bind a superuser, a role that bypasses it or a table's owner, so the application does not
-    // start as one. Both of its connections are checked: the pooled one requests use, and the direct one Wolverine keeps its
-    // messages over.
+    // start as one. Both of its connections are checked: the one requests use, and the one Wolverine keeps its messages over.
     [Fact]
     public async Task StartApplication_AsTheMigrationAccount_FailsNamingTheProblem()
     {
-        await using var api = new ApiFactory(database.OwnerConnectionString, directConnectionString: database.ApplicationConnectionString);
+        await using var api = new ApiFactory(database.OwnerConnectionString, messagingConnectionString: database.ApplicationConnectionString);
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Pooled connection's role owns tables");
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Database connection's role owns tables");
     }
 
     [Fact]
     public async Task StartApplication_AsASuperuser_FailsNamingTheProblem()
     {
-        await using var api = new ApiFactory(database.SuperuserConnectionString, directConnectionString: database.ApplicationConnectionString);
+        await using var api = new ApiFactory(database.SuperuserConnectionString, messagingConnectionString: database.ApplicationConnectionString);
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Pooled connection's role is a superuser");
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Database connection's role is a superuser");
     }
 
     [Fact]
     public async Task StartApplication_AsARoleThatBypassesRowLevelSecurity_FailsNamingTheProblem()
     {
         var bypassing = await database.CreateLoginRoleAsync("BYPASSRLS");
-        await using var api = new ApiFactory(bypassing, directConnectionString: database.ApplicationConnectionString);
+        await using var api = new ApiFactory(bypassing, messagingConnectionString: database.ApplicationConnectionString);
 
         var start = () => api.CreateClient();
 
         start.ShouldThrow<InvalidOperationException>().Message
-            .ShouldContain("ConnectionStrings:Pooled connection's role bypasses row level security");
+            .ShouldContain("ConnectionStrings:Database connection's role bypasses row level security");
     }
 
     [Fact]
-    public async Task StartApplication_AsTheMigrationAccountOverTheDirectConnection_FailsNamingTheProblem()
+    public async Task StartApplication_AsTheMigrationAccountOverTheMessagingConnection_FailsNamingTheProblem()
     {
-        await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: database.OwnerConnectionString);
+        await using var api = new ApiFactory(database.ApplicationConnectionString, messagingConnectionString: database.OwnerConnectionString);
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Direct connection's role owns tables");
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Messaging connection's role owns tables");
     }
 
+    // Without a connection of its own, Wolverine keeps its messages over the database connection.
     [Fact]
-    public async Task StartApplication_WithoutTheDirectConnection_FailsNamingTheSetting()
+    public async Task StartApplication_WithoutTheMessagingConnection_KeepsMessagesOverTheDatabaseConnection()
     {
-        await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: "");
+        await using var api = new ApiFactory(database.ApplicationConnectionString, messagingConnectionString: null);
 
-        var start = () => api.CreateClient();
+        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
 
-        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Direct");
+        ready.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -136,22 +136,20 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
     // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted.
     [Fact]
-    public async Task Outside_development_the_application_is_not_ready_without_authorized_parties()
+    public async Task Outside_development_the_application_does_not_start_without_authorized_parties()
     {
-        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production, authorizedParties: []);
+        await using var api = new ApiFactory(
+            database.ApplicationConnectionString, environment: Environments.Production, authorizedParties: [], settings: Resend);
 
-        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+        var start = () => api.CreateClient();
 
-        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        start.ShouldThrow<Exception>().Message.ShouldContain("Authentication:Clerk:AuthorizedParties");
     }
 
     [Fact]
     public async Task Outside_development_the_application_is_ready_with_authorized_parties()
     {
-        await using var api = new ApiFactory(
-            database.ApplicationConnectionString,
-            environment: Environments.Production,
-            settings: new Dictionary<string, string?> { ["Resend:ApiKey"] = "re_test_key", ["Resend:From"] = "no-reply@app.test" });
+        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production, settings: Resend);
 
         var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
 
@@ -184,6 +182,12 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
+
+    private static readonly Dictionary<string, string?> Resend = new()
+    {
+        ["Notifications:Resend:ApiKey"] = "re_test_key",
+        ["Notifications:Resend:From"] = "no-reply@app.test",
+    };
 
     [Fact]
     public async Task The_scalar_reference_is_served_in_development()

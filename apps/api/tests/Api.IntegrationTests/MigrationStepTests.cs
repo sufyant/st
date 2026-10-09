@@ -35,6 +35,8 @@ public sealed class MigrationStepTests(Database database)
         exitCode.ShouldBe(0, output);
         (await OwnerOfAsync("catalog", "tenants", empty)).ShouldBe(DatabaseRoles.Owner);
         (await OwnerOfAsync("wolverine", "wolverine_incoming_envelopes", empty)).ShouldBe(DatabaseRoles.Owner);
+        (await OwnerOfAsync("wolverine", "wolverine_queue_messages", empty)).ShouldBe(DatabaseRoles.Owner);
+        (await OwnerOfAsync("wolverine", "wolverine_queue_messages_scheduled", empty)).ShouldBe(DatabaseRoles.Owner);
     }
 
     // The application role owns nothing the migration step creates, yet it can use all of it, the message storage included.

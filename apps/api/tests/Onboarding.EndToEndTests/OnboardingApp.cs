@@ -12,9 +12,11 @@ using Wolverine.Tracking;
 namespace Onboarding.EndToEndTests;
 
 // The application as Program composes it, running in Production against the database the deployment steps prepared. Clerk and the
-// email channel are fakes at their ports.
+// email channel are fakes at their ports. The first system admin is the person whose verified email address the configuration names.
 internal sealed class OnboardingApp(Database database) : WebApplicationFactory<Program>
 {
+    public const string FirstSystemAdminEmail = "admin@e2e.test";
+
     public FakeIdentityProvider Identity { get; } = new();
 
     public FakeEmailChannel Email { get; } = new();
@@ -41,11 +43,15 @@ internal sealed class OnboardingApp(Database database) : WebApplicationFactory<P
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Production);
-        builder.UseSetting("ConnectionStrings:Pooled", database.ApplicationConnectionString);
-        builder.UseSetting("ConnectionStrings:Direct", database.ApplicationConnectionString);
-        builder.UseSetting("Invitations:AcceptUrl", "https://app.test/invitations/accept");
-        builder.UseSetting("Clerk:Issuer", TestTokens.Issuer);
-        builder.UseSetting("Clerk:AuthorizedParties:0", TestTokens.AuthorizedParty);
+        builder.UseSetting("Host:Role", "all");
+        builder.UseSetting("ConnectionStrings:Database", database.ApplicationConnectionString);
+        builder.UseSetting("ControlPlane:Invitations:AcceptUrl", "https://app.test/invitations/accept");
+        builder.UseSetting("ControlPlane:Clerk:SecretKey", "sk_test_unused");
+        builder.UseSetting("ControlPlane:FirstSystemAdminEmail", FirstSystemAdminEmail);
+        builder.UseSetting("Authentication:Clerk:Issuer", TestTokens.Issuer);
+        builder.UseSetting("Authentication:Clerk:AuthorizedParties:0", TestTokens.AuthorizedParty);
+        builder.UseSetting("Notifications:Resend:ApiKey", "re_test_unused");
+        builder.UseSetting("Notifications:Resend:From", "no-reply@app.test");
 
         builder.ConfigureTestServices(services =>
         {
