@@ -89,7 +89,7 @@ public sealed class TenantOnboardingTests(Database database)
 
     // Both find the slug free, and the slug's unique index lets only one of them have it: the other is a conflict, not a failure.
     [Fact]
-    public async Task Two_onboardings_of_one_slug_at_once_create_one_tenant_and_refuse_the_other()
+    public async Task StartOnboarding_TwoWithOneSlugAtOnce_CreatesOneTenantAndRefusesTheOther()
     {
         var admin = await Catalog.AddUserAsync(database.Services);
         var slug = Unique.Slug();

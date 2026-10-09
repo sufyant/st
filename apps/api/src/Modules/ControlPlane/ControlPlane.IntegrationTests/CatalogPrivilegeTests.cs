@@ -8,7 +8,7 @@ public sealed class CatalogPrivilegeTests(Database database)
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task The_owner_owns_every_catalog_table()
+    public async Task ReadTableOwners_CatalogSchema_AreAllTheOwnerRole()
     {
         var owners = await QueryAsync<string>(
             DatabaseRoles.Application, "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname = 'catalog'");

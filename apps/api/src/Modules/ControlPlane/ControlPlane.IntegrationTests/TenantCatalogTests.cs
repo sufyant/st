@@ -13,7 +13,7 @@ public sealed class TenantCatalogTests(Database database)
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task A_tenant_sees_only_its_own_memberships()
+    public async Task ReadMemberships_InATenant_ReturnsOnlyItsOwn()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var other = await Catalog.AddTenantAsync(database.Services);
@@ -29,7 +29,7 @@ public sealed class TenantCatalogTests(Database database)
     }
 
     [Fact]
-    public async Task A_membership_added_in_a_tenant_belongs_to_that_tenant()
+    public async Task AddMember_InATenant_BelongsToThatTenant()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var user = await Catalog.AddUserAsync(database.Services);
@@ -48,7 +48,7 @@ public sealed class TenantCatalogTests(Database database)
     }
 
     [Fact]
-    public async Task Outside_a_tenant_the_tenant_catalog_cannot_be_used()
+    public async Task ReadMemberships_OutsideATenant_IsRefused()
     {
         await using var scope = database.Services.CreateAsyncScope();
         var catalog = (TenantCatalog)scope.ServiceProvider.GetRequiredService<ITenantCatalog>();
@@ -59,7 +59,7 @@ public sealed class TenantCatalogTests(Database database)
     }
 
     [Fact]
-    public async Task A_tenant_does_not_find_the_invitation_of_another_tenant()
+    public async Task FindInvitationByHash_OfAnotherTenant_FindsNothing()
     {
         var email = Unique.Email();
         await Handlers.OnboardAsync(database.Services, email);
@@ -73,7 +73,7 @@ public sealed class TenantCatalogTests(Database database)
     }
 
     [Fact]
-    public async Task A_tenant_does_not_find_the_invitation_of_another_tenant_by_its_id()
+    public async Task FindInvitationById_OfAnotherTenant_FindsNothing()
     {
         var (_, _, ready) = await Handlers.OnboardAsync(database.Services, Unique.Email());
         var invitationId = ready.InvitationId;
@@ -87,7 +87,7 @@ public sealed class TenantCatalogTests(Database database)
 
     // Onboarding adds the tenant it runs in, and only that one.
     [Fact]
-    public async Task A_tenant_cannot_add_another_tenant()
+    public async Task AddTenant_OtherThanTheDeclaredTenant_IsRefused()
     {
         var other = Domain.Tenants.Tenant.Create(Guid.CreateVersion7(), "Other Ltd", Unique.Slug()).Value;
 
