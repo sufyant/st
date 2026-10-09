@@ -4,5 +4,5 @@ internal enum TenantStatus
 {
     Provisioning,
     Active,
-    Failed,
+    Cancelled,
 }

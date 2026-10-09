@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Notifications.Application.Ports;
-using Notifications.Contracts;
+using Notifications.Application;
 
 namespace Notifications.Infrastructure.Email;
 

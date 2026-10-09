@@ -4,7 +4,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Notifications.Contracts;
+using Notifications.Application;
+using Notifications.Application.Ports;
 using Notifications.Infrastructure;
 
 namespace Notifications.IntegrationTests;
@@ -14,7 +15,7 @@ public sealed class ResendEmailChannelTests : IDisposable
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    private static readonly EmailMessage Email = new("ada@example.com", "You are invited", "Open https://app.test/accept?token=abc");
+    private static readonly EmailMessage Email = new("ada@example.com", "You are invited", "Open https://app.test/accept?token=abc", "invite/0199a8f0-0000-7000-8000-000000000401");
 
     private readonly StubResend _resend = new();
 
@@ -23,7 +24,7 @@ public sealed class ResendEmailChannelTests : IDisposable
     [Fact]
     public async Task An_email_is_sent_through_resend_from_the_configured_address()
     {
-        await Notifications().SendEmailAsync(Email, Cancellation);
+        await Notifications().SendAsync(Email, Cancellation);
 
         var request = _resend.Requests.ShouldHaveSingleItem();
         (request.Method, request.Uri).ShouldBe((HttpMethod.Post, new Uri("https://api.resend.test/emails")));
@@ -41,20 +42,21 @@ public sealed class ResendEmailChannelTests : IDisposable
     {
         _resend.Delay = TimeSpan.FromSeconds(30);
 
-        var send = () => Notifications(timeout: "00:00:00.100").SendEmailAsync(Email, Cancellation);
+        var send = () => Notifications(timeout: "00:00:00.100").SendAsync(Email, Cancellation);
 
         await send.ShouldThrowAsync<TaskCanceledException>();
     }
 
+    // Resend sends one email per idempotency key, so an email sent again under its key is not sent twice (O4).
     [Fact]
-    public async Task Separate_emails_have_separate_idempotency_keys()
+    public async Task SendEmail_SentTwice_CarriesItsOwnIdempotencyKeyBothTimes()
     {
-        var notifications = Notifications();
+        var channel = Notifications();
 
-        await notifications.SendEmailAsync(Email, Cancellation);
-        await notifications.SendEmailAsync(Email, Cancellation);
+        await channel.SendAsync(Email, Cancellation);
+        await channel.SendAsync(Email, Cancellation);
 
-        _resend.Requests[1].IdempotencyKey.ShouldNotBe(_resend.Requests[0].IdempotencyKey);
+        _resend.Requests.Select(request => request.IdempotencyKey).ShouldBe(["invite/0199a8f0-0000-7000-8000-000000000401", "invite/0199a8f0-0000-7000-8000-000000000401"]);
     }
 
     [Fact]
@@ -62,14 +64,14 @@ public sealed class ResendEmailChannelTests : IDisposable
     {
         _resend.Respond(HttpStatusCode.UnprocessableEntity);
 
-        var send = async () => await Notifications().SendEmailAsync(Email, Cancellation);
+        var send = async () => await Notifications().SendAsync(Email, Cancellation);
 
         await send.ShouldThrowAsync<HttpRequestException>();
         _resend.Requests.ShouldHaveSingleItem();
     }
 
     // The module as the host registers it, outside Development, with Resend replaced at the HTTP boundary.
-    private INotificationsModule Notifications(string timeout = "00:00:10")
+    private IEmailChannel Notifications(string timeout = "00:00:10")
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -88,7 +90,7 @@ public sealed class ResendEmailChannelTests : IDisposable
             .AddNotificationsInfrastructure()
             .ConfigureHttpClientDefaults(client => client.ConfigurePrimaryHttpMessageHandler(() => _resend))
             .BuildServiceProvider()
-            .GetRequiredService<INotificationsModule>();
+            .GetRequiredService<IEmailChannel>();
     }
 
     private sealed class StubResend : HttpMessageHandler

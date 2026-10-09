@@ -32,7 +32,7 @@ public interface ITenantCatalog
     /// <summary>The invitation with this token hash, locked for the rest of the transaction so it is accepted only once.</summary>
     internal Task<Invitation?> FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken);
 
-    /// <summary>The invitation with this id, locked for the rest of the transaction so it is delivered only once.</summary>
+    /// <summary>The invitation with this id, locked for the rest of the transaction so the steps that change it run one at a time.</summary>
     internal Task<Invitation?> FindInvitationForUpdateAsync(Guid invitationId, CancellationToken cancellationToken);
 
     internal Task<User?> FindUserAsync(string externalUserId, CancellationToken cancellationToken);

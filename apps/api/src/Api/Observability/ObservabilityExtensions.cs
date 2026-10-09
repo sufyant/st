@@ -17,6 +17,9 @@ internal static class ObservabilityExtensions
     // Wolverine names its meter "Wolverine:{service name}".
     private const string WolverineMeters = "Wolverine*";
 
+    // A module names its meter "Modules.{module}".
+    private const string ModuleMeters = "Modules.*";
+
     public static WebApplicationBuilder AddObservability(this WebApplicationBuilder builder)
     {
         // Serilog owns the console; the default providers would write every event a second time. Each host keeps its own logger
@@ -34,7 +37,7 @@ internal static class ObservabilityExtensions
         var telemetry = builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(builder.Environment.ApplicationName))
             .WithTracing(tracing => tracing.AddAspNetCoreInstrumentation().AddSource(WolverineActivitySource))
-            .WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddMeter(WolverineMeters))
+            .WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddMeter(WolverineMeters, ModuleMeters))
             .WithLogging();
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))

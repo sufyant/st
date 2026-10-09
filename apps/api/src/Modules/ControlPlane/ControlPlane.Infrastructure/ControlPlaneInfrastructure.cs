@@ -1,5 +1,6 @@
 using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
+using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
 using ControlPlane.Infrastructure.Clerk;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,16 +34,17 @@ public static class ControlPlaneInfrastructure
         services.AddOptions<InvitationSettings>().BindConfiguration(InvitationSettings.Section);
         services.AddSingleton(provider => provider.GetRequiredService<IOptions<InvitationSettings>>().Value);
 
-        services.AddTransient<IInvitationSender, EmailInvitationSender>();
+        services.AddOptions<OnboardingSettings>()
+            .BindConfiguration(OnboardingSettings.Section)
+            .Validate(settings => !settings.Problems().Any(), $"{OnboardingSettings.Section} is not valid: check its timeouts and retry delays.")
+            .ValidateOnStart();
+        services.AddSingleton(provider => provider.GetRequiredService<IOptions<OnboardingSettings>>().Value);
+        services.AddSingleton<IWolverineExtension, IdentityProviderRetries>();
+        services.AddSingleton<OnboardingAlarm>();
 
-        // Wolverine's generated code cannot build these two, so it resolves them from the message's scope. Neither reaches a
-        // DbContext. The identity provider is a typed HTTP client, which only the container builds; the invitation sender reaches
-        // the Notifications module through its contract, whose implementation that module keeps to itself.
-        services.ConfigureWolverine(options =>
-        {
-            options.CodeGeneration.AlwaysUseServiceLocationFor<IIdentityProvider>();
-            options.CodeGeneration.AlwaysUseServiceLocationFor<IInvitationSender>();
-        });
+        // Wolverine's generated code cannot build the identity provider, a typed HTTP client that only the container builds, so it
+        // resolves it from the message's scope. It reaches no DbContext.
+        services.ConfigureWolverine(options => options.CodeGeneration.AlwaysUseServiceLocationFor<IIdentityProvider>());
 
         services.AddOptions<ClerkOptions>().BindConfiguration(ClerkOptions.Section);
         services.AddHttpClient<IIdentityProvider, ClerkIdentityProvider>((provider, http) =>

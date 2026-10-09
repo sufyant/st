@@ -115,6 +115,7 @@ Wolverine is the dispatcher. An endpoint sends a command or a query through `IMe
 Authorization runs once, in ASP.NET Core, before the endpoint sends the message. A refused request opens no transaction. A message from a queue has no caller and is not authorized again.
 
 - Wolverine opens and closes the transaction. We set the rule: each handler runs in its own transaction.
+- A handler that calls an external service uses no DbContext, so no transaction is open during the call. It returns its result as a message. Source: Nygard, Chapter 5 (Integration Points).
 - A domain event is handled inside the module and in the same transaction. An integration event leaves the module through the outbox. Source: Vernon, Chapter 8.
 - HTTP endpoints are plain ASP.NET minimal APIs. The tool's own endpoint model (Wolverine.Http) is not used.
 
@@ -131,7 +132,7 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 | W5 | Local queues are durable (`UseDurableLocalQueues`). The message store is in the shared `wolverine` schema | O1, O5, Requirement 5 | T3 |
 | W6 | A saga derives from Wolverine's `Saga` class. Its record is stored with EF Core in the module's own schema. The `Version` property is mapped as a concurrency token. There is a retry policy for `SagaConcurrencyException` | S3, S8 | T7, T9 |
 | W7 | A business rule rejection returns before any data changes: in a `Validate` or `Before` method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
-| W8 | The transaction middleware is first in the chain. Validation and authorization run inside the transaction | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
+| W8 | The transaction middleware is first in the Wolverine chain. Validation runs inside the transaction. Authorization runs before, in ASP.NET Core | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
 | W9 | Handler, saga, message and DbContext types are `public` | Wolverine compiles handler code in a separate assembly | Compile errors CS0051 and CS0122 |
 | W10 | The `WolverineFx.RuntimeCompilation` package is necessary | Handler code is generated at startup. Pre-generated code was not tried | The host did not start without the package |
 
@@ -240,7 +241,27 @@ The process is a saga. Four steps run in order.
 3. The tenant becomes "active". Pivot.
 4. Notifications sends the invitation email. Retried until it succeeds.
 
-- If step 2 fails, the tenant is cancelled and the system admin sees the reason.
+Onboarding messages:
+
+| Message | Sent by | Handled by | Handler has a transaction |
+| --- | --- | --- | --- |
+| `StartTenantOnboarding` | `POST /v1/system/tenants` | ControlPlane, `StartTenantOnboardingHandler` (step 1, starts the saga) | Yes |
+| `RegisterOwnerWithIdentityProvider` | Step 1 | ControlPlane, `RegisterOwnerWithIdentityProviderHandler` (step 2, calls Clerk) | No |
+| `RegistrationTimedOut` | Step 1, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
+| `OwnerRegistered` | Step 2 | ControlPlane, `TenantOnboarding` saga | Yes |
+| `ActivateTenant` | Saga | ControlPlane, `ActivateTenantHandler` (step 3, pivot) | Yes |
+| `TenantActivated` | Step 3 | Audit, `RecordTenantCreatedHandler`; ControlPlane, `TenantOnboarding` saga | Yes, each its own |
+| `OwnerInvitationReady` | Step 3 | Notifications, `SendOwnerInvitationHandler` (step 4, calls the email service) | No |
+| `InvitationEmailTimedOut` | Saga, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
+| `InvitationEmailSent` | Step 4 | ControlPlane, `TenantOnboarding` saga | Yes |
+| `CancelTenant` | Saga | ControlPlane, `CancelTenantHandler` (compensation) | Yes |
+| `TenantCancelled` | `CancelTenantHandler` | ControlPlane, `TenantOnboarding` saga | Yes |
+| `RevokeOwnerRegistration` | Saga | ControlPlane, `RevokeOwnerRegistrationHandler` (compensation, calls Clerk) | No |
+| `CancelInvitation` | Saga | ControlPlane, `CancelInvitationHandler` (compensation) | Yes |
+| `RaiseOnboardingAlarm` | Saga | ControlPlane, `OnboardingAlarmHandler` | No |
+| `Fault<T>` of a step or a compensation | Wolverine, when the message goes to the dead letter queue | ControlPlane, `TenantOnboarding` saga | Yes |
+
+- If step 2 or step 3 fails, the tenant is cancelled. A reason code is stored on the tenant and logged. No endpoint shows it yet: the tenant list for the system admin is deferred.
 - If step 4 always fails, the tenant stays active and the process goes to the "needs attention" state. The invitation is cancelled.
 - The invitation link travels to Notifications inside the message. See the deviations list.
 - The invitation link carries one invitation code: the tenant id and a secret, `<tenantId>.<secret>`. Only the hash of the secret is stored. Accepting declares the tenant from the code, then finds the invitation by the hash in that tenant. A wrong tenant, a wrong secret and a malformed code all answer 404. This is the only place where a request names its tenant outside the path. The secret gives the right, not the tenant id.

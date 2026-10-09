@@ -1,88 +1,146 @@
-using ControlPlane.Application.Invitations;
-using ControlPlane.Application.Ports;
 using ControlPlane.Contracts;
-using ControlPlane.Domain.Invitations;
-using ControlPlane.Domain.Roles;
-using ControlPlane.Domain.Tenants;
+using Notifications.Contracts;
+using SharedKernel;
 using Wolverine;
-using Wolverine.ErrorHandling;
-using Wolverine.Runtime.Handlers;
+using Wolverine.Persistence.Sagas;
 
 namespace ControlPlane.Application.Tenants;
 
-// The tenant onboarding saga, orchestrated in one place. StartTenantOnboarding creates the tenant as provisioning; each
-// further step is a durable message handled in the new tenant's transaction, and the tenant's status is the saga's state. A step
-// that still fails after its retries goes to the dead letter queue, and the fault Wolverine publishes for it in the same tenant is
-// compensated: the tenant becomes failed. The invitation's delivery is the last step and is not compensated.
-
-/// <summary>Invites the tenant's first owner. The saga chose the invitation's id, so a step that arrives twice finds it.</summary>
-public sealed record CreateFirstOwnerInvitation(Guid InvitationId, string OwnerEmail, Guid InvitedBy);
-
-/// <summary>Makes the tenant active, then has the first owner's invitation delivered.</summary>
-public sealed record ActivateTenant(Guid InvitationId);
-
-public static class TenantOnboardingHandler
+public enum TenantOnboardingState
 {
-    public static void Configure(HandlerChain chain) => chain.OnAnyException().RetryTimes(3);
-
-    public static async Task<ActivateTenant?> HandleAsync(
-        CreateFirstOwnerInvitation step,
-        ITenantCatalog catalog,
-        InvitationSettings settings,
-        TimeProvider time,
-        CancellationToken cancellationToken)
-    {
-        var tenant = await catalog.FindTenantForUpdateAsync(cancellationToken);
-        if (tenant.Status != TenantStatus.Provisioning)
-        {
-            return null;
-        }
-
-        // A message may arrive twice.
-        if (await catalog.FindInvitationForUpdateAsync(step.InvitationId, cancellationToken) is null)
-        {
-            var now = time.GetUtcNow();
-            catalog.Add(Invitation.Create(step.InvitationId, tenant.Id, step.OwnerEmail, BuiltInRoles.Owner, step.InvitedBy, now, settings.Lifetime));
-            await catalog.SaveChangesAsync(cancellationToken);
-        }
-
-        return new ActivateTenant(step.InvitationId);
-    }
-
-    public static async Task<(DeliverInvitation?, TenantActivated?)> HandleAsync(
-        ActivateTenant step,
-        ITenantCatalog catalog,
-        CancellationToken cancellationToken)
-    {
-        var tenant = await catalog.FindTenantForUpdateAsync(cancellationToken);
-        if (!tenant.Activate())
-        {
-            return (null, null);
-        }
-
-        await catalog.SaveChangesAsync(cancellationToken);
-        return (new DeliverInvitation(step.InvitationId), new TenantActivated(tenant.Id, tenant.Slug));
-    }
+    Registering,
+    Activating,
+    SendingInvitation,
+    Completed,
+    Cancelling,
+    Cancelled,
+    NeedsAttention,
 }
 
-// The compensation of a step that failed for good. Wolverine publishes its fault after moving the step to the dead letter queue,
-// with the step's tenant; it does so on a best-effort basis, so the dead letter queue stays the record of what failed.
-public static class FailTenantOnboardingHandler
+/// <summary>How long the onboarding waits for the owner's registration and for the invitation email (S10).</summary>
+public sealed record OnboardingTimeouts(TimeSpan Registration, TimeSpan InvitationEmail);
+
+/// <summary>
+/// The tenant onboarding process of section 6, orchestrated in one place (S3, S4). Its id is the tenant's id, and its record belongs
+/// to the tenant. It only decides: from its state and a message it chooses its next state and the messages to send, and it calls
+/// nothing (S12). A message that does not fit its state is ignored (S7). The record stays when the process ends, so a late or
+/// repeated message still finds the state it is ignored by, and the record says where the process ended.
+/// </summary>
+/// <remarks>
+/// Steps: register the owner with the identity provider (compensatable), activate the tenant (pivot), send the invitation email
+/// (retryable) (S5). A step that fails for good reaches the saga as Wolverine's fault of its message.
+/// </remarks>
+public sealed class TenantOnboarding : Saga, ITenantEntity
 {
-    public static void Configure(HandlerChain chain) => chain.OnAnyException().RetryTimes(3);
+    private const string IdentityProviderFailed = "identity_provider_failed";
+    private const string ActivationFailed = "activation_failed";
+    private const string RegistrationTimedOutReason = "registration_timed_out";
 
-    public static Task HandleAsync(Fault<CreateFirstOwnerInvitation> fault, ITenantCatalog catalog, CancellationToken cancellationToken) =>
-        FailAsync(catalog, cancellationToken);
-
-    public static Task HandleAsync(Fault<ActivateTenant> fault, ITenantCatalog catalog, CancellationToken cancellationToken) =>
-        FailAsync(catalog, cancellationToken);
-
-    private static async Task FailAsync(ITenantCatalog catalog, CancellationToken cancellationToken)
+    private TenantOnboarding()
     {
-        var tenant = await catalog.FindTenantForUpdateAsync(cancellationToken);
-        if (tenant.Fail())
+    }
+
+    public Guid Id { get; private set; }
+
+    public TenantOnboardingState State { get; private set; }
+
+    public Guid InvitationId { get; private set; }
+
+    /// <summary>The identity provider's invitation the owner's registration created, if it needed one.</summary>
+    public string? IdentityProviderInvitationId { get; private set; }
+
+    /// <summary>Fixed when the onboarding starts, so a configuration change does not move a deadline already set.</summary>
+    public TimeSpan InvitationEmailTimeout { get; private set; }
+
+    /// <summary>Step 1 starts the onboarding: the owner is registered with the identity provider, within the registration timeout.</summary>
+    public static (TenantOnboarding Onboarding, RegisterOwnerWithIdentityProvider Register, RegistrationTimedOut Timeout) Begin(
+        Guid tenantId,
+        Guid invitationId,
+        string ownerEmail,
+        Uri acceptLink,
+        OnboardingTimeouts timeouts) =>
+        (
+            new TenantOnboarding
+            {
+                Id = tenantId,
+                State = TenantOnboardingState.Registering,
+                InvitationId = invitationId,
+                InvitationEmailTimeout = timeouts.InvitationEmail,
+            },
+            new RegisterOwnerWithIdentityProvider(tenantId, invitationId, ownerEmail, acceptLink),
+            new RegistrationTimedOut(tenantId, timeouts.Registration));
+
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(OwnerRegistered.TenantId))] OwnerRegistered registered)
+    {
+        if (State == TenantOnboardingState.Registering)
         {
-            await catalog.SaveChangesAsync(cancellationToken);
+            IdentityProviderInvitationId = registered.IdentityProviderInvitationId;
+            return MoveTo(TenantOnboardingState.Activating, new ActivateTenant(Id, InvitationId, registered.Link));
         }
+
+        // The provider's call outlived the registration timeout: what it created is undone.
+        return State is TenantOnboardingState.Cancelling or TenantOnboardingState.Cancelled
+            && registered.IdentityProviderInvitationId is { } created
+            ? [new RevokeOwnerRegistration(Id, created)]
+            : [];
+    }
+
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(TenantActivated.TenantId))] TenantActivated activated) =>
+        State == TenantOnboardingState.Activating
+            ? MoveTo(TenantOnboardingState.SendingInvitation, new InvitationEmailTimedOut(Id, InvitationEmailTimeout))
+            : [];
+
+    // The email can be reported before the activation reaches the saga: both are published by the activation, so the report proves
+    // that the activation committed.
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(InvitationEmailSent.TenantId))] InvitationEmailSent sent) =>
+        IsSendingInvitation ? MoveTo(TenantOnboardingState.Completed) : [];
+
+    public OutgoingMessages Handle(Fault<RegisterOwnerWithIdentityProvider> fault) =>
+        State == TenantOnboardingState.Registering
+            ? MoveTo(TenantOnboardingState.Cancelling, new CancelTenant(Id, InvitationId, IdentityProviderFailed))
+            : [];
+
+    public OutgoingMessages Handle(Fault<ActivateTenant> fault) =>
+        State == TenantOnboardingState.Activating
+            ? MoveTo(
+                TenantOnboardingState.Cancelling,
+                new CancelTenant(Id, InvitationId, ActivationFailed),
+                new RevokeOwnerRegistration(Id, IdentityProviderInvitationId))
+            : [];
+
+    // After the pivot nothing is undone: the tenant stays active, and the invitation nobody received is withdrawn.
+    public OutgoingMessages Handle(Fault<OwnerInvitationReady> fault) =>
+        IsSendingInvitation
+            ? MoveTo(TenantOnboardingState.NeedsAttention, new CancelInvitation(Id, InvitationId), new RaiseOnboardingAlarm(Id))
+            : [];
+
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(RegistrationTimedOut.TenantId))] RegistrationTimedOut timeout) =>
+        State == TenantOnboardingState.Registering
+            ? MoveTo(TenantOnboardingState.Cancelling, new CancelTenant(Id, InvitationId, RegistrationTimedOutReason))
+            : [];
+
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(InvitationEmailTimedOut.TenantId))] InvitationEmailTimedOut timeout) =>
+        State == TenantOnboardingState.SendingInvitation
+            ? MoveTo(TenantOnboardingState.NeedsAttention, new RaiseOnboardingAlarm(Id))
+            : [];
+
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(TenantCancelled.TenantId))] TenantCancelled cancelled) =>
+        State == TenantOnboardingState.Cancelling ? MoveTo(TenantOnboardingState.Cancelled) : [];
+
+    // A compensation that fails for good leaves the process to a person (S9).
+    public OutgoingMessages Handle(Fault<CancelTenant> fault) => NeedsAttention();
+
+    public OutgoingMessages Handle(Fault<RevokeOwnerRegistration> fault) => NeedsAttention();
+
+    public OutgoingMessages Handle(Fault<CancelInvitation> fault) => NeedsAttention();
+
+    private bool IsSendingInvitation => State is TenantOnboardingState.Activating or TenantOnboardingState.SendingInvitation;
+
+    private OutgoingMessages NeedsAttention() => MoveTo(TenantOnboardingState.NeedsAttention, new RaiseOnboardingAlarm(Id));
+
+    private OutgoingMessages MoveTo(TenantOnboardingState state, params object[] messages)
+    {
+        State = state;
+        return [.. messages];
     }
 }

@@ -4,4 +4,5 @@ internal enum InvitationStatus
 {
     Pending,
     Accepted,
+    Cancelled,
 }

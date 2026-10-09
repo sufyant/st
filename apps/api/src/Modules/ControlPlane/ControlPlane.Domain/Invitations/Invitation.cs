@@ -4,9 +4,9 @@ using SharedKernel;
 namespace ControlPlane.Domain.Invitations;
 
 /// <summary>
-/// An invitation to join a tenant with a role. It is single-use and expires. Its token is issued when it is delivered, so no
-/// stored message ever carries one. Accepting it needs both the token and a verified email address of the accepting user that
-/// matches the invited one, so a forwarded link does not let someone else in.
+/// An invitation to join a tenant with a role. It is single-use and expires. Its token is born with it and only the token's hash is
+/// kept. Accepting it needs both the token and a verified email address of the accepting user that matches the invited one, so a
+/// forwarded link does not let someone else in.
 /// </summary>
 internal sealed class Invitation : ITenantEntity
 {
@@ -19,7 +19,8 @@ internal sealed class Invitation : ITenantEntity
         Guid roleId,
         Guid invitedBy,
         DateTimeOffset createdAt,
-        DateTimeOffset expiresAt)
+        DateTimeOffset expiresAt,
+        string tokenHash)
     {
         Id = id;
         TenantId = tenantId;
@@ -28,6 +29,7 @@ internal sealed class Invitation : ITenantEntity
         InvitedBy = invitedBy;
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
+        TokenHash = tokenHash;
         Status = InvitationStatus.Pending;
     }
 
@@ -39,8 +41,11 @@ internal sealed class Invitation : ITenantEntity
 
     public Guid RoleId { get; private init; }
 
-    /// <summary>The SHA-256 hash of the token the invitation's link carries; empty until the invitation is delivered.</summary>
-    public string? TokenHash { get; private set; }
+    /// <summary>
+    /// The SHA-256 hash of the token the invitation's link carries. Only an invitation from before tokens were born with their
+    /// invitation has none; it can never be accepted.
+    /// </summary>
+    public string? TokenHash { get; private init; }
 
     public Guid InvitedBy { get; private init; }
 
@@ -61,27 +66,25 @@ internal sealed class Invitation : ITenantEntity
         Role role,
         Guid invitedBy,
         DateTimeOffset now,
-        TimeSpan lifetime) =>
-        new(id, tenantId, email.Trim(), role.Id, invitedBy, now, now + lifetime);
+        TimeSpan lifetime,
+        string token) =>
+        new(id, tenantId, email.Trim(), role.Id, invitedBy, now, now + lifetime, InvitationToken.Hash(token));
 
-    /// <summary>
-    /// Gives a pending invitation the token its link carries, keeping only the hash. A token is issued once: a delivery that arrives
-    /// again must not replace the link already sent.
-    /// </summary>
-    public bool IssueToken(string token)
+    /// <summary>Withdraws a pending invitation, as when nobody could be told of it. A used or withdrawn one stays as it is.</summary>
+    public bool Cancel()
     {
-        if (Status != InvitationStatus.Pending || TokenHash is not null)
+        if (Status != InvitationStatus.Pending)
         {
             return false;
         }
 
-        TokenHash = InvitationToken.Hash(token);
+        Status = InvitationStatus.Cancelled;
         return true;
     }
 
     public Result Accept(IEnumerable<string> verifiedEmails, Guid userId, DateTimeOffset now)
     {
-        if (Status == InvitationStatus.Accepted)
+        if (Status != InvitationStatus.Pending)
         {
             return Error.Conflict("invitation.not_pending", "The invitation has already been used.");
         }

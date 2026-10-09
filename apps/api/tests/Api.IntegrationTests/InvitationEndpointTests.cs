@@ -46,19 +46,22 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
             """)).ShouldBe(1);
     }
 
-    // The secret travels only in the link the delivery sends; the stored messages that carried the invitation never held it.
+    // The secret travels in the accept link, inside the onboarding's messages (see the deviations list); the catalog keeps only its
+    // hash.
     [Fact]
-    public async Task No_stored_message_holds_an_invitation_token()
+    public async Task OnboardTenant_TheAcceptLinksSecret_IsStoredOnlyAsItsHash()
     {
         var email = $"{Guid.NewGuid():N}@example.com";
         _api.Identity.AddAccount($"user_{Guid.NewGuid():N}", email);
         await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
-        var invitationId = (await database.ScalarAsSuperuserAsync<Guid>($"SELECT id FROM catalog.invitations WHERE email = '{email}'")).ToString();
+        var secret = SecretOf(_api.Email.CodeSentTo(email));
 
-        var holdingTheInvitation = await StoredMessagesHoldingAsync(invitationId);
-        var holdingTheSecret = await StoredMessagesHoldingAsync(SecretOf(_api.Sender.CodeSentTo(email)));
+        var stored = await database.ScalarAsSuperuserAsync<long>(
+            $"SELECT count(*) FROM catalog.invitations WHERE email = '{email}' AND token_hash = encode(sha256(convert_to('{secret}', 'UTF8')), 'hex')");
+        var holdingTheSecret = await database.ScalarAsSuperuserAsync<long>(
+            $"SELECT count(*) FROM catalog.invitations WHERE position('{secret}' in invitations::text) > 0");
 
-        holdingTheInvitation.ShouldBeGreaterThan(0);
+        stored.ShouldBe(1);
         holdingTheSecret.ShouldBe(0);
     }
 
@@ -123,6 +126,19 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         var (tenantId, _) = await _catalog.AddTenantAsync();
 
         var accepted = await AcceptAsync($"user_{Guid.NewGuid():N}", $"{tenantId}.no-such-secret");
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await CodeOfAsync(accepted)).ShouldBe("invitation.not_found");
+    }
+
+    // A cancelled invitation answers like one that does not exist.
+    [Fact]
+    public async Task AcceptInvitation_Cancelled_IsNotFound()
+    {
+        var (_, invitee, code) = await InviteSomeoneWithAnAccountAsync();
+        await database.ScalarAsSuperuserAsync<object>($"UPDATE catalog.invitations SET status = 'Cancelled' WHERE tenant_id = '{TenantIdOf(code)}'");
+
+        var accepted = await AcceptAsync(invitee, code);
 
         accepted.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await CodeOfAsync(accepted)).ShouldBe("invitation.not_found");
@@ -202,7 +218,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         _api.Identity.AddAccount(invitee, email);
         var slug = await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
 
-        return (slug, invitee, _api.Sender.CodeSentTo(email));
+        return (slug, invitee, _api.Email.CodeSentTo(email));
     }
 
     private async Task<string> OnboardAsync(string ownerEmail)
@@ -221,14 +237,6 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     private static string TenantIdOf(string code) => code[..code.IndexOf('.', StringComparison.Ordinal)];
 
     private static string SecretOf(string code) => code[(code.IndexOf('.', StringComparison.Ordinal) + 1)..];
-
-    private Task<long> StoredMessagesHoldingAsync(string text) =>
-        database.ScalarAsync<long>(
-            $"""
-            SELECT (SELECT count(*) FROM wolverine.wolverine_incoming_envelopes WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
-                 + (SELECT count(*) FROM wolverine.wolverine_outgoing_envelopes WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
-                 + (SELECT count(*) FROM wolverine.wolverine_dead_letters WHERE position(convert_to('{text}', 'UTF8') in body) > 0)
-            """);
 
     private static async Task<string?> CodeOfAsync(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString();

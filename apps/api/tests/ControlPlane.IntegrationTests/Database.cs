@@ -14,7 +14,7 @@ namespace ControlPlane.IntegrationTests;
 
 // One PostgreSQL 18 server for the test assembly, set up the way a deployment is: the bootstrap script creates the
 // roles, then the module's migrations run as the owner. Tests connect as the application role. The identity
-// provider and the invitation email are systems we do not own, so they are fakes. Wolverine's own test double stands in for the
+// provider is a system we do not own, so it is a fake. Wolverine's own test double stands in for the
 // message context, which carries the tenant.
 public sealed class Database : IAsyncLifetime
 {
@@ -29,8 +29,6 @@ public sealed class Database : IAsyncLifetime
     public IServiceProvider Services => _services;
 
     public FakeIdentityProvider Identity { get; } = new();
-
-    public FakeInvitationSender Sender { get; } = new();
 
     public string ConnectionStringFor(string role, string? database = null) =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
@@ -87,7 +85,6 @@ public sealed class Database : IAsyncLifetime
             services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));
         }
 
-        services.Replace(ServiceDescriptor.Singleton<IInvitationSender>(Sender));
         configure?.Invoke(services);
 
         return services.BuildServiceProvider();

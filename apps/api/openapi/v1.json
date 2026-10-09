@@ -543,7 +543,7 @@
             "type": "string"
           }
         },
-        "description": "A tenant and where its onboarding stands: provisioning, active or failed."
+        "description": "A tenant and where its onboarding stands: provisioning, active or cancelled."
       },
       "TenantSummaryResponse": {
         "required": [

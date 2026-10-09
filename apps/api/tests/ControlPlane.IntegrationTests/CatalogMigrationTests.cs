@@ -14,6 +14,8 @@ public sealed class CatalogMigrationTests(Database database)
 
     private const string BeforeTenantsHadAName = "20261009075343_IsolateMembershipsAndInvitations";
 
+    private const string BeforeOnboardingWasASaga = "20261009103109_AddOwnMembershipsPolicy";
+
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     // The Expired status is gone: expiry is checked when an invitation is read, so an old expired invitation becomes pending and
@@ -64,6 +66,25 @@ public sealed class CatalogMigrationTests(Database database)
         (await database.ScalarAsSuperuserAsync<string>(
             "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'catalog' AND table_name = 'tenants' AND column_name = 'name'",
             name)).ShouldBe("NO");
+    }
+
+    // The Failed status is gone: an onboarding that did not finish cancels its tenant. A tenant that failed before has no reason.
+    [Fact]
+    public async Task MigrateCatalog_ATenantThatFailed_IsCancelledWithoutAReason()
+    {
+        var name = await database.CreateEmptyDatabaseAsync();
+        await MigrateCatalogAsync(name, BeforeOnboardingWasASaga);
+        var tenantId = Guid.CreateVersion7();
+        await database.ExecuteAsSuperuserAsync(
+            $"INSERT INTO catalog.tenants (id, name, slug, status) VALUES ('{tenantId}', 'Acme Ltd', '{Unique.Slug()}', 'Failed')", name);
+
+        await using var services = database.BuildServices(database: name);
+        await services.GetServices<IModuleMigrator>().Single()
+            .MigrateAsync(services, database.ConnectionStringFor(DatabaseRoles.Owner, name), Cancellation);
+
+        (await database.ScalarAsSuperuserAsync<string>($"SELECT status FROM catalog.tenants WHERE id = '{tenantId}'", name)).ShouldBe("Cancelled");
+        (await database.ScalarAsSuperuserAsync<bool>($"SELECT cancellation_reason IS NULL FROM catalog.tenants WHERE id = '{tenantId}'", name))
+            .ShouldBeTrue();
     }
 
     private async Task MigrateCatalogAsync(string databaseName, string targetMigration)

@@ -1,3 +1,4 @@
+using ControlPlane.Application.Tenants;
 using ControlPlane.Domain.Invitations;
 using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.SystemAdmins;
@@ -10,8 +11,8 @@ using Wolverine;
 namespace ControlPlane.Infrastructure;
 
 /// <summary>
-/// The <c>catalog</c> schema: the control plane's data above tenants (tenants, users, roles, system admins), and the memberships
-/// and invitations, which belong to a tenant and are under row level security.
+/// The <c>catalog</c> schema: the control plane's data above tenants (tenants, users, roles, system admins), and the memberships,
+/// invitations and tenant onboardings, which belong to a tenant and are under row level security.
 /// </summary>
 /// <remarks>Public only because Wolverine's generated code creates it for the handlers (W9); its sets are internal to the module.</remarks>
 public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options, IMessageContext? messaging = null)
@@ -31,6 +32,8 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
 
     internal DbSet<SystemAdmin> SystemAdmins => Set<SystemAdmin>();
 
+    internal DbSet<TenantOnboarding> TenantOnboardings => Set<TenantOnboarding>();
+
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -42,6 +45,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             tenant.Property(t => t.Slug).HasMaxLength(63);
             tenant.HasIndex(t => t.Slug).IsUnique();
             tenant.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
+            tenant.Property(t => t.CancellationReason).HasMaxLength(Tenant.CancellationReasonMaxLength);
         });
 
         modelBuilder.Entity<User>(user =>
@@ -81,6 +85,16 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             invitation.HasOne<Role>().WithMany().HasForeignKey(i => i.RoleId).OnDelete(DeleteBehavior.Cascade);
             invitation.HasOne<User>().WithMany().HasForeignKey(i => i.InvitedBy).OnDelete(DeleteBehavior.Restrict);
             invitation.HasOne<User>().WithMany().HasForeignKey(i => i.AcceptedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // The onboarding saga's record (W6). Wolverine raises its version on each change; as the concurrency token the version is
+        // in the update's WHERE clause, so of two messages handled at once the second fails and is tried again (S8).
+        modelBuilder.Entity<TenantOnboarding>(onboarding =>
+        {
+            onboarding.Property(o => o.Id).ValueGeneratedNever();
+            onboarding.Property(o => o.State).HasConversion<string>().HasMaxLength(20);
+            onboarding.Property(o => o.IdentityProviderInvitationId).HasMaxLength(255);
+            onboarding.Property(o => o.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<SystemAdmin>(admin =>

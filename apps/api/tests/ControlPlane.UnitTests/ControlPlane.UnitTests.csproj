@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Application\ControlPlane.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Domain\ControlPlane.Domain.csproj" />
   </ItemGroup>

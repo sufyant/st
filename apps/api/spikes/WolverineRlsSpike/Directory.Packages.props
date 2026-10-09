@@ -1,7 +1,4 @@
 <Project>
   <!-- Inherit the repo's central versions; add only what the spike needs on top. -->
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)../'))" />
-  <ItemGroup>
-    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.45.0" />
-  </ItemGroup>
 </Project>

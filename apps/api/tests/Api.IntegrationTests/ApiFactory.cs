@@ -1,4 +1,5 @@
 using ControlPlane.Application.Ports;
+using Notifications.Application.Ports;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -11,15 +12,16 @@ using Wolverine.Tracking;
 namespace Api.IntegrationTests;
 
 // The composed application, as Program builds it, in development unless a test names another environment, and against the
-// given database. Clerk and the invitation email are systems we do not own, so they are fakes unless a test exercises the
-// application's own sender; the session tokens are signed with the test key.
+// given database. Clerk and the email service are systems we do not own, so they are fakes unless a test exercises the
+// application's own email channel; the session tokens are signed with the test key. The onboarding's retries are short, so a step
+// that fails for good reaches the dead letter queue within a test.
 internal sealed class ApiFactory(
     string pooledConnectionString,
     string? migrationsConnectionString = null,
     TimeProvider? time = null,
     string? environment = null,
     IReadOnlyList<string>? authorizedParties = null,
-    bool fakeInvitationSender = true,
+    bool fakeEmailChannel = true,
     Action<IServiceCollection>? configureServices = null,
     string? directConnectionString = null,
     IReadOnlyDictionary<string, string?>? settings = null) : WebApplicationFactory<Program>
@@ -28,7 +30,16 @@ internal sealed class ApiFactory(
 
     public FakeIdentityProvider Identity { get; } = new();
 
-    public FakeInvitationSender Sender { get; } = new();
+    public FakeEmailChannel Email { get; } = new();
+
+    public static readonly IReadOnlyDictionary<string, string?> ShortRetries = new Dictionary<string, string?>
+    {
+        ["ControlPlane:IdentityProviderRetryDelays:0"] = "00:00:00.010",
+        ["ControlPlane:IdentityProviderRetryDelays:1"] = "00:00:00.020",
+        ["Notifications:InvitationEmailRetryDelays:0"] = "00:00:00.010",
+        ["Notifications:InvitationEmailRetryDelays:1"] = "00:00:00.020",
+        ["Notifications:InvitationEmailRetryDelays:2"] = "00:00:00.040",
+    };
 
     public HttpClient CreateClient(string userId, bool secondFactor = false)
     {
@@ -37,7 +48,7 @@ internal sealed class ApiFactory(
         return client;
     }
 
-    // Runs the action and waits until every message it caused has been handled, such as the delivery of an invitation.
+    // Runs the action and waits until every message it caused has been handled, such as the steps of a tenant's onboarding.
     public async Task<T> WaitingForMessagesAsync<T>(Func<Task<T>> action)
     {
         var result = default(T)!;
@@ -71,7 +82,7 @@ internal sealed class ApiFactory(
             builder.UseSetting($"Clerk:AuthorizedParties:{index}", party);
         }
 
-        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+        foreach (var (key, value) in ShortRetries.Concat(settings ?? new Dictionary<string, string?>()))
         {
             builder.UseSetting(key, value);
         }
@@ -80,9 +91,9 @@ internal sealed class ApiFactory(
         {
             services.TrustTestKey();
             services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));
-            if (fakeInvitationSender)
+            if (fakeEmailChannel)
             {
-                services.Replace(ServiceDescriptor.Singleton<IInvitationSender>(Sender));
+                services.Replace(ServiceDescriptor.Singleton<IEmailChannel>(Email));
             }
 
             if (time is not null)

@@ -6,6 +6,8 @@ internal sealed class Tenant
 {
     public const int NameMaxLength = 100;
 
+    public const int CancellationReasonMaxLength = 50;
+
     private Tenant(Guid id, string name, string slug)
     {
         Id = id;
@@ -23,6 +25,9 @@ internal sealed class Tenant
     public string Slug { get; private init; }
 
     public TenantStatus Status { get; private set; }
+
+    /// <summary>Why the onboarding cancelled the tenant: a fixed code, never the text of an exception.</summary>
+    public string? CancellationReason { get; private set; }
 
     /// <summary>The name is stored without the spaces around it.</summary>
     public static Result<Tenant> Create(Guid id, string name, string slug)
@@ -43,8 +48,20 @@ internal sealed class Tenant
     /// <summary>Ends the tenant's onboarding. Only a provisioning tenant becomes active.</summary>
     public bool Activate() => Leave(TenantStatus.Active);
 
-    /// <summary>Compensates a failed onboarding. Only a provisioning tenant fails; an active one stays active.</summary>
-    public bool Fail() => Leave(TenantStatus.Failed);
+    /// <summary>
+    /// Compensates an onboarding that did not reach the activation. Only a provisioning tenant is cancelled: an active one stays
+    /// active, and a cancelled one keeps its first reason.
+    /// </summary>
+    public bool Cancel(string reason)
+    {
+        if (!Leave(TenantStatus.Cancelled))
+        {
+            return false;
+        }
+
+        CancellationReason = reason;
+        return true;
+    }
 
     private bool Leave(TenantStatus status)
     {
