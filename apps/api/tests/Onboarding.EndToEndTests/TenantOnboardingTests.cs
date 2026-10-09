@@ -22,7 +22,7 @@ public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 
     [Fact]
-    public async Task A_system_admin_onboards_a_tenant_whose_first_owner_accepts_and_sees_it()
+    public async Task OnboardTenant_FirstOwnerAccepts_OwnerSeesTheTenantAndAStrangerGetsNotFound()
     {
         var admin = _app.ClientFor(Database.SystemAdmin, secondFactor: true);
         var owner = _app.ClientFor("user_e2e_owner");
