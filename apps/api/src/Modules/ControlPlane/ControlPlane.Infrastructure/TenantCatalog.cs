@@ -1,8 +1,10 @@
 using ControlPlane.Application.Ports;
 using ControlPlane.Domain.Invitations;
+using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
 using Tenancy;
 
 namespace ControlPlane.Infrastructure;
@@ -44,6 +46,25 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
 
     Task<Membership?> ITenantCatalog.FindMembershipAsync(Guid userId, CancellationToken cancellationToken) =>
         Memberships.SingleOrDefaultAsync(membership => membership.UserId == userId, cancellationToken);
+
+    // Row level security keeps the list to the active tenant; the query names no tenant.
+    async Task<ListPage<(Guid UserId, BuiltInRole Role)>> ITenantCatalog.ListMembersAsync(PageRequest paging, CancellationToken cancellationToken)
+    {
+        var members =
+            from membership in Memberships
+            join role in catalog.Roles on membership.RoleId equals role.Id
+            select new { membership.UserId, role.BuiltIn };
+
+        var total = await members.CountAsync(cancellationToken);
+        var page = await members
+            .OrderBy(member => member.BuiltIn == BuiltInRole.Owner ? 0 : member.BuiltIn == BuiltInRole.Admin ? 1 : 2)
+            .ThenBy(member => member.UserId)
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new([.. page.Select(member => (member.UserId, member.BuiltIn))], paging, total);
+    }
 
     async Task<Invitation?> ITenantCatalog.FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken)
     {

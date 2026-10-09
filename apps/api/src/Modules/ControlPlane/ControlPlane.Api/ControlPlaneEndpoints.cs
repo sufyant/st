@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ControlPlane.Application.Invitations;
+using ControlPlane.Application.Members;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
 using Microsoft.AspNetCore.Builder;
@@ -10,7 +11,7 @@ using Wolverine;
 namespace ControlPlane.Api;
 
 /// <summary>
-/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the system routes. Each endpoint names the
+/// The module's endpoints, mapped into the host's route groups: <c>/v1</c>, the system routes and the tenant routes. Each endpoint names the
 /// permission it needs and sends one command; the host maps its result.
 /// </summary>
 public static class ControlPlaneEndpoints
@@ -19,7 +20,8 @@ public static class ControlPlaneEndpoints
 
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder v1,
-        RouteGroupBuilder system)
+        RouteGroupBuilder system,
+        RouteGroupBuilder tenant)
     {
         // Accepting starts outside any tenant. The invitation code names the tenant, which is declared before the invitation is
         // looked up by its secret, so a wrong tenant, a wrong secret and a malformed code all answer the same 404. The identity
@@ -50,6 +52,20 @@ public static class ControlPlaneEndpoints
                     cancellationToken))
                     .Map(tenant => new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status)))
             .RequireAuthorization(Permissions.SystemTenantsCreate);
+
+        // The tenant comes from the route: the host has declared it, and row level security keeps the list to it.
+        tenant.MapGet("/members", async (int? page, int? pageSize, IMessageBus bus, CancellationToken cancellationToken) =>
+            {
+                var paging = PageRequest.Create(page, pageSize);
+                if (!paging.IsSuccess)
+                {
+                    return (Result<ListPage<MemberResponse>>)paging.Error;
+                }
+
+                var members = await bus.InvokeAsync<Result<ListPage<MemberSummary>>>(new ListMembers(paging.Value), cancellationToken);
+                return members.Map(list => list.Map(member => new MemberResponse(member.UserId, member.Role)));
+            })
+            .RequireAuthorization(Permissions.MembersRead);
     }
 
     // The version group lets only signed-in users through, so the identity provider's user id is always there.

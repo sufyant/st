@@ -11,7 +11,7 @@ namespace Api.IntegrationTests;
 
 internal static class TestEndpoints
 {
-    // A permission no built-in role holds: no tenant capability has one yet.
+    // A permission no built-in role holds: it is in no pool.
     public const string GuardedPermission = "test.guarded";
 
     // Stand-ins for host behaviour that is not about who the caller is, so they let anyone in.

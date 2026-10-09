@@ -12,4 +12,12 @@ public class RoleTests
 
         systemPermissions.ShouldBeEmpty();
     }
+
+    [Fact]
+    public void ReadMembers_EveryBuiltInRole_HoldsThePermission()
+    {
+        var roles = BuiltInRoles.All;
+
+        roles.ShouldAllBe(role => role.Permissions.Contains("members.read"));
+    }
 }

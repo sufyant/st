@@ -22,8 +22,8 @@ internal static class BuiltInRoles
     // Admins hold what owners hold: the tenant pool has no permission that is the owners' alone.
     private static readonly FrozenSet<string> AdminPermissions = OwnerPermissions;
 
-    // Members get the permissions of the capabilities that modules add for them; no module has one yet.
-    private static readonly FrozenSet<string> MemberPermissions = FrozenSet<string>.Empty;
+    // Members get the permissions of the capabilities that modules add for them.
+    private static readonly FrozenSet<string> MemberPermissions = FrozenSet.Create(StringComparer.Ordinal, Permissions.MembersRead);
 
     public static IReadOnlySet<string> PermissionsOf(BuiltInRole role) => role switch
     {
