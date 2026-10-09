@@ -50,7 +50,11 @@ internal sealed class TwoWorkers : IAsyncDisposable
         var name = await database.CreateMigratedDatabaseAsync();
         await database.ScalarAsSuperuserAsync<object>(Handlings.CreateTable, name);
         var workers = new TwoWorkers(database, name);
+
+        // The web host leads the cluster: the case in which the workers' durability agents are assigned by a node that runs none.
         _ = workers.Web.Services;
+        await WaitUntilAsync(async () => await database.ScalarAsSuperuserAsync<long>(
+            "SELECT count(*) FROM wolverine.wolverine_node_assignments WHERE id = 'wolverine://leader/'", name) == 1);
         foreach (var worker in workers._workers.Values)
         {
             _ = worker.Services;
