@@ -6,13 +6,16 @@
 
   <ItemGroup>
     <PackageReference Include="Shouldly" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Application\ControlPlane.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Domain\ControlPlane.Domain.csproj" />
+    <ProjectReference Include="..\Tenancy\Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\db\bootstrap.sql" Link="bootstrap.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

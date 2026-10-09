@@ -10,7 +10,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Shared\SharedKernel\SharedKernel.csproj" />
+    <ProjectReference Include="..\ControlPlane.Application\ControlPlane.Application.csproj" />
+    <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
+    <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
