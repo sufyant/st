@@ -18,7 +18,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
 
-        var response = await PostGuardedAsync(tenant.Slug, owner);
+        var response = await PostGuardedAsync(tenant.Id, owner);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -31,7 +31,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
 
-        var response = await PostGuardedAsync(tenant.Slug, outsider);
+        var response = await PostGuardedAsync(tenant.Id, outsider);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -45,11 +45,11 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
         var admin = await _catalog.AddSystemAdminAsync();
 
         var response = await _host.CreateClient(admin, secondFactor: true)
-            .PostAsync($"/v1/tenants/{tenant.Slug}/guarded", null, TestContext.Current.CancellationToken);
+            .PostAsync($"/v1/tenants/{tenant.Id}/guarded", null, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
-    private Task<HttpResponseMessage> PostGuardedAsync(string slug, string userId) =>
-        _host.CreateClient(userId).PostAsync($"/v1/tenants/{slug}/guarded", null, TestContext.Current.CancellationToken);
+    private Task<HttpResponseMessage> PostGuardedAsync(Guid tenantId, string userId) =>
+        _host.CreateClient(userId).PostAsync($"/v1/tenants/{tenantId}/guarded", null, TestContext.Current.CancellationToken);
 }

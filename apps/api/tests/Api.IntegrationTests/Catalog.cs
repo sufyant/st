@@ -27,13 +27,17 @@ internal sealed class Catalog(Database database)
         return externalId;
     }
 
-    public async Task<string> AddUserAsync()
+    public async Task<string> AddUserAsync(Guid? id = null)
     {
         var externalId = $"user_{Guid.NewGuid():N}";
-        await database.ScalarAsync<object>($"INSERT INTO catalog.users (id, external_id) VALUES ('{Guid.NewGuid()}', '{externalId}')");
+        await database.ScalarAsync<object>($"INSERT INTO catalog.users (id, external_id) VALUES ('{id ?? Guid.NewGuid()}', '{externalId}')");
 
         return externalId;
     }
+
+    // The catalog's own id of a user, which the API answers with; the identity provider's id is what a token carries.
+    public Task<Guid> UserIdOfAsync(string externalId) =>
+        database.ScalarAsync<Guid>($"SELECT id FROM catalog.users WHERE external_id = '{externalId}'");
 
     public async Task<string> AddSystemAdminAsync()
     {
