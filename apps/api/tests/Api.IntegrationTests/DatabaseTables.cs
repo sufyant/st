@@ -5,7 +5,8 @@ namespace Api.IntegrationTests;
 // Every ordinary table of the database, read from pg_class rather than from any model, so a table that no module maps is found
 // too. A table on the list of tables without a tenant needs nothing; every other one is a tenant table and must have row level
 // security enabled and forced, with the tenant isolation policy limiting reads and writes to the declared tenant (R1, R6).
-internal sealed class DatabaseTables(Database database)
+// Every policy, read from pg_policy, is that policy on a tenant table or on the list of extra policies with its command (R11).
+internal sealed class DatabaseTables(Database database, string? databaseName = null)
 {
     private const string TablesQuery =
         """
@@ -24,6 +25,14 @@ internal sealed class DatabaseTables(Database database)
         ORDER BY n.nspname, c.relname
         """;
 
+    private const string PoliciesQuery =
+        """
+        SELECT n.nspname, c.relname, p.polname,
+            CASE p.polcmd WHEN 'r' THEN 'SELECT' WHEN 'a' THEN 'INSERT' WHEN 'w' THEN 'UPDATE' WHEN 'd' THEN 'DELETE' ELSE 'ALL' END
+        FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+        ORDER BY n.nspname, c.relname, p.polname
+        """;
+
     public async Task<List<string>> TenantTablesAsync() =>
         [.. (await ReadAsync()).Where(table => !TablesWithoutTenant.Contains(table.Schema, table.Name)).Select(table => table.QualifiedName)];
 
@@ -31,12 +40,25 @@ internal sealed class DatabaseTables(Database database)
     {
         var tables = await ReadAsync();
         var found = tables.Select(table => table.QualifiedName).ToHashSet();
+        var policies = await ReadPoliciesAsync();
 
         return
         [
             .. TablesWithoutTenant.Tables.Where(listed => !found.Contains(listed)).Select(listed => $"{listed}: listed, but not in the database"),
             .. tables.Where(table => !TablesWithoutTenant.Contains(table.Schema, table.Name)).SelectMany(Gaps),
+            .. ExtraPolicies.Policies.Where(listed => !policies.Contains(listed))
+                .Select(listed => $"{listed.Table}: policy {listed.Name} ({listed.Command}) listed, but not in the database"),
+            .. policies.Where(policy => !IsExpected(policy))
+                .Select(policy => $"{policy.Table}: policy {policy.Name} ({policy.Command}) is neither tenant isolation on a tenant table nor listed"),
         ];
+    }
+
+    private static bool IsExpected((string Table, string Name, string Command) policy)
+    {
+        var (schema, table) = (policy.Table.Split('.')[0], policy.Table.Split('.')[1]);
+        var tenantIsolation = policy.Name == "tenant_isolation" && !TablesWithoutTenant.Contains(schema, table);
+
+        return tenantIsolation || ExtraPolicies.Policies.Contains(policy);
     }
 
     private static IEnumerable<string> Gaps(Table table)
@@ -57,9 +79,30 @@ internal sealed class DatabaseTables(Database database)
         }
     }
 
+    private async Task<List<(string Table, string Name, string Command)>> ReadPoliciesAsync()
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(PoliciesQuery, connection);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+
+        List<(string Table, string Name, string Command)> policies = [];
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            policies.Add(($"{reader.GetString(0)}.{reader.GetString(1)}", reader.GetString(2), reader.GetString(3)));
+        }
+
+        return policies;
+    }
+
+    private string ConnectionString =>
+        databaseName is null
+            ? database.SuperuserConnectionString
+            : new NpgsqlConnectionStringBuilder(database.SuperuserConnectionString) { Database = databaseName }.ConnectionString;
+
     private async Task<List<Table>> ReadAsync()
     {
-        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = new NpgsqlCommand(TablesQuery, connection);
         await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);

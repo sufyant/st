@@ -32,7 +32,11 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         var accepted = await AcceptAsync(invitee, code);
 
         accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("tenantSlug").GetString().ShouldBe(slug);
+        var tenant = await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation);
+        tenant.EnumerateObject().Select(field => field.Name).ShouldBe(["id", "name", "slug"], ignoreOrder: true);
+        tenant.GetProperty("id").GetGuid().ShouldBe(await database.ScalarAsync<Guid>($"SELECT id FROM catalog.tenants WHERE slug = '{slug}'"));
+        tenant.GetProperty("name").GetString().ShouldBe("Acme Ltd");
+        tenant.GetProperty("slug").GetString().ShouldBe(slug);
         (await database.ScalarAsSuperuserAsync<long>(
             $"""
             SELECT count(*) FROM catalog.memberships

@@ -4,9 +4,9 @@ namespace Api.IntegrationTests;
 // name, the way the catalog stores them. A membership belongs to a tenant, so it is written with its tenant declared.
 internal sealed class Catalog(Database database)
 {
-    public async Task<(Guid Id, string Slug)> AddTenantAsync(string status = "Active", string? slug = null, string name = "Acme Ltd")
+    public async Task<(Guid Id, string Slug)> AddTenantAsync(string status = "Active", string? slug = null, string name = "Acme Ltd", Guid? tenantId = null)
     {
-        var id = Guid.NewGuid();
+        var id = tenantId ?? Guid.NewGuid();
         slug ??= $"tenant-{id:N}"[..20];
         await database.ScalarAsync<object>($"INSERT INTO catalog.tenants (id, name, slug, status) VALUES ('{id}', '{name}', '{slug}', '{status}')");
 

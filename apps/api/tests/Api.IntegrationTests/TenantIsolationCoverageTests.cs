@@ -26,12 +26,30 @@ public sealed class TenantIsolationCoverageTests(Database database)
     }
 
     // R6: a table is either on the explicit list of tables without a tenant or isolated; a new table that is neither fails here.
+    // R11: a policy is either the tenant isolation policy of a tenant table or on the explicit list of extra policies.
     [Fact]
-    public async Task CheckTables_EveryTableInTheDatabase_IsOnTheListOrIsolated()
+    public async Task CheckTables_EveryTableAndPolicyInTheDatabase_IsOnTheListOrIsolated()
     {
         var gaps = await new DatabaseTables(database).GapsAsync();
 
         gaps.ShouldBeEmpty();
+    }
+
+    // Permissive policies combine with OR, so a stray one widens access. A database of its own keeps the stray policy away from
+    // the other tests.
+    [Fact]
+    public async Task CheckPolicies_APolicyThatIsNotOnTheList_IsAGap()
+    {
+        var name = await database.CreateMigratedDatabaseAsync();
+        var tables = new DatabaseTables(database, name);
+        await database.ScalarAsSuperuserAsync<object>("CREATE POLICY stray ON catalog.invitations FOR SELECT USING (true)", name);
+
+        var withTheStrayPolicy = await tables.GapsAsync();
+        await database.ScalarAsSuperuserAsync<object>("DROP POLICY stray ON catalog.invitations", name);
+        var withoutIt = await tables.GapsAsync();
+
+        withTheStrayPolicy.ShouldBe(["catalog.invitations: policy stray (SELECT) is neither tenant isolation on a tenant table nor listed"]);
+        withoutIt.ShouldBeEmpty();
     }
 
     [Fact]
