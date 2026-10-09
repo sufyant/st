@@ -111,7 +111,7 @@ public sealed class InvitationDeliveryTests(Database database)
         var admin = await _catalog.AddSystemAdminAsync();
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];
 
-        return await api.CreateClient(admin, secondFactor: true).PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail = email }, Cancellation);
+        return await api.CreateClient(admin, secondFactor: true).PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail = email }, Cancellation);
     }
 
     private sealed class StubResend : HttpMessageHandler

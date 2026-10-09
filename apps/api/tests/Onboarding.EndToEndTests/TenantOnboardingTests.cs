@@ -29,7 +29,7 @@ public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
         const string ownerEmail = "owner@acme.test";
 
         var created = await _app.WaitingForMessagesAsync(() =>
-            admin.PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail }, Cancellation));
+            admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation));
         var invitation = _app.Identity.Invitations.Single(invited => invited.Email == ownerEmail);
         _app.Identity.SignUp("user_e2e_owner", ownerEmail);
         var accepted = await owner.PostAsJsonAsync("/v1/invitations/accept", new { code = CodeOf(invitation.AcceptLink) }, Cancellation);

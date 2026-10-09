@@ -2,7 +2,7 @@ using System.Net;
 
 namespace Api.IntegrationTests;
 
-// The admin API is a separate route group with its own authorization, and needs a second factor.
+// The system door is a separate route group with its own authorization, and needs a second factor.
 public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -15,11 +15,11 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_system_admin_with_a_second_factor_reaches_the_admin_routes()
+    public async Task A_system_admin_with_a_second_factor_reaches_the_system_routes()
     {
         var admin = await _catalog.AddSystemAdminAsync();
 
-        var response = await _host.CreateClient(admin, secondFactor: true).GetAsync("/v1/admin/ping", Cancellation);
+        var response = await _host.CreateClient(admin, secondFactor: true).GetAsync("/v1/system/ping", Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -29,7 +29,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     {
         var admin = await _catalog.AddSystemAdminAsync();
 
-        var response = await _host.CreateClient(admin).GetAsync("/v1/admin/ping", Cancellation);
+        var response = await _host.CreateClient(admin).GetAsync("/v1/system/ping", Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -42,7 +42,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
         var admin = await _catalog.AddSystemAdminAsync();
         var token = TestTokens.For(admin, secondFactor: false, extraClaims: new Dictionary<string, object> { ["second_factor_verified"] = "true" });
 
-        var response = await _host.CreateClientWith(token).GetAsync("/v1/admin/ping", Cancellation);
+        var response = await _host.CreateClientWith(token).GetAsync("/v1/system/ping", Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
@@ -53,7 +53,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
 
-        var response = await _host.CreateClient(owner, secondFactor: true).GetAsync("/v1/admin/ping", Cancellation);
+        var response = await _host.CreateClient(owner, secondFactor: true).GetAsync("/v1/system/ping", Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
@@ -61,7 +61,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task A_request_without_a_token_is_unauthorized()
     {
-        var response = await _host.CreateClient().GetAsync("/v1/admin/ping", Cancellation);
+        var response = await _host.CreateClient().GetAsync("/v1/system/ping", Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }

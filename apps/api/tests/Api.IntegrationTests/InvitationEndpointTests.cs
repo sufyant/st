@@ -177,7 +177,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     {
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];
         var admin = _api.CreateClient(await _catalog.AddSystemAdminAsync(), secondFactor: true);
-        (await admin.PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail }, Cancellation)).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation)).EnsureSuccessStatusCode();
 
         return slug;
     }
