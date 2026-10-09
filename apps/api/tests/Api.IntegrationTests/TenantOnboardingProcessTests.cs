@@ -212,7 +212,7 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
 
     private Task<HttpResponseMessage> CreateTenantAsync(string admin, string slug, string ownerEmail) =>
         _api.CreateClient(admin, secondFactor: true)
-            .PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation);
+            .CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail });
 
     private IMessageBus Bus() => _api.Services.GetRequiredService<IHost>().MessageBus();
 

@@ -139,7 +139,8 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         await Bus().InvokeForTenantAsync<Result>(tenantA.ToString(), new WriteProbe("a"), Cancellation);
         await using var host = await PipelineHost.StartAsync(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:Pooled"] = new NpgsqlConnectionStringBuilder(database.ApplicationConnectionString) { MaxPoolSize = 1 }.ConnectionString,
+            ["ConnectionStrings:Database"] = new NpgsqlConnectionStringBuilder(database.ApplicationConnectionString) { MaxPoolSize = 1 }.ConnectionString,
+            ["ConnectionStrings:Messaging"] = database.ApplicationConnectionString,
         });
         var bus = host.Host.MessageBus();
 

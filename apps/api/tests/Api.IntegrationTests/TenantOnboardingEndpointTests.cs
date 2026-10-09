@@ -32,7 +32,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var slug = Slug();
         var owner = $"{Guid.NewGuid():N}@example.com";
 
-        var created = await _api.WaitingForMessagesAsync(() => admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail = owner }, Cancellation));
+        var created = await _api.WaitingForMessagesAsync(() => admin.CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail = owner }));
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("status").GetString().ShouldBe("Provisioning");
@@ -46,7 +46,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var admin = await AdminAsync();
         var existing = await _catalog.AddTenantAsync();
 
-        var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug = existing.Slug, ownerEmail = "owner@example.com" }, Cancellation);
+        var created = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = existing.Slug, ownerEmail = "owner@example.com" });
 
         created.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await created.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString().ShouldBe("tenant.slug_taken");
@@ -59,7 +59,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     {
         var admin = await AdminAsync();
 
-        var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation);
+        var created = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail });
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -71,7 +71,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var slug = Slug();
 
         var created = await _api.WaitingForMessagesAsync(() =>
-            admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail = "ali@acme.com" }, Cancellation));
+            admin.CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail = "ali@acme.com" }));
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         var tenant = await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation);
@@ -102,7 +102,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     {
         var admin = await AdminAsync();
 
-        var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { name, slug = Slug(), ownerEmail = "ali@acme.com" }, Cancellation);
+        var created = await admin.CreateTenantAsync(new { name, slug = Slug(), ownerEmail = "ali@acme.com" });
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await created.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString().ShouldBe("tenant.name_invalid");
@@ -113,7 +113,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     {
         var admin = await AdminAsync();
 
-        var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { slug = Slug(), ownerEmail = "ali@acme.com" }, Cancellation);
+        var created = await admin.CreateTenantAsync(new { slug = Slug(), ownerEmail = "ali@acme.com" });
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
@@ -130,7 +130,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     {
         var admin = await AdminAsync();
 
-        var created = await admin.PostAsync("/v1/system/tenants", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+        var created = await admin.CreateTenantAsync(new StringContent(body, Encoding.UTF8, "application/json"));
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await created.Content.ReadFromJsonAsync<HttpValidationProblemDetails>(Cancellation))!.Errors.Keys.ShouldBe([field]);
@@ -145,7 +145,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     {
         var admin = await AdminAsync();
 
-        var created = await admin.PostAsync("/v1/system/tenants", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+        var created = await admin.CreateTenantAsync(new StringContent(body, Encoding.UTF8, "application/json"));
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         created.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -158,7 +158,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var name = new string('n', 100);
 
         var created = await _api.WaitingForMessagesAsync(() =>
-            admin.PostAsJsonAsync("/v1/system/tenants", new { name, slug = Slug(), ownerEmail = "ali@acme.com" }, Cancellation));
+            admin.CreateTenantAsync(new { name, slug = Slug(), ownerEmail = "ali@acme.com" }));
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("name").GetString().ShouldBe(name);
@@ -171,12 +171,126 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
 
         var created = await _api.CreateClient(owner, secondFactor: true)
-            .PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug = Slug(), ownerEmail = "owner@example.com" }, Cancellation);
+            .CreateTenantAsync(new { name = "Acme Ltd", slug = Slug(), ownerEmail = "owner@example.com" });
 
         created.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    // Section 8: tenant creation carries an idempotency key, so a request sent twice does not create a second tenant.
+    [Fact]
+    public async Task CreateTenant_WithoutAnIdempotencyKey_IsABadRequest()
+    {
+        var admin = await AdminAsync();
+        var slug = Slug();
+
+        var created = await admin.PostAsJsonAsync(TenantRequests.Path, new { name = "Acme Ltd", slug, ownerEmail = "ali@acme.com" }, Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await created.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString().ShouldBe("idempotency_key_invalid");
+        (await CountAsync($"SELECT count(*) FROM catalog.tenants WHERE slug = '{slug}'")).ShouldBe(0);
+    }
+
+    public static TheoryData<string> InvalidIdempotencyKeys => ["", "has space", "tab\there", "ключ", new string('k', 256)];
+
+    [Theory]
+    [MemberData(nameof(InvalidIdempotencyKeys))]
+    public async Task CreateTenant_WithAnInvalidIdempotencyKey_IsABadRequest(string key)
+    {
+        var admin = await AdminAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, TenantRequests.Path)
+        {
+            Content = JsonContent.Create(new { name = "Acme Ltd", slug = Slug(), ownerEmail = "ali@acme.com" }),
+        };
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", key).ShouldBeTrue();
+
+        var created = await admin.SendAsync(request, Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await created.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString().ShouldBe("idempotency_key_invalid");
+    }
+
+    [Fact]
+    public async Task CreateTenant_AKeyOfTwoHundredFiftyFiveVisibleCharacters_IsAccepted()
+    {
+        var admin = await AdminAsync();
+
+        var created = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = Slug(), ownerEmail = "ali@acme.com" }, new string('~', 255));
+
+        created.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task CreateTenant_TheSameKeyAndBodyAgain_ReturnsTheFirstTenantAndCreatesNothingNew()
+    {
+        var admin = await AdminAsync();
+        var slug = Slug();
+        var body = new { name = "Acme Ltd", slug, ownerEmail = "ali@acme.com" };
+        var key = Guid.NewGuid().ToString();
+        var first = await _api.WaitingForMessagesAsync(() => admin.CreateTenantAsync(body, key));
+
+        var again = await _api.WaitingForMessagesAsync(() => admin.CreateTenantAsync(body, key));
+
+        var tenantId = await IdOfAsync(first);
+        again.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await IdOfAsync(again)).ShouldBe(tenantId);
+        (await CountAsync($"SELECT count(*) FROM catalog.tenants WHERE slug = '{slug}'")).ShouldBe(1);
+        (await CountAsync($"SELECT count(*) FROM catalog.invitations WHERE tenant_id = '{tenantId}'")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task CreateTenant_TheSameKeyWithAnotherBody_IsUnprocessable()
+    {
+        var admin = await AdminAsync();
+        var key = Guid.NewGuid().ToString();
+        await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = Slug(), ownerEmail = "ali@acme.com" }, key);
+        var otherSlug = Slug();
+
+        var reused = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = otherSlug, ownerEmail = "ali@acme.com" }, key);
+
+        reused.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await reused.Content.ReadFromJsonAsync<ProblemDetails>(Cancellation))!.Extensions["code"]?.ToString().ShouldBe("idempotency_key_reused");
+        (await CountAsync($"SELECT count(*) FROM catalog.tenants WHERE slug = '{otherSlug}'")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CreateTenant_TwoRequestsWithTheSameKeyAtOnce_CreateOneTenant()
+    {
+        var admin = await AdminAsync();
+        var slug = Slug();
+        var body = new { name = "Acme Ltd", slug, ownerEmail = "ali@acme.com" };
+        var key = Guid.NewGuid().ToString();
+
+        var created = await Task.WhenAll(admin.CreateTenantAsync(body, key), admin.CreateTenantAsync(body, key));
+
+        created.Select(response => response.StatusCode).ShouldBe([HttpStatusCode.OK, HttpStatusCode.OK]);
+        (await IdOfAsync(created[0])).ShouldBe(await IdOfAsync(created[1]));
+        (await CountAsync($"SELECT count(*) FROM catalog.tenants WHERE slug = '{slug}'")).ShouldBe(1);
+    }
+
+    // A key belongs to the system admin who sent it.
+    [Fact]
+    public async Task CreateTenant_TwoSystemAdminsWithTheSameKey_EachCreateTheirOwnTenant()
+    {
+        var first = await AdminAsync();
+        var second = await AdminAsync();
+        var key = Guid.NewGuid().ToString();
+        var firstSlug = Slug();
+        var secondSlug = Slug();
+
+        var byFirst = await first.CreateTenantAsync(new { name = "Acme Ltd", slug = firstSlug, ownerEmail = "ali@acme.com" }, key);
+        var bySecond = await second.CreateTenantAsync(new { name = "Globex", slug = secondSlug, ownerEmail = "hank@globex.com" }, key);
+
+        byFirst.StatusCode.ShouldBe(HttpStatusCode.OK);
+        bySecond.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await IdOfAsync(bySecond)).ShouldNotBe(await IdOfAsync(byFirst));
+    }
+
     private async Task<HttpClient> AdminAsync() => _api.CreateClient(await _catalog.AddSystemAdminAsync(), secondFactor: true);
+
+    private static async Task<Guid> IdOfAsync(HttpResponseMessage created) =>
+        (await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetGuid();
+
+    private Task<long> CountAsync(string sql) => database.ScalarAsSuperuserAsync<long>(sql);
 
     private static string Slug() => $"tenant-{Guid.NewGuid():N}"[..20];
 

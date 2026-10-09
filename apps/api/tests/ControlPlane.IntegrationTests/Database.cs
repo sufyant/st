@@ -20,6 +20,8 @@ public sealed class Database : IAsyncLifetime
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
 
+    public const string FirstSystemAdminEmail = "first-admin@app.test";
+
     private const string Password = "test-password";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18").Build();
@@ -68,7 +70,9 @@ public sealed class Database : IAsyncLifetime
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Invitations:AcceptUrl"] = AcceptUrl,
+                ["ControlPlane:Invitations:AcceptUrl"] = AcceptUrl,
+                ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
+                ["ControlPlane:FirstSystemAdminEmail"] = FirstSystemAdminEmail,
             })
             .AddInMemoryCollection(settings ?? [])
             .Build();
@@ -91,6 +95,18 @@ public sealed class Database : IAsyncLifetime
     }
 
     public Task RunScriptAsync(string script, params string[] variables) => RunScriptInAsync(MainDatabase, script, variables);
+
+    // A database set up the way a deployment is, for a test that needs the catalog as it starts, without the rows other tests write.
+    public async Task<string> CreateMigratedDatabaseAsync()
+    {
+        var name = await CreateEmptyDatabaseAsync();
+        foreach (var migrator in _services.GetServices<IModuleMigrator>())
+        {
+            await migrator.MigrateAsync(_services, ConnectionStringFor(DatabaseRoles.Owner, name), CancellationToken.None);
+        }
+
+        return name;
+    }
 
     // A database with the roles but no migrations, for a test that migrates it step by step.
     public async Task<string> CreateEmptyDatabaseAsync()

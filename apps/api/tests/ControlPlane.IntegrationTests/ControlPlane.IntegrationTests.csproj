@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <None Include="..\..\db\bootstrap.sql" Link="bootstrap.sql" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\db\seed-system-admin.sql" Link="seed-system-admin.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

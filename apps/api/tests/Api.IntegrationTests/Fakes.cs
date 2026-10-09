@@ -80,10 +80,13 @@ internal sealed partial class FakeEmailChannel : IEmailChannel
     // The next sends fail, then the channel recovers.
     public void FailNext(int sends) => _failures = sends;
 
+    // Every send to this address fails, as when one recipient's mail server keeps refusing.
+    public string? Refuses { get; set; }
+
     public Task SendAsync(EmailMessage email, CancellationToken cancellationToken)
     {
         Attempts.Enqueue((email, TimeProvider.System.GetTimestamp()));
-        if (IsDown || Interlocked.Decrement(ref _failures) >= 0)
+        if (IsDown || email.To == Refuses || Interlocked.Decrement(ref _failures) >= 0)
         {
             throw new HttpRequestException("The email service is down.");
         }

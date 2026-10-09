@@ -161,7 +161,6 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData("")]
     [InlineData("no-dot-at-all")]
     [InlineData("not-a-uuid.k3J9xSecret")]
     [InlineData(".k3J9xSecret")]
@@ -174,10 +173,13 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         (await CodeOfAsync(accepted)).ShouldBe("invitation.not_found");
     }
 
-    // OWASP API8: a request that leaves out the code, or sends it as null, is a bad request, never a server error.
+    // OWASP API8: a request that leaves out the code, sends it as null or sends it empty or blank is a bad request, one shape for
+    // all of them, never a server error.
     [Theory]
     [InlineData("{}")]
     [InlineData("""{"code":null}""")]
+    [InlineData("""{"code":""}""")]
+    [InlineData("""{"code":"   "}""")]
     public async Task AcceptInvitation_WithoutACode_IsABadRequest(string body)
     {
         var accepted = await _api.CreateClient($"user_{Guid.NewGuid():N}")
@@ -225,7 +227,7 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
     {
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];
         var admin = _api.CreateClient(await _catalog.AddSystemAdminAsync(), secondFactor: true);
-        (await admin.PostAsJsonAsync("/v1/system/tenants", new { name = "Acme Ltd", slug, ownerEmail }, Cancellation)).EnsureSuccessStatusCode();
+        (await admin.CreateTenantAsync(new { name = "Acme Ltd", slug, ownerEmail })).EnsureSuccessStatusCode();
 
         return slug;
     }

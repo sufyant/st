@@ -76,10 +76,10 @@ public sealed class ResendEmailChannelTests : IDisposable
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Resend:ApiKey"] = "re_test_key",
-                ["Resend:From"] = "App <no-reply@app.test>",
-                ["Resend:ApiUrl"] = "https://api.resend.test/",
-                ["Resend:Timeout"] = timeout,
+                ["Notifications:Resend:ApiKey"] = "re_test_key",
+                ["Notifications:Resend:From"] = "App <no-reply@app.test>",
+                ["Notifications:Resend:ApiUrl"] = "https://api.resend.test/",
+                ["Notifications:Resend:Timeout"] = timeout,
             })
             .Build();
 

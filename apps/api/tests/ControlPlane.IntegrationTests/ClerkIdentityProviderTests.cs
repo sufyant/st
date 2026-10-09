@@ -156,9 +156,9 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
             services => services.ConfigureHttpClientDefaults(client => client.ConfigurePrimaryHttpMessageHandler(() => _clerk)),
             settings: new()
             {
-                ["Clerk:SecretKey"] = "sk_test_secret",
-                ["Clerk:BackendApiUrl"] = "https://api.clerk.test/v1/",
-                ["Clerk:Timeout"] = timeout,
+                ["ControlPlane:Clerk:SecretKey"] = "sk_test_secret",
+                ["ControlPlane:Clerk:BackendApiUrl"] = "https://api.clerk.test/v1/",
+                ["ControlPlane:Clerk:Timeout"] = timeout,
             },
             realIdentityProvider: true);
 
