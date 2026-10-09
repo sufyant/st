@@ -34,6 +34,8 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
 
     internal DbSet<TenantOnboarding> TenantOnboardings => Set<TenantOnboarding>();
 
+    internal DbSet<TenantCreationRequest> TenantCreationRequests => Set<TenantCreationRequest>();
+
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -95,6 +97,17 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             onboarding.Property(o => o.State).HasConversion<string>().HasMaxLength(20);
             onboarding.Property(o => o.IdentityProviderInvitationId).HasMaxLength(255);
             onboarding.Property(o => o.Version).IsConcurrencyToken();
+        });
+
+        // A system admin's requests to create a tenant, by idempotency key (section 8). They belong to the system admin, not to a
+        // tenant: a request that comes again names its tenant before any tenant is declared for it.
+        modelBuilder.Entity<TenantCreationRequest>(request =>
+        {
+            request.HasKey(r => new { r.SystemAdminId, r.IdempotencyKey });
+            request.Property(r => r.IdempotencyKey).HasMaxLength(TenantCreationRequest.KeyMaxLength);
+            request.Property(r => r.RequestHash).HasMaxLength(64);
+            request.HasOne<User>().WithMany().HasForeignKey(r => r.SystemAdminId);
+            request.HasOne<Tenant>().WithMany().HasForeignKey(r => r.TenantId);
         });
 
         modelBuilder.Entity<SystemAdmin>(admin =>

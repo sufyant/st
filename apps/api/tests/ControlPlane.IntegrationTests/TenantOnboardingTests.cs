@@ -280,7 +280,7 @@ public sealed class TenantOnboardingTests(Database database)
 
     private static async Task<SharedKernel.Result<TenantDetails>> StartAsync(AsyncServiceScope scope, string adminId, string slug) =>
         (await StartTenantOnboardingHandler.HandleAsync(
-            new StartTenantOnboarding(adminId, "Acme Ltd", slug, Unique.Email()),
+            new StartTenantOnboarding(adminId, "Acme Ltd", slug, Unique.Email(), Guid.NewGuid().ToString()),
             scope.ServiceProvider.GetRequiredService<ITenantCatalog>(),
             scope.ServiceProvider.GetRequiredService<Application.Invitations.InvitationSettings>(),
             scope.ServiceProvider.GetRequiredService<OnboardingSettings>(),

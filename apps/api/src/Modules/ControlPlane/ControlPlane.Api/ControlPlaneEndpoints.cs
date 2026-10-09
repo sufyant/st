@@ -5,6 +5,7 @@ using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using SharedKernel;
 using Wolverine;
@@ -20,6 +21,11 @@ public static class ControlPlaneEndpoints
     private static readonly Error InvitationNotFound = Error.NotFound("invitation.not_found", "The invitation was not found.");
 
     private static readonly Error InvitationCodeRequired = Error.Validation("invitation.code_required", "The request has no invitation code.");
+
+    private static readonly Error IdempotencyKeyInvalid = Error.Validation(
+        "idempotency_key_invalid", $"The {IdempotencyKeyHeader} header must hold 1 to 255 visible ASCII characters.");
+
+    private const string IdempotencyKeyHeader = "Idempotency-Key";
 
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder signedIn,
@@ -66,13 +72,27 @@ public static class ControlPlaneEndpoints
             return tenants.Map(list => list.Map(tenant => new TenantSummaryResponse(tenant.Id, tenant.Name, tenant.Slug)));
         });
 
-        // Onboarding runs inside the tenant it creates. The tenant's id is chosen here, by the server, never by the client.
-        system.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
-                (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
+        // Onboarding runs inside the tenant it creates. The tenant's id is chosen here, by the server, never by the client. The client
+        // gives each new tenant an idempotency key; the same key with the same request answers with the tenant the first one created.
+        system.MapPost("/tenants", async (
+                CreateTenantRequest request,
+                [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
+                ClaimsPrincipal user,
+                IMessageBus bus,
+                TimeProvider time,
+                CancellationToken cancellationToken) =>
+            {
+                if (!StartTenantOnboarding.IsIdempotencyKey(idempotencyKey))
+                {
+                    return (Result<TenantResponse>)IdempotencyKeyInvalid;
+                }
+
+                var started = await bus.InvokeForTenantAsync<Result<TenantDetails>>(
                     Guid.CreateVersion7(time.GetUtcNow()).ToString(),
-                    new StartTenantOnboarding(user.Id(), request.Name, request.Slug, request.OwnerEmail),
-                    cancellationToken))
-                    .Map(tenant => new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status)))
+                    new StartTenantOnboarding(user.Id(), request.Name, request.Slug, request.OwnerEmail, idempotencyKey!),
+                    cancellationToken);
+                return started.Map(tenant => new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status));
+            })
             .RequireAuthorization(Permissions.SystemTenantsCreate);
 
         // The tenant comes from the route: the host has declared it, and row level security keeps the list to it.

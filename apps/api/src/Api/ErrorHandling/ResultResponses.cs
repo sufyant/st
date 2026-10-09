@@ -15,6 +15,7 @@ internal static class ResultResponses
         StatusCodes.Status403Forbidden,
         StatusCodes.Status404NotFound,
         StatusCodes.Status409Conflict,
+        StatusCodes.Status422UnprocessableEntity,
     ];
 
     public static TBuilder DescribeResults<TBuilder>(this TBuilder builder)

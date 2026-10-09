@@ -41,6 +41,7 @@ public sealed class OpenApiDocumentTests : IAsyncLifetime
     [InlineData("403")]
     [InlineData("404")]
     [InlineData("409")]
+    [InlineData("422")]
     public void The_failures_of_a_result_are_described_as_problem_details(string status)
     {
         var failure = Responses("/v1/greetings", "post").GetProperty(status);

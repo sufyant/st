@@ -36,6 +36,19 @@ public sealed class TenantCatalog(CatalogDbContext catalog) : ITenantCatalog
         return catalog.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
     }
 
+    Task<Tenant> ITenantCatalog.FindTenantAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        catalog.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
+
+    // A transaction-level advisory lock on the system admin and the key: it is not data, so taking it changes nothing (W7).
+    async Task<TenantCreationRequest?> ITenantCatalog.FindCreationRequestAsync(Guid systemAdminId, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        var lockKey = $"tenant_creation_requests/{systemAdminId}/{idempotencyKey}";
+        await catalog.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken);
+
+        return await catalog.TenantCreationRequests.AsNoTracking()
+            .SingleOrDefaultAsync(request => request.SystemAdminId == systemAdminId && request.IdempotencyKey == idempotencyKey, cancellationToken);
+    }
+
     async Task<Tenant> ITenantCatalog.FindTenantForUpdateAsync(CancellationToken cancellationToken)
     {
         var found = await catalog.Tenants
@@ -102,6 +115,8 @@ public sealed class TenantCatalog(CatalogDbContext catalog) : ITenantCatalog
     }
 
     void ITenantCatalog.Add(Invitation invitation) => catalog.Invitations.Add(invitation);
+
+    void ITenantCatalog.Add(TenantCreationRequest request) => catalog.TenantCreationRequests.Add(request);
 
     void ITenantCatalog.Add(User user) => catalog.Users.Add(user);
 
