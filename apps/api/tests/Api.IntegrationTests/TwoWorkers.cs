@@ -100,15 +100,18 @@ internal sealed class TwoWorkers : IAsyncDisposable
     public Task<long> DeadLettersAsync() =>
         _database.ScalarAsSuperuserAsync<long>("SELECT count(*) FROM wolverine.wolverine_dead_letters", DatabaseName);
 
-    public async Task<string> AddSystemAdminAsync()
+    public Task<string> AddSystemAdminAsync() => AddSystemAdminAsync(_database, DatabaseName);
+
+    // A system admin in the database's staff list, by the user's external id.
+    public static async Task<string> AddSystemAdminAsync(Database database, string databaseName)
     {
         var externalId = $"user_{Guid.NewGuid():N}";
-        await _database.ScalarAsSuperuserAsync<object>(
+        await database.ScalarAsSuperuserAsync<object>(
             $"""
             INSERT INTO catalog.users (id, external_id) VALUES ('{Guid.NewGuid()}', '{externalId}');
             INSERT INTO catalog.system_admins (user_id, granted_at) SELECT id, now() FROM catalog.users WHERE external_id = '{externalId}';
             """,
-            DatabaseName);
+            databaseName);
 
         return externalId;
     }
