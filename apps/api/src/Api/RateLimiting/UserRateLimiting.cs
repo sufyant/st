@@ -2,17 +2,17 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
-using Api.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace Api.RateLimiting;
 
-// In-memory, per-pod limits from configuration.
-internal static class TenantRateLimiting
+// In-memory, per-pod limits from configuration. API4: the bucket is the signed-in user, so one member of a tenant cannot use up the
+// requests of the others; a caller without a user is limited by their address.
+internal static class UserRateLimiting
 {
-    public const string Policy = "per-tenant";
+    public const string Policy = "per-user";
 
-    public static IServiceCollection AddTenantRateLimiting(this IServiceCollection services)
+    public static IServiceCollection AddUserRateLimiting(this IServiceCollection services)
     {
         services.AddOptions<RateLimitingOptions>()
             .BindConfiguration(RateLimitingOptions.Section)
@@ -37,12 +37,8 @@ internal static class TenantRateLimiting
         });
     }
 
-    // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the id in the route alone is
-    // never a key.
     private static string PartitionKey(HttpContext context) =>
-        context.RequestServices.GetRequiredService<RequestAccess>().Membership is { } membership ? $"tenant:{membership.TenantId}"
-        : context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } userId ? $"user:{userId}"
-        : $"ip:{context.Connection.RemoteIpAddress}";
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } userId ? $"user:{userId}" : $"ip:{context.Connection.RemoteIpAddress}";
 
     private static async ValueTask WriteProblemAsync(OnRejectedContext rejected, CancellationToken cancellationToken)
     {

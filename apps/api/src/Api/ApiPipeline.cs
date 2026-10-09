@@ -110,7 +110,7 @@ internal static class ApiPipeline
             .WithMethods(HttpMethods.Get, HttpMethods.Post)
             .WithHeaders(HeaderNames.Authorization, HeaderNames.ContentType, IdempotencyKeyHeader)));
 
-        builder.Services.AddTenantRateLimiting();
+        builder.Services.AddUserRateLimiting();
         builder.Services.AddHealthChecks();
         builder.Services.AddOpenApi();
 
@@ -130,14 +130,14 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so tenant resolution sees the tenant id, and the rate limiter the resolved tenant. A browser's preflight
-        // is answered before anything asks who the caller is. Authorization comes last, so callers it turns away have been rate limited
-        // too.
+        // Routing runs first so tenant resolution sees the tenant id. A browser's preflight is answered before anything asks who the
+        // caller is. The rate limiter needs only the user, so a caller over their limit costs no membership lookup. Authorization comes
+        // last, so callers it turns away have been rate limited too.
         app.UseRouting();
         app.UseCors();
         app.UseAuthentication();
-        app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseRateLimiter();
+        app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseAuthorization();
 
         app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false }).AllowAnonymous();
@@ -164,7 +164,7 @@ internal static class ApiPipeline
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()
             .DescribeResults()
-            .RequireRateLimiting(TenantRateLimiting.Policy);
+            .RequireRateLimiting(UserRateLimiting.Policy);
 
     // The endpoints of the version group that any signed-in user may call, without a permission (A5).
     public static RouteGroupBuilder MapSignedIn(this RouteGroupBuilder v1) => v1.MapGroup("").RequireSignedIn();
