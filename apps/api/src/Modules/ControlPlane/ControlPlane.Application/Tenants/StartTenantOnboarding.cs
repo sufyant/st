@@ -25,6 +25,8 @@ public sealed class StartTenantOnboardingValidator : AbstractValidator<StartTena
     }
 }
 
+// Every rejection returns before the handler changes anything, because Wolverine commits a failed Result too (W7); a taken slug is
+// found by the insert itself, which writes nothing then.
 public static class StartTenantOnboardingHandler
 {
     public static async Task<(Result<TenantDetails>, CreateFirstOwnerInvitation?)> HandleAsync(
