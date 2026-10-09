@@ -2,48 +2,82 @@ using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
+using ControlPlane.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel;
 using Wolverine;
+using Wolverine.Persistence;
 
 namespace ControlPlane.IntegrationTests;
 
-// The module's handlers, called in their tenant with the services Wolverine would pass them.
+// The module's handlers, called in their tenant with the services Wolverine would pass them. A handler that calls a system we do
+// not own runs without a transaction, as Wolverine runs it.
 internal static class Handlers
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    // The delivery runs after the invitation is saved, in the invitation's tenant, the way the outbox hands it on.
-    public static Task DeliverAsync(IServiceProvider services, Guid tenantId, DeliverInvitation delivery) =>
-        InTenant.RunAsync(services, tenantId, scope => DeliverInvitationHandler.HandleAsync(
-            delivery,
-            scope.GetRequiredService<ITenantCatalog>(),
-            scope.GetRequiredService<IIdentityProvider>(),
-            scope.GetRequiredService<IInvitationSender>(),
-            scope.GetRequiredService<InvitationSettings>(),
-            Cancellation));
-
-    // A tenant's first owner invited the way onboarding does it: the invitation step, then the activation, which hands on the
-    // invitation's delivery. The tenant is active afterwards, and the invitation is not delivered yet.
-    public static async Task<(Guid TenantId, string Slug, Guid InvitationId, DeliverInvitation Delivery)> InviteFirstOwnerAsync(
+    // Onboarding runs inside the tenant it creates, whose id the endpoint chooses. The saga it starts is inserted in the same
+    // transaction, as Wolverine inserts a returned Insert<T>.
+    public static Task<StartedOnboarding> StartOnboardingAsync(
         IServiceProvider services,
-        string ownerEmail)
-    {
-        var tenant = await Catalog.AddTenantAsync(services, Domain.Tenants.TenantStatus.Provisioning);
-        var admin = await Catalog.AddUserAsync(services);
-        var invitationId = Guid.CreateVersion7();
-        var activate = await InviteFirstOwnerAsync(services, tenant.Id, new CreateFirstOwnerInvitation(invitationId, ownerEmail, admin.Id));
-        var (delivery, _) = await ActivateAsync(services, tenant.Id, activate.ShouldNotBeNull());
+        Guid tenantId,
+        string adminId,
+        string slug,
+        string ownerEmail) =>
+        InTenant.RunAsync(services, tenantId, async scope =>
+        {
+            var (result, onboarding, register, timeout) = await StartTenantOnboardingHandler.HandleAsync(
+                new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail),
+                scope.GetRequiredService<ITenantCatalog>(),
+                scope.GetRequiredService<InvitationSettings>(),
+                scope.GetRequiredService<OnboardingSettings>(),
+                scope.GetRequiredService<TimeProvider>(),
+                Cancellation);
+            if (onboarding is not null)
+            {
+                scope.GetRequiredService<CatalogDbContext>().Add(onboarding.Entity);
+            }
 
-        return (tenant.Id, tenant.Slug, invitationId, delivery.ShouldNotBeNull());
+            return new StartedOnboarding(result, onboarding, register, timeout);
+        });
+
+    public static async Task<OwnerRegistered> RegisterOwnerAsync(IServiceProvider services, RegisterOwnerWithIdentityProvider step)
+    {
+        await using var scope = services.CreateAsyncScope();
+        return await RegisterOwnerWithIdentityProviderHandler.HandleAsync(step, scope.ServiceProvider.GetRequiredService<IIdentityProvider>(), Cancellation);
     }
 
-    public static async Task<(Guid TenantId, string Slug, Guid InvitationId)> InviteAndDeliverAsync(IServiceProvider services, string ownerEmail)
-    {
-        var (tenantId, slug, invitationId, delivery) = await InviteFirstOwnerAsync(services, ownerEmail);
-        await DeliverAsync(services, tenantId, delivery);
+    public static Task<(TenantActivated? Activated, OwnerInvitationReady? Ready)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
+        InTenant.RunAsync(services, tenantId, scope => ActivateTenantHandler.HandleAsync(
+            step,
+            scope.GetRequiredService<ITenantCatalog>(),
+            scope.GetRequiredService<TimeProvider>(),
+            Cancellation));
 
-        return (tenantId, slug, invitationId);
+    public static Task<TenantCancelled> CancelTenantAsync(IServiceProvider services, Guid tenantId, CancelTenant step) =>
+        InTenant.RunAsync(services, tenantId, scope => CancelTenantHandler.HandleAsync(step, scope.GetRequiredService<ITenantCatalog>(), Cancellation));
+
+    public static Task CancelInvitationAsync(IServiceProvider services, Guid tenantId, CancelInvitation step) =>
+        InTenant.RunAsync(services, tenantId, scope => CancelInvitationHandler.HandleAsync(step, scope.GetRequiredService<ITenantCatalog>(), Cancellation));
+
+    public static async Task RevokeOwnerRegistrationAsync(IServiceProvider services, RevokeOwnerRegistration step)
+    {
+        await using var scope = services.CreateAsyncScope();
+        await RevokeOwnerRegistrationHandler.HandleAsync(step, scope.ServiceProvider.GetRequiredService<IIdentityProvider>(), Cancellation);
+    }
+
+    // A tenant onboarded up to its pivot, the way the saga drives it: started, its first owner registered with the identity
+    // provider, and activated. Returns what the invitation email is sent from.
+    public static async Task<(Guid TenantId, string Slug, OwnerInvitationReady Ready)> OnboardAsync(IServiceProvider services, string ownerEmail)
+    {
+        var admin = await Catalog.AddUserAsync(services);
+        var tenantId = Guid.CreateVersion7();
+        var slug = Unique.Slug();
+        var started = await StartOnboardingAsync(services, tenantId, admin.ExternalId, slug, ownerEmail);
+        var registered = await RegisterOwnerAsync(services, started.Register.ShouldNotBeNull().Message);
+        var (_, ready) = await ActivateAsync(services, tenantId, new ActivateTenant(tenantId, registered.InvitationId, registered.Link));
+
+        return (tenantId, slug, ready.ShouldNotBeNull());
     }
 
     // Accepting starts outside any tenant: the invitation code names the tenant, the identity provider is asked for the user's
@@ -63,49 +97,6 @@ internal static class Handlers
             Cancellation));
     }
 
-    // Onboarding runs inside the tenant it creates, whose id the endpoint chooses.
-    public static Task<(Result<TenantDetails> Result, CreateFirstOwnerInvitation? Next)> StartOnboardingAsync(
-        IServiceProvider services,
-        Guid tenantId,
-        string adminId,
-        string slug,
-        string ownerEmail) =>
-        InTenant.RunAsync(services, tenantId, scope => StartTenantOnboardingHandler.HandleAsync(
-            new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail),
-            scope.GetRequiredService<ITenantCatalog>(),
-            scope.GetRequiredService<TimeProvider>(),
-            Cancellation));
-
-    public static Task<ActivateTenant?> InviteFirstOwnerAsync(IServiceProvider services, Guid tenantId, CreateFirstOwnerInvitation step) =>
-        InTenant.RunAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
-            step,
-            scope.GetRequiredService<ITenantCatalog>(),
-            scope.GetRequiredService<InvitationSettings>(),
-            scope.GetRequiredService<TimeProvider>(),
-            Cancellation));
-
-    public static Task<(DeliverInvitation? Delivery, TenantActivated? Activated)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
-        InTenant.RunAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
-            step,
-            scope.GetRequiredService<ITenantCatalog>(),
-            Cancellation));
-
-    // The fault Wolverine publishes once a step has gone to the dead letter queue.
-    public static Task FailOnboardingAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
-        InTenant.RunAsync(services, tenantId, scope => FailTenantOnboardingHandler.HandleAsync(
-            new Fault<ActivateTenant>(
-                step,
-                ExceptionInfo.From(new InvalidOperationException("The step failed."), includeMessage: false, includeStackTrace: false),
-                4,
-                DateTimeOffset.UtcNow,
-                null,
-                Guid.Empty,
-                tenantId.ToString(),
-                null,
-                new Dictionary<string, string?>()),
-            scope.GetRequiredService<ITenantCatalog>(),
-            Cancellation));
-
     // The invitation code an accept link carries: `<tenantId>.<secret>`.
     public static string CodeOf(Uri link) =>
         Uri.UnescapeDataString(link.Query.TrimStart('?').Split('&').Single(pair => pair.StartsWith("code=", StringComparison.Ordinal))["code=".Length..]);
@@ -113,4 +104,10 @@ internal static class Handlers
     public static Guid TenantIdOf(string code) => Guid.Parse(code[..code.IndexOf('.', StringComparison.Ordinal)]);
 
     public static string SecretOf(string code) => code[(code.IndexOf('.', StringComparison.Ordinal) + 1)..];
+
+    public sealed record StartedOnboarding(
+        Result<TenantDetails> Result,
+        Insert<TenantOnboarding>? Onboarding,
+        DeliveryMessage<RegisterOwnerWithIdentityProvider>? Register,
+        RegistrationTimedOut? Timeout);
 }

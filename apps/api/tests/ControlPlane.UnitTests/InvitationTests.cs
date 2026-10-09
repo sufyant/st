@@ -13,50 +13,62 @@ public class InvitationTests
     private static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
     private const string Token = "the-invitation-token";
 
-    // The token is born when the invitation is delivered, so no stored message ever carries it.
+    // The secret is born with the invitation, and only its hash is kept.
     [Fact]
-    public void A_new_invitation_has_no_token_yet()
+    public void CreateInvitation_WithItsSecret_StoresTheHashNeverTheSecret()
     {
         var invitation = Invite("ada@example.com");
 
-        invitation.TokenHash.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Issuing_a_token_stores_its_hash_never_the_token()
-    {
-        var invitation = Invite("ada@example.com");
-
-        var issued = invitation.IssueToken(Token);
-
-        issued.ShouldBeTrue();
         invitation.TokenHash.ShouldBe(InvitationToken.Hash(Token));
         invitation.TokenHash.ShouldNotBeNull().ShouldNotContain(Token);
     }
 
-    // A delivery that arrives twice must not replace the token the first one sent.
     [Fact]
-    public void A_token_is_issued_only_once()
+    public void CancelInvitation_Pending_IsCancelled()
     {
         var invitation = Invite("ada@example.com");
-        invitation.IssueToken(Token);
 
-        var issued = invitation.IssueToken("another-token");
+        var cancelled = invitation.Cancel();
 
-        issued.ShouldBeFalse();
-        invitation.TokenHash.ShouldBe(InvitationToken.Hash(Token));
+        cancelled.ShouldBeTrue();
+        invitation.Status.ShouldBe(InvitationStatus.Cancelled);
+    }
+
+    // A compensation may arrive twice.
+    [Fact]
+    public void CancelInvitation_AlreadyCancelled_ChangesNothing()
+    {
+        var invitation = Invite("ada@example.com");
+        invitation.Cancel();
+
+        var cancelled = invitation.Cancel();
+
+        cancelled.ShouldBeFalse();
+        invitation.Status.ShouldBe(InvitationStatus.Cancelled);
     }
 
     [Fact]
-    public void An_invitation_that_is_no_longer_pending_is_issued_no_token()
+    public void CancelInvitation_Accepted_StaysAccepted()
     {
         var invitation = Invite("ada@example.com");
         invitation.Accept(["ada@example.com"], AccepterId, Now);
 
-        var issued = invitation.IssueToken(Token);
+        var cancelled = invitation.Cancel();
 
-        issued.ShouldBeFalse();
-        invitation.TokenHash.ShouldBeNull();
+        cancelled.ShouldBeFalse();
+        invitation.Status.ShouldBe(InvitationStatus.Accepted);
+    }
+
+    [Fact]
+    public void AcceptInvitation_Cancelled_IsRefused()
+    {
+        var invitation = Invite("ada@example.com");
+        invitation.Cancel();
+
+        var accepted = invitation.Accept(["ada@example.com"], AccepterId, Now);
+
+        accepted.Error.Code.ShouldBe("invitation.not_pending");
+        invitation.Status.ShouldBe(InvitationStatus.Cancelled);
     }
 
     [Fact]
@@ -125,5 +137,5 @@ public class InvitationTests
     }
 
     private static Invitation Invite(string email) =>
-        Invitation.Create(Id, TenantId, email, BuiltInRoles.Member, InviterId, Now, Lifetime);
+        Invitation.Create(Id, TenantId, email, BuiltInRoles.Member, InviterId, Now, Lifetime, Token);
 }

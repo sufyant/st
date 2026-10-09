@@ -1,4 +1,5 @@
 using ControlPlane.Application.Ports;
+using Notifications.Application.Ports;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -16,7 +17,7 @@ internal sealed class OnboardingApp(Database database) : WebApplicationFactory<P
 {
     public FakeIdentityProvider Identity { get; } = new();
 
-    public FakeInvitationSender Sender { get; } = new();
+    public FakeEmailChannel Email { get; } = new();
 
     public HttpClient ClientFor(string userId, bool secondFactor = false)
     {
@@ -26,7 +27,7 @@ internal sealed class OnboardingApp(Database database) : WebApplicationFactory<P
     }
 
     // Runs the action and waits until every message it caused has been handled: the steps of the onboarding saga and the
-    // invitation's delivery run after the request, through the outbox.
+    // invitation email run after the request, through the outbox.
     public async Task<T> WaitingForMessagesAsync<T>(Func<Task<T>> action)
     {
         var result = default(T)!;
@@ -50,7 +51,7 @@ internal sealed class OnboardingApp(Database database) : WebApplicationFactory<P
         {
             services.TrustTestKey();
             services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));
-            services.Replace(ServiceDescriptor.Singleton<IInvitationSender>(Sender));
+            services.Replace(ServiceDescriptor.Singleton<IEmailChannel>(Email));
         });
     }
 }

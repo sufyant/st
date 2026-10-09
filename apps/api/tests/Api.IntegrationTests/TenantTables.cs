@@ -25,6 +25,9 @@ internal static class TenantTables
                 INSERT INTO catalog.memberships (tenant_id, user_id, role_id)
                 SELECT '{tenant}', member.id, roles.id FROM member, catalog.roles WHERE roles.built_in = 'Member'
                 """),
+        ["catalog.tenant_onboardings"] = new(
+            ApplicationMayUpdate: true,
+            tenant => $"INSERT INTO catalog.tenant_onboardings (id, tenant_id, state, invitation_id, invitation_email_timeout, version) VALUES (gen_random_uuid(), '{tenant}', 'Registering', gen_random_uuid(), interval '2 hours', 0)"),
         ["probes.probes"] = new(
             ApplicationMayUpdate: true,
             tenant => $"INSERT INTO probes.probes (id, value, tenant_id) VALUES (gen_random_uuid(), 'isolation', '{tenant}')"),

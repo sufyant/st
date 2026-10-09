@@ -63,10 +63,10 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
         var invitationId = new Guid("0199a8f0-0000-7000-8000-000000000401");
         _clerk.Respond("""{"object":"invitation","id":"inv_1","url":"https://accounts.clerk.test/sign-up?__clerk_ticket=t"}""");
 
-        var link = await Identity().InviteAsync(
+        var invited = await Identity().InviteAsync(
             "ada@example.com", invitationId, new Uri("https://app.test/invitations/accept?token=abc"), Cancellation);
 
-        link.ShouldBe(new Uri("https://accounts.clerk.test/sign-up?__clerk_ticket=t"));
+        invited.ShouldBe(new IdentityProviderInvitation("inv_1", new Uri("https://accounts.clerk.test/sign-up?__clerk_ticket=t")));
         var request = _clerk.Requests.ShouldHaveSingleItem();
         (request.Method, request.Uri).ShouldBe((HttpMethod.Post, new Uri("https://api.clerk.test/v1/invitations")));
         var body = JsonDocument.Parse(request.Body!).RootElement;
@@ -75,6 +75,41 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
         body.GetProperty("ignore_existing").GetBoolean().ShouldBeTrue();
         body.GetProperty("redirect_url").GetString().ShouldBe("https://app.test/invitations/accept?token=abc");
         body.GetProperty("public_metadata").GetProperty("invitation_id").GetString().ShouldBe(invitationId.ToString());
+    }
+
+    [Fact]
+    public async Task RevokeInvitation_Pending_IsRevokedAtClerk()
+    {
+        _clerk.Respond("""{"object":"invitation","id":"inv_1","status":"revoked","revoked":true}""");
+
+        await Identity().RevokeInvitationAsync("inv_1", Cancellation);
+
+        var request = _clerk.Requests.ShouldHaveSingleItem();
+        (request.Method, request.Uri).ShouldBe((HttpMethod.Post, new Uri("https://api.clerk.test/v1/invitations/inv_1/revoke")));
+    }
+
+    // Clerk revokes only an active invitation and answers 400 for any other, and 404 for one it does not know: a revocation that
+    // arrives again finds nothing left to revoke.
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task RevokeInvitation_NoLongerActive_IsDone(HttpStatusCode status)
+    {
+        _clerk.Respond("""{"errors":[{"code":"resource_not_found"}]}""", status);
+
+        var revoke = async () => await Identity().RevokeInvitationAsync("inv_1", Cancellation);
+
+        await revoke.ShouldNotThrowAsync();
+    }
+
+    [Fact]
+    public async Task RevokeInvitation_ClerkFails_IsAnError()
+    {
+        _clerk.Respond("""{"errors":[{"code":"internal"}]}""", HttpStatusCode.InternalServerError);
+
+        var revoke = async () => await Identity().RevokeInvitationAsync("inv_1", Cancellation);
+
+        await revoke.ShouldThrowAsync<HttpRequestException>();
     }
 
     [Fact]

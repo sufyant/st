@@ -87,40 +87,55 @@ public class TenantTests
         tenant.Status.ShouldBe(TenantStatus.Active);
     }
 
-    // A tenant's onboarding ends active or failed, never both.
+    // A tenant's onboarding ends active or cancelled, never both.
     [Fact]
-    public void Only_a_provisioning_tenant_is_activated()
+    public void ActivateTenant_Cancelled_StaysCancelled()
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
-        tenant.Fail();
+        tenant.Cancel("identity_provider_failed");
 
         var activated = tenant.Activate();
 
         activated.ShouldBeFalse();
-        tenant.Status.ShouldBe(TenantStatus.Failed);
+        tenant.Status.ShouldBe(TenantStatus.Cancelled);
     }
 
     [Fact]
-    public void A_provisioning_tenant_fails()
+    public void CancelTenant_Provisioning_IsCancelledWithItsReason()
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
 
-        var failed = tenant.Fail();
+        var cancelled = tenant.Cancel("identity_provider_failed");
 
-        failed.ShouldBeTrue();
-        tenant.Status.ShouldBe(TenantStatus.Failed);
+        cancelled.ShouldBeTrue();
+        tenant.Status.ShouldBe(TenantStatus.Cancelled);
+        tenant.CancellationReason.ShouldBe("identity_provider_failed");
     }
 
-    // The invitation's delivery comes after activation and is not compensated, so an active tenant stays active.
+    // A compensation may arrive twice; the first reason stays.
     [Fact]
-    public void An_active_tenant_does_not_fail()
+    public void CancelTenant_AlreadyCancelled_KeepsTheFirstReason()
+    {
+        var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
+        tenant.Cancel("identity_provider_failed");
+
+        var cancelled = tenant.Cancel("registration_timed_out");
+
+        cancelled.ShouldBeFalse();
+        tenant.CancellationReason.ShouldBe("identity_provider_failed");
+    }
+
+    // Activation is the pivot: an active tenant is not cancelled.
+    [Fact]
+    public void CancelTenant_Active_StaysActive()
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
         tenant.Activate();
 
-        var failed = tenant.Fail();
+        var cancelled = tenant.Cancel("activation_failed");
 
-        failed.ShouldBeFalse();
+        cancelled.ShouldBeFalse();
         tenant.Status.ShouldBe(TenantStatus.Active);
+        tenant.CancellationReason.ShouldBeNull();
     }
 }

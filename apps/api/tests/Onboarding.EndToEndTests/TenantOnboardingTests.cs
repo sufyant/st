@@ -40,7 +40,7 @@ public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
         var strangerMembers = await stranger.GetAsync($"/v1/tenants/{tenantId}/members", Cancellation);
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
-        _app.Sender.Sent.Single(sent => sent.Email == ownerEmail).Link.ShouldBe(new Uri($"https://clerk.test/invitations/{invitation.InvitationId}"));
+        _app.Email.Sent.Single(sent => sent.To == ownerEmail).Text.ShouldContain($"https://clerk.test/invitations/{invitation.InvitationId}");
         accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetGuid().ShouldBe(tenantId);
         myTenants.GetProperty("items").EnumerateArray()

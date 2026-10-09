@@ -62,7 +62,7 @@ public sealed class TenantCatalogTests(Database database)
     public async Task A_tenant_does_not_find_the_invitation_of_another_tenant()
     {
         var email = Unique.Email();
-        await Handlers.InviteAndDeliverAsync(database.Services, email);
+        await Handlers.OnboardAsync(database.Services, email);
         var tokenHash = InvitationToken.Hash(Handlers.SecretOf(Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink)));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
@@ -75,7 +75,8 @@ public sealed class TenantCatalogTests(Database database)
     [Fact]
     public async Task A_tenant_does_not_find_the_invitation_of_another_tenant_by_its_id()
     {
-        var (_, _, invitationId, _) = await Handlers.InviteFirstOwnerAsync(database.Services, Unique.Email());
+        var (_, _, ready) = await Handlers.OnboardAsync(database.Services, Unique.Email());
+        var invitationId = ready.InvitationId;
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
