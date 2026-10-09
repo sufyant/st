@@ -1,6 +1,5 @@
 using System.Net;
 using ControlPlane.Contracts;
-using Notifications.Contracts;
 
 namespace Api.IntegrationTests;
 
@@ -52,7 +51,7 @@ public sealed class TwoWorkerTests(Database database)
         var dead = await workers.Hold.HeldInAsync();
         await workers.WaitForOnboardingStateAsync(tenantId, "SendingInvitation");
         await workers.CrashAsync(dead);
-        await workers.Runs.HandledAsync<InvitationEmailSent>();
+        await workers.WaitForOnboardingStateAsync(tenantId, "Completed");
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await workers.OnboardingStateAsync(tenantId)).ShouldBe("Completed");

@@ -19,8 +19,6 @@ internal sealed class TwoWorkers : IAsyncDisposable
     public const string First = "worker-1";
     public const string Second = "worker-2";
 
-    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
-
     private readonly Database _database;
     private readonly Dictionary<string, ApiFactory> _workers;
 
@@ -53,7 +51,7 @@ internal sealed class TwoWorkers : IAsyncDisposable
 
         // The web host leads the cluster: the case in which the workers' durability agents are assigned by a node that runs none.
         _ = workers.Web.Services;
-        await WaitUntilAsync(async () => await database.ScalarAsSuperuserAsync<long>(
+        await Waiting.UntilAsync(async () => await database.ScalarAsSuperuserAsync<long>(
             "SELECT count(*) FROM wolverine.wolverine_node_assignments WHERE id = 'wolverine://leader/'", name) == 1);
         foreach (var worker in workers._workers.Values)
         {
@@ -87,12 +85,12 @@ internal sealed class TwoWorkers : IAsyncDisposable
     }
 
     // Waits until the inbox shows the given number of messages of the type as handled, so no host will run any of them again.
-    public Task WaitForHandledAsync<TMessage>(int count) => WaitUntilAsync(async () => await _database.ScalarAsSuperuserAsync<long>(
+    public Task WaitForHandledAsync<TMessage>(int count) => Waiting.UntilAsync(async () => await _database.ScalarAsSuperuserAsync<long>(
         $"SELECT count(*) FROM wolverine.wolverine_incoming_envelopes WHERE status = 'Handled' AND message_type = '{typeof(TMessage).FullName}'",
         DatabaseName) == count);
 
     public Task WaitForOnboardingStateAsync(Guid tenantId, string state) =>
-        WaitUntilAsync(async () => await OnboardingStateAsync(tenantId) == state);
+        Waiting.UntilAsync(async () => await OnboardingStateAsync(tenantId) == state);
 
     public Task<string?> OnboardingStateAsync(Guid tenantId) =>
         _database.ScalarAsSuperuserAsync<string>($"SELECT state FROM catalog.tenant_onboardings WHERE id = '{tenantId}'", DatabaseName);
@@ -163,16 +161,6 @@ internal sealed class TwoWorkers : IAsyncDisposable
         durability.ScheduledJobPollingTime = TimeSpan.FromSeconds(1);
         durability.ScheduledJobFirstExecution = TimeSpan.Zero;
         durability.OrphanedMessageSweepPollingTime = TimeSpan.FromSeconds(1);
-    }
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(Patience);
-        while (!await condition())
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(100), timeout.Token);
-        }
     }
 }
 

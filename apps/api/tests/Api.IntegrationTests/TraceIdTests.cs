@@ -31,18 +31,18 @@ public sealed class TraceIdTests(Database database)
     {
         using var spans = new HandlerSpans();
         var logs = new LogRecords();
-        var runs = new HandlerRuns();
         var name = await database.CreateMigratedDatabaseAsync();
-        await using var web = Host(name, "web", runs, logs);
-        await using var worker = Host(name, "worker", runs, logs);
+        await using var web = Host(name, "web", logs);
+        await using var worker = Host(name, "worker", logs);
         _ = worker.Services;
         var admin = web.CreateClient(await TwoWorkers.AddSystemAdminAsync(database, name), secondFactor: true);
         var traceId = ActivityTraceId.CreateRandom();
         admin.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
 
         var created = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = "acme", ownerEmail = "owner@acme.test" });
-        await runs.HandledAsync<InvitationEmailSent>();
-        var handlers = spans.OfTenant(await TwoWorkers.IdOfAsync(created));
+        var tenantId = await TwoWorkers.IdOfAsync(created);
+        await Waiting.UntilAsync(() => spans.OfTenant(tenantId).Any(span => span.MessageType == typeof(InvitationEmailSent).FullName));
+        var handlers = spans.OfTenant(tenantId);
 
         handlers.Select(span => span.MessageType).Distinct().ShouldBe(OnboardingHandlers, ignoreOrder: true);
         handlers.Select(span => span.TraceId).Distinct().ShouldBe([traceId]);
@@ -50,15 +50,11 @@ public sealed class TraceIdTests(Database database)
     }
 
     // The worker writes the invitation email to its log: in Development without Resend, that is the email channel.
-    private ApiFactory Host(string databaseName, string role, HandlerRuns runs, LogRecords logs) => new(
+    private ApiFactory Host(string databaseName, string role, LogRecords logs) => new(
         database.ConnectionStringFor(DatabaseRoles.Application, databaseName),
         fakeEmailChannel: false,
         settings: new Dictionary<string, string?> { ["Host:Role"] = role },
-        configureServices: services =>
-        {
-            HandlerRunsOfHost.Register(role, runs)(services);
-            services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddProcessor(logs));
-        });
+        configureServices: services => services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddProcessor(logs)));
 
     // The handler spans Wolverine starts in any host of this process. It names a handler's span after the message type it handles.
     private sealed class HandlerSpans : IDisposable
