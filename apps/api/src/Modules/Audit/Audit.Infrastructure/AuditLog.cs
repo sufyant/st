@@ -4,12 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Audit.Infrastructure;
 
-internal sealed class AuditLog(AuditDbContext audit) : IAuditLog
+/// <summary>The audit log on the module's DbContext.</summary>
+/// <remarks>Public only so that Wolverine's generated code can build it on the handler's own DbContext (W1, W9).</remarks>
+public sealed class AuditLog(AuditDbContext audit) : IAuditLog
 {
-    public Task<bool> ContainsAsync(Guid entryId, CancellationToken cancellationToken) =>
+    Task<bool> IAuditLog.ContainsAsync(Guid entryId, CancellationToken cancellationToken) =>
         audit.Entries.AnyAsync(entry => entry.Id == entryId, cancellationToken);
 
-    public async Task AddAsync(AuditEntry entry, CancellationToken cancellationToken)
+    async Task IAuditLog.AddAsync(AuditEntry entry, CancellationToken cancellationToken)
     {
         audit.Entries.Add(entry);
         await audit.SaveChangesAsync(cancellationToken);

@@ -1,15 +1,18 @@
 using Audit.Domain;
 using Microsoft.EntityFrameworkCore;
 using Tenancy;
+using Wolverine;
 
 namespace Audit.Infrastructure;
 
 /// <summary>The <c>audit</c> schema: one table of audit entries with a tenant column, under row level security.</summary>
-internal sealed class AuditDbContext(DbContextOptions<AuditDbContext> options) : TenantDbContext(options)
+/// <remarks>Public only because Wolverine's generated code creates it for the handlers (W9); its set is internal to the module.</remarks>
+public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options, IMessageContext? messaging = null)
+    : TenantDbContext(options, messaging)
 {
     public const string Schema = "audit";
 
-    public DbSet<AuditEntry> Entries => Set<AuditEntry>();
+    internal DbSet<AuditEntry> Entries => Set<AuditEntry>();
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {

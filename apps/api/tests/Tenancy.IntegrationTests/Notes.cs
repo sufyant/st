@@ -1,13 +1,18 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Wolverine;
 
 namespace Tenancy.IntegrationTests;
 
-// Runs work the way the host does: in a scope, on the scope's connection, inside a tenant transaction when a tenant is given.
+// Runs work the way a Wolverine handler does: in a scope whose message carries the tenant, inside the transaction the DbContext
+// begins, which declares that tenant. Wolverine's own test double stands in for the message context; only its tenant is read.
 internal sealed class Notes(string connectionString) : IAsyncDisposable
 {
     private readonly ServiceProvider _services = new ServiceCollection()
         .AddTenancy(_ => connectionString)
-        .AddModuleDbContext<NotesDbContext>(NotesDbContext.Schema)
+        .AddDbContext<NotesDbContext>((provider, options) => options.UseModuleDatabase(provider, NotesDbContext.Schema))
+        .AddScoped<IMessageContext>(_ => new TestMessageContext())
         .BuildServiceProvider();
 
     public Task InTenantAsync(Guid tenantId, Func<NotesDbContext, Task> work) =>
@@ -20,8 +25,7 @@ internal sealed class Notes(string connectionString) : IAsyncDisposable
     public async Task<T> InTenantAsync<T>(Guid tenantId, Func<NotesDbContext, Task<T>> work)
     {
         await using var scope = _services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
+        await using var transaction = await BeginUncommittedAsync(scope, tenantId);
 
         var result = await work(scope.ServiceProvider.GetRequiredService<NotesDbContext>());
 
@@ -36,11 +40,10 @@ internal sealed class Notes(string connectionString) : IAsyncDisposable
         return await work(scope.ServiceProvider.GetRequiredService<NotesDbContext>());
     }
 
-    public static async Task<TenantTransaction> BeginUncommittedAsync(AsyncServiceScope scope, Guid tenantId)
+    public static Task<IDbContextTransaction> BeginUncommittedAsync(AsyncServiceScope scope, Guid tenantId)
     {
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
-        return transaction;
+        scope.ServiceProvider.GetRequiredService<IMessageContext>().TenantId = tenantId.ToString();
+        return scope.ServiceProvider.GetRequiredService<NotesDbContext>().Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
     }
 
     public AsyncServiceScope CreateScope() => _services.CreateAsyncScope();

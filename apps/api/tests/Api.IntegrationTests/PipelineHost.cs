@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Notifications.Infrastructure;
 using Tenancy;
+using Wolverine.EntityFrameworkCore;
 
 namespace Api.IntegrationTests;
 
@@ -56,7 +57,10 @@ internal sealed class PipelineHost : IAsyncDisposable
         builder.AddApiPipeline(typeof(PipelineHost).Assembly);
         builder.Services.AddControlPlaneInfrastructure();
         builder.Services.AddNotificationsInfrastructure();
-        builder.Services.AddModuleDbContext<ProbeDbContext>(ProbeDbContext.Schema);
+        builder.Services.AddDbContextWithWolverineIntegration<ProbeDbContext>(
+            (provider, options) => options.UseModuleDatabase(provider, ProbeDbContext.Schema),
+            TenancyServiceCollectionExtensions.MessageSchema);
+        builder.Services.AddModuleMigrations<ProbeDbContext>(ProbeDbContext.Schema);
         builder.Services.TrustTestKey();
         configureServices?.Invoke(builder.Services);
 

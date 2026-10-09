@@ -23,7 +23,7 @@ public sealed class TenantCatalogTests(Database database)
         await Catalog.AddMemberAsync(database.Services, other, outsider);
 
         var members = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            scope.GetRequiredService<TenantCatalog>().Memberships.Select(membership => membership.UserId).ToListAsync(Cancellation));
+            ((TenantCatalog)scope.GetRequiredService<ITenantCatalog>()).Memberships.Select(membership => membership.UserId).ToListAsync(Cancellation));
 
         members.ShouldBe([member.Id]);
     }
@@ -36,14 +36,14 @@ public sealed class TenantCatalogTests(Database database)
 
         await InTenant.RunAsync(database.Services, tenant.Id, async scope =>
         {
-            var catalog = scope.GetRequiredService<TenantCatalog>();
+            var catalog = ((TenantCatalog)scope.GetRequiredService<ITenantCatalog>());
             catalog.AddMember(user.Id, BuiltInRoles.Member.Id);
             await catalog.SaveChangesAsync(Cancellation);
             return SharedKernel.Result.Success();
         });
 
         var memberships = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            scope.GetRequiredService<TenantCatalog>().Memberships.Select(membership => membership.TenantId).ToListAsync(Cancellation));
+            ((TenantCatalog)scope.GetRequiredService<ITenantCatalog>()).Memberships.Select(membership => membership.TenantId).ToListAsync(Cancellation));
         memberships.ShouldBe([tenant.Id]);
     }
 
@@ -51,7 +51,7 @@ public sealed class TenantCatalogTests(Database database)
     public async Task Outside_a_tenant_the_tenant_catalog_cannot_be_used()
     {
         await using var scope = database.Services.CreateAsyncScope();
-        var catalog = scope.ServiceProvider.GetRequiredService<TenantCatalog>();
+        var catalog = (TenantCatalog)scope.ServiceProvider.GetRequiredService<ITenantCatalog>();
 
         var read = () => catalog.Memberships.ToListAsync(Cancellation);
 
@@ -67,7 +67,7 @@ public sealed class TenantCatalogTests(Database database)
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(tokenHash, Cancellation));
+            scope.GetRequiredService<ITenantCatalog>().FindInvitationForUpdateAsync(tokenHash, Cancellation));
 
         found.ShouldBeNull();
     }
@@ -79,7 +79,7 @@ public sealed class TenantCatalogTests(Database database)
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).FindInvitationForUpdateAsync(invitationId, Cancellation));
+            scope.GetRequiredService<ITenantCatalog>().FindInvitationForUpdateAsync(invitationId, Cancellation));
 
         found.ShouldBeNull();
     }
@@ -91,7 +91,7 @@ public sealed class TenantCatalogTests(Database database)
         var other = Domain.Tenants.Tenant.Create(Guid.CreateVersion7(), "Other Ltd", Unique.Slug()).Value;
 
         var add = () => InTenant.ReadAsync(database.Services, Guid.CreateVersion7(), scope =>
-            ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).TryAddAsync(other, Cancellation));
+            scope.GetRequiredService<ITenantCatalog>().TryAddAsync(other, Cancellation));
 
         await add.ShouldThrowAsync<InvalidOperationException>();
     }

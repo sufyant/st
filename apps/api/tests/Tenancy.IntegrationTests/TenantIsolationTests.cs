@@ -221,7 +221,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         (await _notes.InTenantAsync(tenant, notes => notes.Notes.AnyAsync(row => row.Id == note.Id, Cancellation))).ShouldBeFalse();
     }
 
-    // A save of several rows would begin a transaction of its own; it has to join the tenant transaction instead.
+    // A save of several rows would begin a transaction of its own; it joins the transaction in progress instead.
     [Fact]
     public async Task Several_rows_saved_together_are_discarded_with_their_transaction()
     {
@@ -244,13 +244,18 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     public async Task The_tenant_setting_ends_with_its_transaction()
     {
         await using var scope = _notes.CreateScope();
-        var transaction = await Notes.BeginUncommittedAsync(scope, Tenants.New());
-        await transaction.CommitAsync(Cancellation);
+        var notes = scope.ServiceProvider.GetRequiredService<NotesDbContext>();
+        await notes.Database.OpenConnectionAsync(Cancellation);
+        await using (var transaction = await Notes.BeginUncommittedAsync(scope, Tenants.New()))
+        {
+            await transaction.CommitAsync(Cancellation);
+        }
 
-        await using var command = new NpgsqlCommand("SELECT NULLIF(current_setting('app.tenant_id', true), '')", transaction.Connection);
-        var setting = await command.ExecuteScalarAsync(Cancellation);
+        var setting = await notes.Database
+            .SqlQueryRaw<string?>("SELECT NULLIF(current_setting('app.tenant_id', true), '') AS \"Value\"")
+            .SingleAsync(Cancellation);
 
-        setting.ShouldBe(DBNull.Value);
+        setting.ShouldBeNull();
     }
 
     [Fact]

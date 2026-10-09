@@ -1,6 +1,7 @@
 using Audit.Application.Ports;
 using Microsoft.Extensions.DependencyInjection;
 using Tenancy;
+using Wolverine.EntityFrameworkCore;
 
 namespace Audit.Infrastructure;
 
@@ -12,7 +13,12 @@ public static class AuditInfrastructure
 {
     public static IServiceCollection AddAuditInfrastructure(this IServiceCollection services)
     {
-        services.AddModuleDbContext<AuditDbContext>(AuditDbContext.Schema);
+        services.AddDbContextWithWolverineIntegration<AuditDbContext>(
+            (provider, options) => options.UseModuleDatabase(provider, AuditDbContext.Schema),
+            TenancyServiceCollectionExtensions.MessageSchema);
+        services.AddModuleMigrations<AuditDbContext>(AuditDbContext.Schema);
+
+        // Registered by type, so Wolverine builds it in its generated code on the handler's own DbContext (W1).
         services.AddScoped<IAuditLog, AuditLog>();
 
         return services;

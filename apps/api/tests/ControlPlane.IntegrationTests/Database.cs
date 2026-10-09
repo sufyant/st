@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Tenancy;
 using Testcontainers.PostgreSql;
+using Wolverine;
 
 [assembly: AssemblyFixture(typeof(ControlPlane.IntegrationTests.Database))]
 
@@ -13,7 +14,8 @@ namespace ControlPlane.IntegrationTests;
 
 // One PostgreSQL 18 server for the test assembly, set up the way a deployment is: the bootstrap script creates the
 // roles, then the module's migrations run as the owner. Tests connect as the application role. The identity
-// provider and the invitation email are systems we do not own, so they are fakes.
+// provider and the invitation email are systems we do not own, so they are fakes. Wolverine's own test double stands in for the
+// message context, which carries the tenant.
 public sealed class Database : IAsyncLifetime
 {
     public const string AcceptUrl = "https://app.test/invitations/accept";
@@ -78,7 +80,8 @@ public sealed class Database : IAsyncLifetime
             .AddLogging()
             .AddSingleton(TimeProvider.System)
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
-            .AddControlPlaneInfrastructure();
+            .AddControlPlaneInfrastructure()
+            .AddScoped<IMessageContext>(_ => new TestMessageContext());
         if (!realIdentityProvider)
         {
             services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));

@@ -5,6 +5,7 @@ using Notifications.Application.Ports;
 using Notifications.Contracts;
 using Notifications.Infrastructure.Email;
 using Tenancy;
+using Wolverine.EntityFrameworkCore;
 
 namespace Notifications.Infrastructure;
 
@@ -18,7 +19,10 @@ public static class NotificationsInfrastructure
     {
         services.AddTransient<INotificationsModule, EmailNotifications>();
 
-        services.AddModuleDbContext<NotificationsDbContext>(NotificationsDbContext.Schema);
+        services.AddDbContextWithWolverineIntegration<NotificationsDbContext>(
+            (provider, options) => options.UseModuleDatabase(provider, NotificationsDbContext.Schema),
+            TenancyServiceCollectionExtensions.MessageSchema);
+        services.AddModuleMigrations<NotificationsDbContext>(NotificationsDbContext.Schema);
 
         services.AddOptions<ResendOptions>().BindConfiguration(ResendOptions.Section);
         services.AddHealthChecks().AddCheck<EmailChannelHealthCheck>("email", tags: ["ready"]);

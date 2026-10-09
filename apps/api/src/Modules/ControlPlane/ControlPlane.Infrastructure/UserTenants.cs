@@ -5,10 +5,13 @@ using SharedKernel;
 
 namespace ControlPlane.Infrastructure;
 
-// The catalog user is found by the identity provider's id in catalog.users, which belongs to no tenant. Their memberships are
-// then read in a transaction that declares that user (R11), so the own_memberships policy decides what is seen; the query adds
-// no filter of its own.
-internal sealed class UserTenants(CatalogDbContext catalog) : IUserTenants
+/// <summary>
+/// The catalog user is found by the identity provider's id in catalog.users, which belongs to no tenant. Their memberships are then
+/// read with that user declared in the transaction Wolverine began for the handler (R11), so the own_memberships policy decides
+/// what is seen; the query adds no filter of its own. The message has no tenant, so the transaction declares none (R4).
+/// </summary>
+/// <remarks>Public only so that Wolverine's generated code can build it on the handler's own DbContext (W1, W9).</remarks>
+public sealed class UserTenants(CatalogDbContext catalog) : IUserTenants
 {
     async Task<ListPage<Tenant>> IUserTenants.ListActiveAsync(string externalUserId, PageRequest paging, CancellationToken cancellationToken)
     {
@@ -21,7 +24,6 @@ internal sealed class UserTenants(CatalogDbContext catalog) : IUserTenants
             return new ListPage<Tenant>([], paging, 0);
         }
 
-        await using var transaction = await catalog.Database.BeginTransactionAsync(cancellationToken);
         await catalog.DeclareUserAsync(id, cancellationToken);
         var tenants =
             from membership in catalog.Memberships
@@ -37,7 +39,6 @@ internal sealed class UserTenants(CatalogDbContext catalog) : IUserTenants
             .Take(paging.PageSize)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
 
         return new ListPage<Tenant>(page, paging, total);
     }

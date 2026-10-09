@@ -7,42 +7,37 @@ namespace Tenancy;
 
 public static class TenancyServiceCollectionExtensions
 {
-    /// <summary>The host's part: the pooled data source, the tenant context and the per-scope transaction.</summary>
-    public static IServiceCollection AddTenancy(this IServiceCollection services, Func<IServiceProvider, string> pooledConnectionString)
-    {
+    /// <summary>The shared schema of Wolverine's message store (W5), whose envelope tables a module DbContext writes its messages to.</summary>
+    public const string MessageSchema = "wolverine";
+
+    /// <summary>The host's part: the pooled data source every module DbContext uses.</summary>
+    public static IServiceCollection AddTenancy(this IServiceCollection services, Func<IServiceProvider, string> pooledConnectionString) =>
         services.AddSingleton(provider => NpgsqlDataSource.Create(pooledConnectionString(provider)));
-        services.AddScoped<TenantContext>();
-        services.AddScoped<TenantTransaction>();
 
-        return services;
-    }
+    /// <summary>
+    /// A module DbContext's options: the pooled data source, the module's own schema, and the tenant declared at the start of each
+    /// transaction (W2). The module registers its DbContext with Wolverine's EF Core integration and these options.
+    /// </summary>
+    public static DbContextOptionsBuilder UseModuleDatabase(this DbContextOptionsBuilder options, IServiceProvider services, string schema) =>
+        UseModuleConventions(options, npgsql => npgsql.UseNpgsql(services.GetRequiredService<NpgsqlDataSource>(), Configure(schema)))
+            .AddInterceptors(TenantDeclarationInterceptor.Instance);
 
-    /// <summary>A module's part: its DbContext on the scope's connection, in its own schema, and its migrations.</summary>
-    public static IServiceCollection AddModuleDbContext<TContext>(this IServiceCollection services, string schema)
-        where TContext : DbContext
-    {
-        services.AddDbContext<TContext>((provider, options) =>
-        {
-            var transaction = provider.GetRequiredService<TenantTransaction>();
-            UseModuleDatabase(options, npgsql => npgsql.UseNpgsql(transaction.Connection, Configure(schema)))
-                .AddInterceptors(new TenantTransactionEnlistment(transaction));
-        });
+    /// <summary>A module's migrations, which the separate migration step applies.</summary>
+    public static IServiceCollection AddModuleMigrations<TContext>(this IServiceCollection services, string schema)
+        where TContext : DbContext =>
         services.AddSingleton<IModuleMigrator>(new ModuleMigrator<TContext>(schema));
-
-        return services;
-    }
 
     /// <summary>The same configuration on a plain connection string, for design-time tooling and migrations.</summary>
     public static DbContextOptions<TContext> ModuleDbContextOptions<TContext>(string schema, string connectionString)
         where TContext : DbContext
     {
         var options = new DbContextOptionsBuilder<TContext>();
-        UseModuleDatabase(options, npgsql => npgsql.UseNpgsql(connectionString, Configure(schema)));
+        UseModuleConventions(options, npgsql => npgsql.UseNpgsql(connectionString, Configure(schema)));
 
         return options.Options;
     }
 
-    private static DbContextOptionsBuilder UseModuleDatabase(
+    private static DbContextOptionsBuilder UseModuleConventions(
         DbContextOptionsBuilder options,
         Func<DbContextOptionsBuilder, DbContextOptionsBuilder> useNpgsql) =>
         useNpgsql(options)

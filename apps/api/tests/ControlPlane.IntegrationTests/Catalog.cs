@@ -2,8 +2,8 @@ using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using ControlPlane.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
@@ -51,9 +51,8 @@ internal static class Catalog
     private static async Task SaveInTenantAsync(IServiceProvider services, Guid tenantId, Action<CatalogDbContext> change)
     {
         await using var scope = services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
-        var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var catalog = InTenant.Catalog(scope, tenantId);
+        await using var transaction = await catalog.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
         change(catalog);
         await catalog.SaveChangesAsync(TestContext.Current.CancellationToken);
         await transaction.CommitAsync(TestContext.Current.CancellationToken);

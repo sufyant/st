@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Tenancy;
+using Wolverine;
 
 namespace Notifications.Infrastructure;
 
 /// <summary>The <c>notifications</c> schema, under row level security. It holds no table at present.</summary>
-internal sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : TenantDbContext(options)
+/// <remarks>Public because Wolverine's generated code creates a module DbContext for the handlers (W9).</remarks>
+public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options, IMessageContext? messaging = null)
+    : TenantDbContext(options, messaging)
 {
     public const string Schema = "notifications";
 

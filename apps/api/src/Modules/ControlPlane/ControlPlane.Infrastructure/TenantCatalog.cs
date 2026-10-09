@@ -5,17 +5,18 @@ using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
-using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 
 /// <summary>
 /// The one way to reach catalog rows that belong to a tenant, used only inside a tenant. Row level security keeps one tenant's
-/// memberships and invitations from another; this access point adds no filter of its own.
+/// memberships and invitations from another; this access point adds no filter of its own. The active tenant is the tenant of the
+/// message the handler serves (W2).
 /// </summary>
-internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tenant) : ITenantCatalog
+/// <remarks>Public only so that Wolverine's generated code can build it on the handler's own DbContext (W1, W9).</remarks>
+public sealed class TenantCatalog(CatalogDbContext catalog) : ITenantCatalog
 {
-    public IQueryable<Membership> Memberships
+    internal IQueryable<Membership> Memberships
     {
         get
         {
@@ -27,7 +28,7 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     Guid ITenantCatalog.TenantId => ActiveTenant;
 
     private Guid ActiveTenant =>
-        tenant.TenantId ?? throw new InvalidOperationException("Tenant-owned catalog rows are reached only inside a tenant.");
+        catalog.MessageTenantId ?? throw new InvalidOperationException("Tenant-owned catalog rows are reached only inside a tenant.");
 
     Task<Tenant> ITenantCatalog.FindTenantAsync(CancellationToken cancellationToken)
     {

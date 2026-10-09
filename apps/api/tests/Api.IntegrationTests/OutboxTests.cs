@@ -71,7 +71,7 @@ public sealed class OutboxTests(Database database) : IAsyncLifetime
         await _host.Host.TrackActivity().ExecuteAndWaitAsync(context =>
             context.InvokeForTenantAsync(tenant.ToString(), new WriteProbeUnlessRejected(value, Reject: false)));
 
-        (await ReadProbesAsync(tenant)).ShouldBe([$"announced:{value}", value]);
+        (await ReadProbesAsync(tenant)).ShouldBe([value, $"announced:{value}"]);
     }
 
     // A handler without a tenant sends its messages with Wolverine's default tenant id, which names no tenant.
