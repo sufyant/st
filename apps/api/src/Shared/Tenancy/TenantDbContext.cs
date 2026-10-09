@@ -1,4 +1,6 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Tenancy;
@@ -10,8 +12,6 @@ namespace Tenancy;
 /// </summary>
 public abstract class TenantDbContext(DbContextOptions options) : DbContext(options)
 {
-    private const string UserSetting = "app.user_id";
-
     protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
     {
         BuildModel(modelBuilder);
@@ -35,31 +35,29 @@ public abstract class TenantDbContext(DbContextOptions options) : DbContext(opti
 
     /// <summary>
     /// Declares the tenant for the rest of the current transaction (R4). Outside a transaction the setting would end with the
-    /// statement, so it is refused.
+    /// statement, so it is refused; so is a transaction that has declared a user.
     /// </summary>
-    public async Task DeclareTenantAsync(Guid tenantId, CancellationToken cancellationToken)
-    {
-        if (Database.CurrentTransaction is null)
-        {
-            throw new InvalidOperationException("A tenant is declared inside a transaction, never on the connection.");
-        }
-
-        await Database.ExecuteSqlAsync($"SELECT set_config({TenantColumn.Setting}, {tenantId.ToString()}, true)", cancellationToken);
-    }
+    public Task DeclareTenantAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        Declaration.DeclareTenantAsync(
+            Database.GetDbConnection(),
+            CurrentTransaction("A tenant is declared inside a transaction, never on the connection."),
+            tenantId,
+            cancellationToken);
 
     /// <summary>
     /// Declares the catalog user for the rest of the current transaction, the way the tenant is declared, for the one policy that
-    /// reads by user rather than by tenant (R11). Outside a transaction it is refused.
+    /// reads by user rather than by tenant (R11). Outside a transaction it is refused; so is a transaction that has declared a
+    /// tenant.
     /// </summary>
-    public async Task DeclareUserAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        if (Database.CurrentTransaction is null)
-        {
-            throw new InvalidOperationException("A user is declared inside a transaction, never on the connection.");
-        }
-
-        await Database.ExecuteSqlAsync($"SELECT set_config({UserSetting}, {userId.ToString()}, true)", cancellationToken);
-    }
+    public Task DeclareUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        Declaration.DeclareUserAsync(
+            Database.GetDbConnection(),
+            CurrentTransaction("A user is declared inside a transaction, never on the connection."),
+            userId,
+            cancellationToken);
 
     protected abstract void BuildModel(ModelBuilder modelBuilder);
+
+    private DbTransaction CurrentTransaction(string refusal) =>
+        Database.CurrentTransaction?.GetDbTransaction() ?? throw new InvalidOperationException(refusal);
 }
