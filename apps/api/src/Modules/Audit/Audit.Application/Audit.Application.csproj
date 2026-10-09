@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Audit.Domain\Audit.Domain.csproj" />
     <ProjectReference Include="..\Audit.Contracts\Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\ControlPlane\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
   </ItemGroup>
 

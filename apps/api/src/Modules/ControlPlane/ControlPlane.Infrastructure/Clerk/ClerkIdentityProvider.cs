@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using ControlPlane.Application.Ports;
@@ -16,7 +17,7 @@ internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
 
     // Clerk does not send its own email (notify: false): we send the link ourselves. ignore_existing lets a person be
     // invited again while an earlier Clerk invitation is still pending.
-    public async Task<Uri> InviteAsync(string email, Guid invitationId, Uri acceptLink, CancellationToken cancellationToken)
+    public async Task<IdentityProviderInvitation> InviteAsync(string email, Guid invitationId, Uri acceptLink, CancellationToken cancellationToken)
     {
         using var response = await http.PostAsJsonAsync(
             "invitations",
@@ -25,7 +26,18 @@ internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
         response.EnsureSuccessStatusCode();
 
         var invitation = await response.Content.ReadFromJsonAsync<InvitationResponse>(cancellationToken);
-        return new Uri(invitation!.Url);
+        return new IdentityProviderInvitation(invitation!.Id, new Uri(invitation.Url));
+    }
+
+    // Clerk revokes only an active invitation: it answers 400 for one already revoked or accepted, and 404 for one it does not know.
+    // Either way nothing is left to revoke.
+    public async Task RevokeInvitationAsync(string invitationId, CancellationToken cancellationToken)
+    {
+        using var response = await http.PostAsync($"invitations/{Uri.EscapeDataString(invitationId)}/revoke", null, cancellationToken);
+        if (response.StatusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.NotFound))
+        {
+            response.EnsureSuccessStatusCode();
+        }
     }
 
     public async Task<IReadOnlyList<string>> FindVerifiedEmailsAsync(string externalUserId, CancellationToken cancellationToken)
@@ -43,7 +55,7 @@ internal sealed class ClerkIdentityProvider(HttpClient http) : IIdentityProvider
 
     private sealed record InvitationMetadata([property: JsonPropertyName("invitation_id")] Guid InvitationId);
 
-    private sealed record InvitationResponse([property: JsonPropertyName("url")] string Url);
+    private sealed record InvitationResponse([property: JsonPropertyName("id")] string Id, [property: JsonPropertyName("url")] string Url);
 
     private sealed record UserResponse([property: JsonPropertyName("email_addresses")] IReadOnlyList<EmailAddressResponse> EmailAddresses);
 

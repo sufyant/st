@@ -23,7 +23,9 @@ public static class AcceptInvitationHandler
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        if (await catalog.FindInvitationForUpdateAsync(InvitationToken.Hash(command.Secret), cancellationToken) is not { } invitation)
+        // A cancelled invitation answers like one that does not exist.
+        if (await catalog.FindInvitationForUpdateAsync(InvitationToken.Hash(command.Secret), cancellationToken) is not { } invitation
+            || invitation.Status == InvitationStatus.Cancelled)
         {
             return Errors.InvitationNotFound;
         }

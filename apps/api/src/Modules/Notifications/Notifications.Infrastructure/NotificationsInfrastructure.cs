@@ -1,10 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Notifications.Application;
 using Notifications.Application.Ports;
-using Notifications.Contracts;
 using Notifications.Infrastructure.Email;
 using Tenancy;
+using Wolverine;
 using Wolverine.EntityFrameworkCore;
 
 namespace Notifications.Infrastructure;
@@ -17,8 +18,6 @@ public static class NotificationsInfrastructure
 {
     public static IServiceCollection AddNotificationsInfrastructure(this IServiceCollection services)
     {
-        services.AddTransient<INotificationsModule, EmailNotifications>();
-
         services.AddDbContextWithWolverineIntegration<NotificationsDbContext>(
             (provider, options) => options.UseModuleDatabase(provider, NotificationsDbContext.Schema),
             TenancyServiceCollectionExtensions.MessageSchema);
@@ -42,6 +41,16 @@ public static class NotificationsInfrastructure
             || !provider.GetRequiredService<IHostEnvironment>().IsDevelopment()
                 ? provider.GetRequiredService<ResendEmailChannel>()
                 : ActivatorUtilities.CreateInstance<LogEmailChannel>(provider));
+
+        // Wolverine's generated code cannot build the email channel, which the container chooses by environment, so it resolves it
+        // from the message's scope. It reaches no DbContext.
+        services.ConfigureWolverine(options => options.CodeGeneration.AlwaysUseServiceLocationFor<IEmailChannel>());
+
+        services.AddOptions<NotificationsSettings>()
+            .BindConfiguration(NotificationsSettings.Section)
+            .Validate(settings => settings.IsValid, $"{NotificationsSettings.Section}:InvitationEmailRetryDelays must be positive pauses that grow.")
+            .ValidateOnStart();
+        services.AddSingleton<IWolverineExtension, InvitationEmailRetries>();
 
         return services;
     }
