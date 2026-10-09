@@ -37,7 +37,7 @@ internal static class TenantRateLimiting
         });
     }
 
-    // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the slug in the route is
+    // Only a verified membership puts a request in its tenant's bucket, keyed by the resolved tenant id; the id in the route alone is
     // never a key.
     private static string PartitionKey(HttpContext context) =>
         context.RequestServices.GetRequiredService<RequestAccess>().Membership is { } membership ? $"tenant:{membership.TenantId}"

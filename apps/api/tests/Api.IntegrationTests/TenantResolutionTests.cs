@@ -17,21 +17,21 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
 
-        var response = await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Id}/ping", TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Tenant routes have a segment of their own, so no slug needs to be reserved for the routes outside a tenant.
+    // T1: the path carries the tenant's id. The slug names no tenant in a path, even for a member.
     [Fact]
-    public async Task A_slug_may_be_the_name_of_a_route_outside_tenants()
+    public async Task ResolveTenant_TheSlugInThePath_IsNotFound()
     {
-        var tenant = await _catalog.AddTenantAsync(slug: "ping");
+        var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
 
-        var response = await _host.CreateClient(member).GetAsync("/v1/tenants/ping/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     {
         var tenant = await _catalog.AddTenantAsync();
 
-        var response = await _host.CreateClient().GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient().GetAsync($"/v1/tenants/{tenant.Id}/ping", TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -52,7 +52,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
 
-        var response = await _host.CreateClient(outsider).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient(outsider).GetAsync($"/v1/tenants/{tenant.Id}/ping", TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -63,7 +63,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     {
         var user = await _catalog.AddUserAsync();
 
-        var response = await _host.CreateClient(user).GetAsync("/v1/tenants/no-such-tenant/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient(user).GetAsync($"/v1/tenants/{Guid.NewGuid()}/ping", TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -75,7 +75,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync(status: "Provisioning");
         var member = await _catalog.AddMemberAsync(tenant.Id);
 
-        var response = await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+        var response = await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Id}/ping", TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

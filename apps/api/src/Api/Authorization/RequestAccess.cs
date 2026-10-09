@@ -3,7 +3,7 @@ using Tenancy;
 namespace Api.Authorization;
 
 // What the caller of this request may do, resolved once per request with the tenant: their membership on a
-// tenant route, their system permissions on an admin route.
+// tenant route, their system permissions on a system route.
 internal sealed class RequestAccess
 {
     public TenantMembership? Membership { get; set; }

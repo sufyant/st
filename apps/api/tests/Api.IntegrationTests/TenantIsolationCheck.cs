@@ -8,7 +8,8 @@ using Tenancy;
 namespace Api.IntegrationTests;
 
 // Finds every ITenantEntity of every module database, with no list to keep up to date, and reports what it lacks: row level
-// security enabled and forced, exactly one policy limiting reads and writes to the active tenant, and the tenant column default.
+// security enabled and forced, exactly one policy limiting reads and writes to the active tenant besides the listed extra
+// policies (R11), and the tenant column default.
 internal sealed class TenantIsolationCheck(Database database)
 {
     public static List<IEntityType> TenantEntities(IServiceProvider services)
@@ -44,7 +45,8 @@ internal sealed class TenantIsolationCheck(Database database)
             SELECT
                 c.relrowsecurity,
                 c.relforcerowsecurity,
-                (SELECT count(*) FROM pg_policies p WHERE p.schemaname = @schema AND p.tablename = @table),
+                (SELECT coalesce(array_agg(p.policyname || ' (' || p.cmd || ')'), '{}') FROM pg_policies p
+                    WHERE p.schemaname = @schema AND p.tablename = @table),
                 (SELECT count(*) FROM pg_policies p
                     WHERE p.schemaname = @schema AND p.tablename = @table AND p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE'
                     AND p.qual = p.with_check AND p.qual LIKE '%tenant_id = %current_setting(''app.tenant_id''%'),
@@ -75,7 +77,8 @@ internal sealed class TenantIsolationCheck(Database database)
             gaps.Add($"{schema}.{table}: row level security is not forced");
         }
 
-        if (reader.GetInt64(2) != 1 || reader.GetInt64(3) != 1)
+        var listed = ExtraPolicies.Policies.Where(policy => policy.Table == $"{schema}.{table}").Select(policy => $"{policy.Name} ({policy.Command})");
+        if (reader.GetFieldValue<string[]>(2).Except(listed).Count() != 1 || reader.GetInt64(3) != 1)
         {
             gaps.Add($"{schema}.{table}: expected exactly one policy limiting reads and writes to the active tenant");
         }

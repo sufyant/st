@@ -6,8 +6,8 @@ namespace Tenancy;
 /// </summary>
 public interface ITenantDirectory
 {
-    /// <summary>The user's membership in the tenant with this slug, when the tenant is active and the user is its member.</summary>
-    Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId, CancellationToken cancellationToken);
+    /// <summary>The user's membership in the tenant with this id, when the tenant is active and the user is its member.</summary>
+    Task<TenantMembership?> FindMembershipAsync(Guid tenantId, string externalUserId, CancellationToken cancellationToken);
 }
 
 /// <summary>A verified membership: the tenant and the permissions the member's role holds there.</summary>

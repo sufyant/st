@@ -33,7 +33,7 @@ public sealed class RequestLoggingTests(Database database) : IAsyncLifetime
         var tenant = await catalog.AddTenantAsync();
         var member = await catalog.AddMemberAsync(tenant.Id);
 
-        await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Slug}/ping", TestContext.Current.CancellationToken);
+        await _host.CreateClient(member).GetAsync($"/v1/tenants/{tenant.Id}/ping", TestContext.Current.CancellationToken);
 
         RequestLogs().ShouldHaveSingleItem().StructuredState.ShouldNotBeNull().ShouldContain(new KeyValuePair<string, string?>("TenantId", tenant.Id.ToString()));
     }

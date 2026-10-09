@@ -4,12 +4,12 @@ namespace Api.Tenants;
 
 internal static class TenantRoutes
 {
-    public const string SlugParameter = "tenantSlug";
+    public const string TenantIdParameter = "tenantId";
 
-    // Tenant-scoped routes are /v1/tenants/{slug}/...; their own segment keeps every slug apart from the routes outside
-    // tenants. Every endpoint in the group runs only for a verified member.
+    // Tenant routes are /v1/tenants/{tenantId}/... (T1); a value that is not a GUID matches no route. Every endpoint in the group
+    // runs only for a verified member (T7).
     public static RouteGroupBuilder MapTenant(this RouteGroupBuilder v1) =>
-        v1.MapGroup($"/tenants/{{{SlugParameter}}}")
+        v1.MapGroup($"/tenants/{{{TenantIdParameter}:guid}}")
             .WithMetadata(new TenantScopedEndpoint())
             .RequireAuthorization(AccessPolicies.TenantMember);
 }

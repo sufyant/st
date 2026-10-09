@@ -1,6 +1,8 @@
 using ControlPlane.Domain.Invitations;
+using ControlPlane.Domain.Roles;
 using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
+using SharedKernel;
 
 namespace ControlPlane.Application.Ports;
 
@@ -17,12 +19,15 @@ public interface ITenantCatalog
 {
     internal Guid TenantId { get; }
 
-    internal Task<string> FindSlugAsync(CancellationToken cancellationToken);
+    internal Task<Tenant> FindTenantAsync(CancellationToken cancellationToken);
 
     /// <summary>The active tenant, locked for the rest of the transaction, so the steps of its onboarding run one at a time.</summary>
     internal Task<Tenant> FindTenantForUpdateAsync(CancellationToken cancellationToken);
 
     internal Task<Membership?> FindMembershipAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>A page of the active tenant's members with their roles, by role (Owner, Admin, Member), then by user id.</summary>
+    internal Task<ListPage<(Guid UserId, BuiltInRole Role)>> ListMembersAsync(PageRequest paging, CancellationToken cancellationToken);
 
     /// <summary>The invitation with this token hash, locked for the rest of the transaction so it is accepted only once.</summary>
     internal Task<Invitation?> FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken);

@@ -91,7 +91,7 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so tenant resolution sees the slug, and the rate limiter the resolved tenant. Authorization comes
+        // Routing runs first so tenant resolution sees the tenant id, and the rate limiter the resolved tenant. Authorization comes
         // last, so callers it turns away have been rate limited too.
         app.UseRouting();
         app.UseAuthentication();

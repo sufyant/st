@@ -22,9 +22,9 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
 
-        await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/probes", new { value = "mine" }, Cancellation);
+        await member.PostAsJsonAsync($"/v1/tenants/{tenant.Id}/probes", new { value = "mine" }, Cancellation);
 
-        var probes = await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Slug}/probes", Cancellation);
+        var probes = await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Id}/probes", Cancellation);
         probes.ShouldBe(["mine"]);
     }
 
@@ -34,10 +34,10 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var other = await _catalog.AddTenantAsync();
         var otherMember = _host.CreateClient(await _catalog.AddMemberAsync(other.Id));
-        await otherMember.PostAsJsonAsync($"/v1/tenants/{other.Slug}/probes", new { value = "theirs" }, Cancellation);
+        await otherMember.PostAsJsonAsync($"/v1/tenants/{other.Id}/probes", new { value = "theirs" }, Cancellation);
 
         var probes = await _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id))
-            .GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Slug}/probes", Cancellation);
+            .GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Id}/probes", Cancellation);
 
         probes.ShouldBeEmpty();
     }
@@ -51,7 +51,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
         var value = $"probe-{Guid.NewGuid():N}";
 
-        await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/probes", new { value, tenantId = other.Id }, Cancellation);
+        await member.PostAsJsonAsync($"/v1/tenants/{tenant.Id}/probes", new { value, tenantId = other.Id }, Cancellation);
 
         (await database.ScalarAsSuperuserAsync<Guid>($"SELECT tenant_id FROM probes.probes WHERE value = '{value}'")).ShouldBe(tenant.Id);
     }
@@ -62,10 +62,10 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
 
-        var response = await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/failing-probes", new { value = "lost" }, Cancellation);
+        var response = await member.PostAsJsonAsync($"/v1/tenants/{tenant.Id}/failing-probes", new { value = "lost" }, Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
-        (await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Slug}/probes", Cancellation)).ShouldBeEmpty();
+        (await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Id}/probes", Cancellation)).ShouldBeEmpty();
     }
 
     [Fact]
@@ -74,10 +74,10 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
 
-        var response = await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/rejected-probes", new { value = "rejected" }, Cancellation);
+        var response = await member.PostAsJsonAsync($"/v1/tenants/{tenant.Id}/rejected-probes", new { value = "rejected" }, Cancellation);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Slug}/probes", Cancellation)).ShouldBeEmpty();
+        (await member.GetFromJsonAsync<string[]>($"/v1/tenants/{tenant.Id}/probes", Cancellation)).ShouldBeEmpty();
     }
 
     [Fact]

@@ -175,6 +175,40 @@ public sealed class Database : IAsyncLifetime
         return value is null or DBNull ? default : (T)value;
     }
 
+    // Runs the SQL as the role in a transaction that declares the catalog user first, as GET /v1/me/tenants does (R11); returns the
+    // rows it changed.
+    public async Task<int> ExecuteAsUserAsync(Guid userId, string sql)
+    {
+        await using var connection = new NpgsqlConnection(ApplicationConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await DeclareUserAsync(connection, transaction, userId);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        var changed = await command.ExecuteNonQueryAsync();
+        await transaction.CommitAsync();
+
+        return changed;
+    }
+
+    public async Task<T?> ScalarAsUserAsync<T>(Guid userId, string sql)
+    {
+        await using var connection = new NpgsqlConnection(ApplicationConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await DeclareUserAsync(connection, transaction, userId);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        var value = await command.ExecuteScalarAsync();
+
+        return value is null or DBNull ? default : (T)value;
+    }
+
+    private static async Task DeclareUserAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid userId)
+    {
+        await using var declare = new NpgsqlCommand("SELECT set_config('app.user_id', @user, true)", connection, transaction);
+        declare.Parameters.AddWithValue("user", userId.ToString());
+        await declare.ExecuteNonQueryAsync();
+    }
+
     private static async Task DeclareTenantAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid tenantId)
     {
         await using var declare = new NpgsqlCommand("SELECT set_config('app.tenant_id', @tenant, true)", connection, transaction);

@@ -17,9 +17,9 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     {
         var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
 
-        var rejected = await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
+        var rejected = await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
 
         rejected.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
         rejected.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -32,9 +32,9 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var first = await _catalog.AddMemberAsync(tenant.Id);
         var second = await _catalog.AddMemberAsync(tenant.Id);
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", first);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", first);
 
-        var rejected = await GetAsync($"/v1/tenants/{tenant.Slug}/ping", second);
+        var rejected = await GetAsync($"/v1/tenants/{tenant.Id}/ping", second);
 
         rejected.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
     }
@@ -46,10 +46,10 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
         var other = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
         await _catalog.AddMemberAsync(other.Id, member);
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
 
-        var response = await GetAsync($"/v1/tenants/{other.Slug}/ping", member);
+        var response = await GetAsync($"/v1/tenants/{other.Id}/ping", member);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -61,9 +61,9 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
         var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
         var outsider = await _catalog.AddUserAsync();
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", outsider);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", outsider);
 
-        var response = await GetAsync($"/v1/tenants/{tenant.Slug}/ping", member);
+        var response = await GetAsync($"/v1/tenants/{tenant.Id}/ping", member);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -73,7 +73,7 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     {
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
-        await GetAsync($"/v1/tenants/{tenant.Slug}/ping", outsider);
+        await GetAsync($"/v1/tenants/{tenant.Id}/ping", outsider);
 
         var rejected = await GetAsync("/v1/ping", outsider);
 

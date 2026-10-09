@@ -10,14 +10,18 @@ namespace ControlPlane.Application.Tenants;
 /// A system admin starts a tenant's onboarding. It runs inside the tenant it creates, whose id the caller chose, so every step
 /// of the saga runs in that tenant's transaction and hands the tenant on to the next one.
 /// </summary>
-public sealed record StartTenantOnboarding(string AdminId, string Slug, string OwnerEmail);
+public sealed record StartTenantOnboarding(string AdminId, string Name, string Slug, string OwnerEmail);
 
-public sealed record TenantDetails(Guid Id, string Slug, string Status);
+public sealed record TenantDetails(Guid Id, string Name, string Slug, string Status);
 
 public sealed class StartTenantOnboardingValidator : AbstractValidator<StartTenantOnboarding>
 {
-    public StartTenantOnboardingValidator() =>
+    public StartTenantOnboardingValidator()
+    {
+        // The tenant checks the name itself; a request without one never reaches it.
+        RuleFor(command => command.Name).NotNull();
         RuleFor(command => command.OwnerEmail).NotEmpty().EmailAddress().MaximumLength(Invitation.EmailMaxLength);
+    }
 }
 
 public static class StartTenantOnboardingHandler
@@ -28,7 +32,7 @@ public static class StartTenantOnboardingHandler
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var tenant = Tenant.Create(catalog.TenantId, command.Slug);
+        var tenant = Tenant.Create(catalog.TenantId, command.Name, command.Slug);
         if (!tenant.IsSuccess)
         {
             return (tenant.Error, null);
@@ -43,7 +47,7 @@ public static class StartTenantOnboardingHandler
         }
 
         return (
-            new TenantDetails(tenant.Value.Id, tenant.Value.Slug, tenant.Value.Status.ToString()),
+            new TenantDetails(tenant.Value.Id, tenant.Value.Name, tenant.Value.Slug, tenant.Value.Status.ToString()),
             new CreateFirstOwnerInvitation(Guid.CreateVersion7(time.GetUtcNow()), command.OwnerEmail, admin.Id));
     }
 }
