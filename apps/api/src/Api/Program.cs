@@ -26,6 +26,6 @@ if (args is [MigrationStep.Command, ..])
 app.UseApiPipeline();
 
 var v1 = app.MapV1();
-v1.MapControlPlaneEndpoints(v1.MapSystem(), v1.MapTenant());
+v1.MapSignedIn().MapControlPlaneEndpoints(v1.MapSystem(), v1.MapTenant());
 
 app.Run();

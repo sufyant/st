@@ -12,22 +12,22 @@ using Wolverine;
 namespace ControlPlane.Api;
 
 /// <summary>
-/// The module's endpoints, mapped into the host's route groups: <c>/v1</c>, the system routes and the tenant routes. Each endpoint names the
-/// permission it needs and sends one command; the host maps its result.
+/// The module's endpoints, mapped into the host's route groups: the signed-in only routes, the system routes and the tenant routes. Each
+/// endpoint on a system or tenant route names the permission it needs (A5); each sends one command, and the host maps its result.
 /// </summary>
 public static class ControlPlaneEndpoints
 {
     private static readonly Error InvitationNotFound = Error.NotFound("invitation.not_found", "The invitation was not found.");
 
     public static void MapControlPlaneEndpoints(
-        this RouteGroupBuilder v1,
+        this RouteGroupBuilder signedIn,
         RouteGroupBuilder system,
         RouteGroupBuilder tenant)
     {
         // Accepting starts outside any tenant. The invitation code names the tenant, which is declared before the invitation is
         // looked up by its secret, so a wrong tenant, a wrong secret and a malformed code all answer the same 404. The identity
         // provider is asked first, so its call never runs while the acceptance holds the invitation locked.
-        v1.MapPost("/invitations/accept", async (
+        signedIn.MapPost("/invitations/accept", async (
             AcceptInvitationRequest request,
             ClaimsPrincipal user,
             IIdentityProvider identity,
@@ -46,7 +46,7 @@ public static class ControlPlaneEndpoints
         });
 
         // T4: the user's own tenants, read without a tenant.
-        v1.MapGet("/me/tenants", async (int? page, int? pageSize, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
+        signedIn.MapGet("/me/tenants", async (int? page, int? pageSize, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
         {
             var paging = PageRequest.Create(page, pageSize);
             if (!paging.IsSuccess)
@@ -82,7 +82,7 @@ public static class ControlPlaneEndpoints
             .RequireAuthorization(Permissions.MembersRead);
     }
 
-    // The version group lets only signed-in users through, so the identity provider's user id is always there.
+    // Every endpoint here requires a signed-in user, so the identity provider's user id is always there.
     private static string Id(this ClaimsPrincipal user) =>
         user.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new InvalidOperationException("The request has no signed-in user.");
 }
