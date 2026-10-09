@@ -97,7 +97,7 @@ The tool is Wolverine. The tested version is 6.45.0. The tool is measured agains
 8. The `Domain` and `Contracts` projects do not see the tool's types. `Api`, `Application` and `Infrastructure` can.
 9. The architecture controls the tool. We decide the module structure, the schema layout and the transaction rule.
 
-Requirements 3 and 5 do not have a test yet. A two-pod test is part of the fix plan.
+Requirements 3 and 5 are tested with two workers on one database (`TwoWorkerTests`).
 
 ### Handlers and pipeline
 
@@ -344,6 +344,8 @@ Unit test standard:
 - A test has no `if` and no loop.
 - The name pattern is `Operation_Scenario_ExpectedOutcome`. `Operation` is the name of the work, not the method name. Example: `ActivateTenant_WhenCancelled_IsRejected`.
 
+An architecture test enforces the trait, the name pattern and the rule against branches and loops.
+
 The order for a fix is: first a red test that checks the rule, then the fix.
 
 ## Deviations from the books
@@ -379,6 +381,3 @@ These parts are not in the first template. Each one comes in when its written co
 | Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
 ## Open items
-
-- Requirements 3 and 5 for the messaging tool have no evidence yet. The two-pod test is written in the fix plan.
-- The licenses of transitive test packages are not verified yet.
