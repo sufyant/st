@@ -9,11 +9,11 @@ using Api.Observability;
 using Api.Persistence;
 using Api.RateLimiting;
 using Api.Tenants;
-using JasperFx.CodeGeneration.Model;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 using Wolverine.FluentValidation;
 
 namespace Api;
@@ -54,10 +54,6 @@ internal static class ApiPipeline
                 options.Discovery.IncludeAssembly(assembly);
             }
 
-            // Module DbContexts are built by factories on the scope's tenant connection, which Wolverine can only resolve
-            // from the message's scope.
-            options.ServiceLocationPolicy = ServiceLocationPolicy.AlwaysAllowed;
-
             // Wolverine takes its data source while it is configured. The build writes the OpenAPI document, and the migration step
             // runs, from a host without the setting; a host that runs without it keeps no messages and is never ready
             // (DatabaseHealthCheck).
@@ -70,9 +66,14 @@ internal static class ApiPipeline
             // such as a saga's compensation. Faults are stored messages, so they carry only the exception's type.
             options.PublishFaultEvents(includeExceptionMessage: false, includeStackTrace: false);
 
+            // Wolverine's EF Core middleware begins, saves and commits the transaction of every handler that uses a module DbContext,
+            // with the messages the handler sends in it (W1). Each handler of a message runs in its own transaction (W4).
+            options.UseEntityFrameworkCoreTransactions();
+            options.Policies.AutoApplyTransactions();
+            options.MultipleHandlerBehavior = MultipleHandlerBehavior.Separated;
+
             options.UseFluentValidation();
             options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));
-            options.Policies.Add<TenantTransactionPolicy>();
         });
 
         builder.Services.AddTenantRateLimiting();

@@ -7,7 +7,6 @@ using ControlPlane.Contracts;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog;
 using Serilog.Context;
-using Tenancy;
 using Wolverine;
 
 namespace Api.Tenants;
@@ -26,7 +25,6 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next)
         ITenantDirectory directory,
         ISystemAdminDirectory systemAdmins,
         RequestAccess access,
-        TenantContext tenant,
         IMessageBus bus,
         IDiagnosticContext diagnostics)
     {
@@ -56,9 +54,7 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        tenant.Set(resolved);
-
-        // Commands sent from the request carry the tenant in their envelope; the transaction middleware sets it there.
+        // Commands sent from the request carry the tenant in their envelope, and their handlers' transactions declare it (W2, W3).
         bus.TenantId = resolved.ToString();
 
         // Every signal carries the tenant.

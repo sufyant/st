@@ -15,7 +15,7 @@ internal static class Handlers
 
     // The delivery runs after the invitation is saved, in the invitation's tenant, the way the outbox hands it on.
     public static Task DeliverAsync(IServiceProvider services, Guid tenantId, DeliverInvitation delivery) =>
-        InTenant.ProcessAsync(services, tenantId, scope => DeliverInvitationHandler.HandleAsync(
+        InTenant.RunAsync(services, tenantId, scope => DeliverInvitationHandler.HandleAsync(
             delivery,
             scope.GetRequiredService<ITenantCatalog>(),
             scope.GetRequiredService<IIdentityProvider>(),
@@ -77,7 +77,7 @@ internal static class Handlers
             Cancellation));
 
     public static Task<ActivateTenant?> InviteFirstOwnerAsync(IServiceProvider services, Guid tenantId, CreateFirstOwnerInvitation step) =>
-        InTenant.ProcessAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
+        InTenant.RunAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
             step,
             scope.GetRequiredService<ITenantCatalog>(),
             scope.GetRequiredService<InvitationSettings>(),
@@ -85,14 +85,14 @@ internal static class Handlers
             Cancellation));
 
     public static Task<(DeliverInvitation? Delivery, TenantActivated? Activated)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
-        InTenant.ProcessAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
+        InTenant.RunAsync(services, tenantId, scope => TenantOnboardingHandler.HandleAsync(
             step,
             scope.GetRequiredService<ITenantCatalog>(),
             Cancellation));
 
     // The fault Wolverine publishes once a step has gone to the dead letter queue.
     public static Task FailOnboardingAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
-        InTenant.ProcessAsync(services, tenantId, scope => FailTenantOnboardingHandler.HandleAsync(
+        InTenant.RunAsync(services, tenantId, scope => FailTenantOnboardingHandler.HandleAsync(
             new Fault<ActivateTenant>(
                 step,
                 ExceptionInfo.From(new InvalidOperationException("The step failed."), includeMessage: false, includeStackTrace: false),

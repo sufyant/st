@@ -1,66 +1,31 @@
+using ControlPlane.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using SharedKernel;
-using Tenancy;
+using Wolverine;
 
 namespace ControlPlane.IntegrationTests;
 
-// Runs a handler the way the host's transaction policy does: in one transaction with the tenant set at its start,
-// committed only when the handler succeeds.
+// Runs a handler the way Wolverine does: the message carries the tenant, the module's DbContext begins the transaction, which
+// declares that tenant (W2), and when the handler returns its changes are saved and committed, a failed Result included (W7). An
+// exception leaves the transaction uncommitted, and it rolls back.
 internal static class InTenant
 {
-    public static async Task<TResult> RunAsync<TResult>(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task<TResult>> handler)
-        where TResult : Result
+    // What a handler returns: its Result, or the messages it sends, which are the caller's to deliver, as the outbox would.
+    public static async Task<T> RunAsync<T>(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task<T>> handler)
     {
         await using var scope = services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
+        var catalog = Catalog(scope, tenantId);
+        await using var transaction = await catalog.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
-        var result = await handler(scope.ServiceProvider);
+        var returned = await handler(scope.ServiceProvider);
 
-        if (result.IsSuccess)
-        {
-            await transaction.CommitAsync(TestContext.Current.CancellationToken);
-        }
-
-        return result;
-    }
-
-    // A handler that returns its Result with the message it sends; the message is the caller's to deliver, as the outbox would.
-    public static async Task<(TResult Result, TMessage? Message)> RunAsync<TResult, TMessage>(
-        IServiceProvider services,
-        Guid tenantId,
-        Func<IServiceProvider, Task<(TResult, TMessage?)>> handler)
-        where TResult : Result
-    {
-        await using var scope = services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
-
-        var (result, message) = await handler(scope.ServiceProvider);
-
-        if (result.IsSuccess)
-        {
-            await transaction.CommitAsync(TestContext.Current.CancellationToken);
-        }
-
-        return (result, message);
-    }
-
-    // A message handler without a Result, committed unless it throws; what it returns are the messages it sends.
-    public static async Task<T> ProcessAsync<T>(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task<T>> handler)
-    {
-        await using var scope = services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
-
-        var sent = await handler(scope.ServiceProvider);
-
+        await catalog.SaveChangesAsync(TestContext.Current.CancellationToken);
         await transaction.CommitAsync(TestContext.Current.CancellationToken);
-        return sent;
+        return returned;
     }
 
-    public static Task ProcessAsync(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task> handler) =>
-        ProcessAsync(services, tenantId, async scope =>
+    public static Task RunAsync(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task> handler) =>
+        RunAsync(services, tenantId, async scope =>
         {
             await handler(scope);
             return true;
@@ -69,9 +34,15 @@ internal static class InTenant
     public static async Task<T> ReadAsync<T>(IServiceProvider services, Guid tenantId, Func<IServiceProvider, Task<T>> read)
     {
         await using var scope = services.CreateAsyncScope();
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
+        await using var transaction = await Catalog(scope, tenantId).Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
 
         return await read(scope.ServiceProvider);
+    }
+
+    // The scope's message carries the tenant, the way Wolverine hands the message context to the DbContext it creates.
+    public static CatalogDbContext Catalog(AsyncServiceScope scope, Guid tenantId)
+    {
+        scope.ServiceProvider.GetRequiredService<IMessageContext>().TenantId = tenantId.ToString();
+        return scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
     }
 }

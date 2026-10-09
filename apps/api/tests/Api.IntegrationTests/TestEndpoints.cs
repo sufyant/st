@@ -61,10 +61,6 @@ internal static class TestEndpoints
                 bus.InvokeAsync(command, cancellationToken))
             .RequireAuthorization(Permissions.MembersRead);
 
-        tenant.MapPost("/rejected-probes", (WriteProbeThenReject command, IMessageBus bus, CancellationToken cancellationToken) =>
-                bus.InvokeAsync<Result>(command, cancellationToken))
-            .RequireAuthorization(Permissions.MembersRead);
-
         tenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
                 bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken))
             .RequireAuthorization(Permissions.MembersRead);

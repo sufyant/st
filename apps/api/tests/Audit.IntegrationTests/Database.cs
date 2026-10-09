@@ -3,13 +3,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Tenancy;
 using Testcontainers.PostgreSql;
+using Wolverine;
 
 [assembly: AssemblyFixture(typeof(Audit.IntegrationTests.Database))]
 
 namespace Audit.IntegrationTests;
 
 // One PostgreSQL 18 server for the test assembly, set up the way a deployment is: the bootstrap script creates the roles,
-// then the module's migrations run as the owner. Tests connect as the application role.
+// then the module's migrations run as the owner. Tests connect as the application role. Wolverine's own test double stands in for
+// the message context, which carries the tenant.
 public sealed class Database : IAsyncLifetime
 {
     private const string Password = "test-password";
@@ -38,6 +40,7 @@ public sealed class Database : IAsyncLifetime
         _services = new ServiceCollection()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application))
             .AddAuditInfrastructure()
+            .AddScoped<IMessageContext>(_ => new TestMessageContext())
             .BuildServiceProvider();
         foreach (var migrator in _services.GetServices<IModuleMigrator>())
         {

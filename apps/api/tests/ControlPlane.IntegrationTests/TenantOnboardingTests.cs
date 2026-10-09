@@ -2,6 +2,8 @@ using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Tenancy;
@@ -49,12 +51,12 @@ public sealed class TenantOnboardingTests(Database database)
         var slug = Unique.Slug();
         await using var firstScope = database.Services.CreateAsyncScope();
         await using var secondScope = database.Services.CreateAsyncScope();
-        var firstTransaction = await BeginAsync(firstScope, Guid.CreateVersion7());
-        var secondTransaction = await BeginAsync(secondScope, Guid.CreateVersion7());
+        var (firstTransaction, _) = await BeginAsync(firstScope, Guid.CreateVersion7());
+        var (_, secondProcessId) = await BeginAsync(secondScope, Guid.CreateVersion7());
         (await StartAsync(firstScope, admin.ExternalId, slug)).Tenant.IsSuccess.ShouldBeTrue();
 
         var second = StartAsync(secondScope, admin.ExternalId, slug);
-        await WaitUntilBlockedAsync(secondTransaction.Connection.ProcessID);
+        await WaitUntilBlockedAsync(secondProcessId);
         await firstTransaction.CommitAsync(TestContext.Current.CancellationToken);
 
         (await second).Tenant.Error.Code.ShouldBe("tenant.slug_taken");
@@ -147,11 +149,12 @@ public sealed class TenantOnboardingTests(Database database)
         return (tenantId, next.ShouldNotBeNull());
     }
 
-    private static async Task<TenantTransaction> BeginAsync(AsyncServiceScope scope, Guid tenantId)
+    // The transaction Wolverine would begin for the onboarding, and the database session it runs in.
+    private static async Task<(IDbContextTransaction Transaction, int ProcessId)> BeginAsync(AsyncServiceScope scope, Guid tenantId)
     {
-        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
-        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
-        return transaction;
+        var catalog = InTenant.Catalog(scope, tenantId);
+        var transaction = await catalog.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        return (transaction, ((NpgsqlConnection)catalog.Database.GetDbConnection()).ProcessID);
     }
 
     private static async Task<(SharedKernel.Result<TenantDetails> Tenant, CreateFirstOwnerInvitation? Next)> StartAsync(

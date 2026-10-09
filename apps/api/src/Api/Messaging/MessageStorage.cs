@@ -8,11 +8,12 @@ using Wolverine.Postgresql;
 namespace Api.Messaging;
 
 // Wolverine keeps its envelopes in one shared schema, over the application role's direct connection: its durability agent holds
-// session-level advisory locks, which a transaction-mode pooler cannot keep. A handler's own envelopes are written in its tenant
-// transaction instead (TenantTransactionMiddleware). The migration step creates the schema as the owner; starting never does.
+// session-level advisory locks, which a transaction-mode pooler cannot keep. A handler's own envelopes are written by its module
+// DbContext, in the transaction Wolverine began for the handler (W1). The migration step creates the schema as the owner; starting
+// never does.
 internal static class MessageStorage
 {
-    public const string Schema = "wolverine";
+    public const string Schema = TenancyServiceCollectionExtensions.MessageSchema;
 
     public static void Configure(WolverineOptions options, NpgsqlDataSource dataSource)
     {

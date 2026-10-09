@@ -14,6 +14,7 @@ namespace ControlPlane.Application.Invitations;
 /// </summary>
 public sealed record AcceptInvitation(string Secret, string UserId, IReadOnlyList<string> VerifiedEmails);
 
+// Every rejection returns before the handler changes anything, because Wolverine commits a failed Result too (W7).
 public static class AcceptInvitationHandler
 {
     public static async Task<Result<TenantSummary>> HandleAsync(

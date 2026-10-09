@@ -5,6 +5,7 @@ using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Tenancy;
+using Wolverine;
 
 namespace ControlPlane.Infrastructure;
 
@@ -12,21 +13,23 @@ namespace ControlPlane.Infrastructure;
 /// The <c>catalog</c> schema: the control plane's data above tenants (tenants, users, roles, system admins), and the memberships
 /// and invitations, which belong to a tenant and are under row level security.
 /// </summary>
-internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : TenantDbContext(options)
+/// <remarks>Public only because Wolverine's generated code creates it for the handlers (W9); its sets are internal to the module.</remarks>
+public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options, IMessageContext? messaging = null)
+    : TenantDbContext(options, messaging)
 {
     public const string Schema = "catalog";
 
-    public DbSet<Tenant> Tenants => Set<Tenant>();
+    internal DbSet<Tenant> Tenants => Set<Tenant>();
 
-    public DbSet<User> Users => Set<User>();
+    internal DbSet<User> Users => Set<User>();
 
-    public DbSet<Membership> Memberships => Set<Membership>();
+    internal DbSet<Membership> Memberships => Set<Membership>();
 
-    public DbSet<Role> Roles => Set<Role>();
+    internal DbSet<Role> Roles => Set<Role>();
 
-    public DbSet<Invitation> Invitations => Set<Invitation>();
+    internal DbSet<Invitation> Invitations => Set<Invitation>();
 
-    public DbSet<SystemAdmin> SystemAdmins => Set<SystemAdmin>();
+    internal DbSet<SystemAdmin> SystemAdmins => Set<SystemAdmin>();
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {

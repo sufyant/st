@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
+using Wolverine;
 
 namespace Tenancy.IntegrationTests;
 
@@ -11,7 +12,8 @@ internal sealed class Note : ITenantEntity
     public required string Text { get; set; }
 }
 
-internal sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : TenantDbContext(options)
+internal sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, IMessageContext? messaging = null)
+    : TenantDbContext(options, messaging)
 {
     public const string Schema = "fixture";
 

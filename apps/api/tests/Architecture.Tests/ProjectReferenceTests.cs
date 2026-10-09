@@ -24,6 +24,17 @@ public class ProjectReferenceTests
         references.Except([Solution.SharedKernel]).ShouldBeEmpty();
     }
 
+    // Tenancy reads the tenant of a module DbContext from Wolverine's message context (W2), and nothing else of Wolverine.
+    [Fact]
+    public void ReferencePackages_Tenancy_StaysInsideTheTable()
+    {
+        string[] allowed = ["EFCore.NamingConventions", "Microsoft.EntityFrameworkCore.*", "Npgsql.*", "WolverineFx"];
+
+        var packages = Solution.ReadProjectFile(Solution.Tenancy).PackageReferences;
+
+        packages.Where(package => !allowed.Any(pattern => Matches(pattern, package))).ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(ModuleProjects))]
     public void ReferenceProjects_ModuleProject_StaysInsideTheTable(string module, string layer)
@@ -71,9 +82,10 @@ public class ProjectReferenceTests
                 [Wolverine, "FluentValidation.*"],
                 []),
             "Api" => new([$"{module}.Application", $"{module}.Contracts", Solution.SharedKernel], [Wolverine], [AspNetCore]),
+            // Wolverine's EF Core integration registers the module's DbContext (W1).
             "Infrastructure" => new(
                 [$"{module}.Application", $"{module}.Domain", $"{module}.Contracts", Solution.SharedKernel, Solution.Tenancy],
-                ["Microsoft.EntityFrameworkCore.*", "Npgsql.*", "Microsoft.Extensions.*"],
+                ["Microsoft.EntityFrameworkCore.*", "Npgsql.*", "Microsoft.Extensions.*", "WolverineFx", "WolverineFx.EntityFrameworkCore"],
                 []),
             _ => throw new ArgumentOutOfRangeException(nameof(layer), layer, "Every layer has a row in the table."),
         };

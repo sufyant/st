@@ -5,6 +5,8 @@
     <!-- Aligns EF Core with the version the design-time package of the module Infrastructure projects brings. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- The tenant of a module DbContext is the tenant of the message it serves (W2). -->
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 
   <ItemGroup>
