@@ -71,6 +71,14 @@ internal sealed class ApiFactory(
         Task RunAsync(IMessageContext _) => action();
     }
 
+    // The same, until the condition holds, for a test that ends while messages still wait, such as a retry scheduled for later.
+    public Task<ITrackedSession> TrackMessagesAsync(Func<Task> action, ITrackedCondition until)
+    {
+        return Tracking().DoNotAssertOnExceptionsDetected().WaitForCondition(until).ExecuteAndWaitAsync(RunAsync);
+
+        Task RunAsync(IMessageContext _) => action();
+    }
+
     private TrackedSessionConfiguration Tracking() => Services.GetRequiredService<IHost>().TrackActivity().Timeout(TimeSpan.FromSeconds(30));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -104,20 +104,37 @@ public sealed class InvitationDeliveryTests(Database database)
         var next = $"{Guid.NewGuid():N}@example.com";
         api.Email.Refuses = refused;
 
-        await api.TrackMessagesAsync(async () =>
-        {
-            await InviteAsync(api, refused);
-            await InviteAsync(api, next);
-        });
+        var startedAt = DateTimeOffset.UtcNow;
+
+        var messages = await api.TrackMessagesAsync(
+            async () =>
+            {
+                await InviteAsync(api, refused);
+                await InviteAsync(api, next);
+            },
+            until: new SentAndRescheduled(sent: next, rescheduled: refused));
 
         api.Email.Sent.ShouldHaveSingleItem().To.ShouldBe(next);
-        (await database.ScalarAsync<long>(
-                $"""
-                SELECT count(*) FROM wolverine.wolverine_incoming_envelopes
-                WHERE status = 'Scheduled' AND message_type LIKE '%OwnerInvitationReady' AND execution_time > now() + interval '30 seconds'
-                AND position(convert_to('{refused}', 'UTF8') IN body) > 0
-                """))
-            .ShouldBe(1);
+        messages.Requeued.Envelopes().Where(envelope => envelope.Message is OwnerInvitationReady { Email: var email } && email == refused)
+            .ShouldHaveSingleItem().ScheduledTime.ShouldNotBeNull().ShouldBeGreaterThanOrEqualTo(startedAt.AddMinutes(1));
+    }
+
+    // The session ends once the next invitation is sent and the refused one is put back to wait for its next try.
+    private sealed class SentAndRescheduled(string sent, string rescheduled) : ITrackedCondition
+    {
+        private bool _sent;
+        private bool _rescheduled;
+
+        public void Record(EnvelopeRecord record)
+        {
+            if (record.Message is OwnerInvitationReady ready)
+            {
+                _sent |= record.MessageEventType == MessageEventType.MessageSucceeded && ready.Email == sent;
+                _rescheduled |= record.MessageEventType == MessageEventType.Requeued && ready.Email == rescheduled;
+            }
+        }
+
+        public bool IsCompleted() => _sent && _rescheduled;
     }
 
     private static readonly Dictionary<string, string?> Resend = new()
