@@ -26,6 +26,8 @@ public sealed class Database : IAsyncLifetime
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18").Build();
 
+    private readonly SemaphoreSlim _scripts = new(1, 1);
+
     private ServiceProvider _services = null!;
 
     public IServiceProvider Services => _services;
@@ -139,12 +141,22 @@ public sealed class Database : IAsyncLifetime
     private string SuperuserConnectionStringFor(string? database) =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = database ?? MainDatabase }.ConnectionString;
 
+    // One script at a time: the bootstrap script alters the shared roles, and two ALTER ROLE at once fail with "tuple concurrently
+    // updated". Tests that need a database of their own create them in parallel.
     private async Task RunScriptInAsync(string database, string script, params string[] variables)
     {
-        await _container.CopyAsync(await File.ReadAllBytesAsync(script), $"/tmp/{script}");
+        await _scripts.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            await _container.CopyAsync(await File.ReadAllBytesAsync(script), $"/tmp/{script}");
 
-        var result = await _container.ExecAsync(["psql", "--username", "postgres", "--dbname", database, .. variables, "--file", $"/tmp/{script}"]);
+            var result = await _container.ExecAsync(["psql", "--username", "postgres", "--dbname", database, .. variables, "--file", $"/tmp/{script}"]);
 
-        result.ExitCode.ShouldBe(0, result.Stderr);
+            result.ExitCode.ShouldBe(0, result.Stderr);
+        }
+        finally
+        {
+            _scripts.Release();
+        }
     }
 }

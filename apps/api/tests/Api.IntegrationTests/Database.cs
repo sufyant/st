@@ -30,6 +30,8 @@ public sealed class Database : IAsyncLifetime
         .WithCommand("-c", "max_connections=300")
         .Build();
 
+    private readonly SemaphoreSlim _bootstrap = new(1, 1);
+
     public string ApplicationConnectionString => ConnectionStringFor(DatabaseRoles.Application);
 
     public string OwnerConnectionString => ConnectionStringFor(DatabaseRoles.Owner);
@@ -228,16 +230,26 @@ public sealed class Database : IAsyncLifetime
         await MigrationStep.RunAsync(services, ConnectionStringFor(DatabaseRoles.Owner, database), CancellationToken.None);
     }
 
+    // One run at a time: the script alters the shared roles, and two ALTER ROLE at once fail with "tuple concurrently updated".
+    // Tests that need a database of their own create them in parallel.
     private async Task RunBootstrapScriptAsync(string database)
     {
-        var result = await _container.ExecAsync(
-        [
-            "psql", "--username", "postgres", "--dbname", database,
-            "-v", $"owner_password={Password}", "-v", $"application_password={Password}",
-            "--file", "/tmp/bootstrap.sql",
-        ]);
+        await _bootstrap.WaitAsync();
+        try
+        {
+            var result = await _container.ExecAsync(
+            [
+                "psql", "--username", "postgres", "--dbname", database,
+                "-v", $"owner_password={Password}", "-v", $"application_password={Password}",
+                "--file", "/tmp/bootstrap.sql",
+            ]);
 
-        result.ExitCode.ShouldBe(0, result.Stderr);
+            result.ExitCode.ShouldBe(0, result.Stderr);
+        }
+        finally
+        {
+            _bootstrap.Release();
+        }
     }
 
     private async Task CreateProbesAsOwnerAsync()
