@@ -8,9 +8,8 @@ using Tenancy;
 namespace ControlPlane.Infrastructure;
 
 /// <summary>
-/// The one way to reach catalog rows that belong to a tenant. The catalog has no row level security, so this access point,
-/// bound to the active tenant, is what keeps one tenant's rows from another: it reads only the active tenant's rows and adds
-/// only rows of the active tenant.
+/// The one way to reach catalog rows that belong to a tenant, used only inside a tenant. Row level security keeps one tenant's
+/// memberships and invitations from another; this access point adds no filter of its own.
 /// </summary>
 internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tenant) : ITenantCatalog
 {
@@ -18,8 +17,8 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     {
         get
         {
-            var tenantId = ActiveTenant;
-            return catalog.Memberships.Where(membership => membership.TenantId == tenantId);
+            _ = ActiveTenant; // Fails fast outside a tenant.
+            return catalog.Memberships;
         }
     }
 
@@ -49,7 +48,7 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     async Task<Invitation?> ITenantCatalog.FindInvitationForUpdateAsync(string tokenHash, CancellationToken cancellationToken)
     {
         var found = await catalog.Invitations
-            .FromSql($"SELECT * FROM catalog.invitations WHERE token_hash = {tokenHash} AND tenant_id = {ActiveTenant} FOR UPDATE")
+            .FromSql($"SELECT * FROM catalog.invitations WHERE token_hash = {tokenHash} FOR UPDATE")
             .ToListAsync(cancellationToken);
 
         return found.SingleOrDefault();
@@ -58,7 +57,7 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     async Task<Invitation?> ITenantCatalog.FindInvitationForUpdateAsync(Guid invitationId, CancellationToken cancellationToken)
     {
         var found = await catalog.Invitations
-            .FromSql($"SELECT * FROM catalog.invitations WHERE id = {invitationId} AND tenant_id = {ActiveTenant} FOR UPDATE")
+            .FromSql($"SELECT * FROM catalog.invitations WHERE id = {invitationId} FOR UPDATE")
             .ToListAsync(cancellationToken);
 
         return found.SingleOrDefault();
@@ -80,12 +79,13 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
         return inserted == 1;
     }
 
-    void ITenantCatalog.Add(Invitation invitation) => catalog.Invitations.Add(OfActiveTenant(invitation, invitation.TenantId));
+    void ITenantCatalog.Add(Invitation invitation) => catalog.Invitations.Add(invitation);
 
     void ITenantCatalog.Add(User user) => catalog.Users.Add(user);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => catalog.SaveChangesAsync(cancellationToken);
 
+    // The tenants table belongs to no tenant, so row level security does not stop a tenant from adding another one.
     private T OfActiveTenant<T>(T row, Guid? tenantId) =>
         tenantId == ActiveTenant ? row : throw new InvalidOperationException("Only rows of the active tenant can be written here.");
 }

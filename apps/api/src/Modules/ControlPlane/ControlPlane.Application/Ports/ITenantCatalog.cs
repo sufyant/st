@@ -5,10 +5,9 @@ using ControlPlane.Domain.Users;
 namespace ControlPlane.Application.Ports;
 
 /// <summary>
-/// The one way handlers reach catalog rows that belong to a tenant, bound to the active tenant. The catalog has no row level
-/// security, so this access point is what keeps one tenant's rows from another: it reads only the active tenant's rows and adds
-/// only rows of the active tenant. Users are not tenant-owned; they are here because accepting an invitation saves a user and its
-/// membership together.
+/// The one way handlers reach catalog rows that belong to a tenant, used inside the active tenant. Row level security keeps one
+/// tenant's memberships and invitations from another. Users are not tenant-owned; they are here because accepting an invitation
+/// saves a user and its membership together.
 /// </summary>
 /// <remarks>
 /// Public only because Wolverine's generated code passes it to public handlers; its members speak domain types, so they

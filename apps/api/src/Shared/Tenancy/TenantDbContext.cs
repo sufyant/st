@@ -22,8 +22,27 @@ public abstract class TenantDbContext(DbContextOptions options) : DbContext(opti
         {
             var builder = modelBuilder.Entity(entity.ClrType);
             builder.Property<Guid>(TenantColumn.Property).HasDefaultValueSql(TenantColumn.CurrentTenantSql);
-            builder.HasIndex(TenantColumn.Property);
+
+            // A key that leads with the tenant column indexes it already.
+            if (entity.FindPrimaryKey()?.Properties[0].Name != TenantColumn.Property)
+            {
+                builder.HasIndex(TenantColumn.Property);
+            }
         }
+    }
+
+    /// <summary>
+    /// Declares the tenant for the rest of the current transaction (R4). Outside a transaction the setting would end with the
+    /// statement, so it is refused.
+    /// </summary>
+    public async Task DeclareTenantAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("A tenant is declared inside a transaction, never on the connection.");
+        }
+
+        await Database.ExecuteSqlAsync($"SELECT set_config({TenantColumn.Setting}, {tenantId.ToString()}, true)", cancellationToken);
     }
 
     protected abstract void BuildModel(ModelBuilder modelBuilder);
