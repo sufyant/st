@@ -25,6 +25,8 @@ public static class ControlPlaneInfrastructure
         services.AddModuleMigrations<CatalogDbContext>(CatalogDbContext.Schema);
         services.AddScoped<ITenantDirectory, TenantDirectory>();
         services.AddScoped<ISystemAdminDirectory, SystemAdminDirectory>();
+        services.AddOptions<SystemAdminSettings>().BindConfiguration(SystemAdminSettings.Section).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SystemAdminSettings>, SystemAdminSettings.Validation>();
 
         // Registered by type, so Wolverine builds them in its generated code on the handler's own DbContext, and sees that the
         // handler needs its transaction (W1).
