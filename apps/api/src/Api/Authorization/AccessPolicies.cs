@@ -97,3 +97,6 @@ internal sealed class AccessHandler : IAuthorizationHandler
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Marks an endpoint any signed-in user may call, without a permission (A5).</summary>
+public sealed class SignedInEndpoint;

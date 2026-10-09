@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Architecture.Tests;
 
@@ -10,6 +11,8 @@ internal static partial class Solution
     public const string Tenancy = "Tenancy";
     public const string Host = "Api";
 
+    private const string SolutionFile = "Api.slnx";
+
     public static IReadOnlyList<string> Layers { get; } = ["Contracts", "Domain", "Application", "Infrastructure", "Api"];
 
     // The deps file marks the solution's own projects apart from third-party packages, some of which follow the module
@@ -18,6 +21,9 @@ internal static partial class Solution
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ProjectReferences { get; } = ReadProjectReferencesFromDepsFile();
 
     private static IReadOnlyList<string> ProjectNames { get; } = [.. ProjectReferences.Keys];
+
+    // The project files themselves, as the solution file lists them.
+    private static Dictionary<string, string> ProjectFiles { get; } = ReadProjectFilesFromSolution();
 
     public static IReadOnlyList<string> Modules { get; } =
     [
@@ -41,8 +47,33 @@ internal static partial class Solution
 
     public static Assembly Load(string project) => Assembly.Load(project);
 
-    // What the project file references, whether or not any type uses it.
-    public static IReadOnlyList<string> ProjectReferencesOf(string project) => ProjectReferences[project];
+    // What the project file itself declares: the projects, packages and shared frameworks it references.
+    public static ProjectFile ReadProjectFile(string project)
+    {
+        var file = XDocument.Load(ProjectFiles[project]);
+
+        return new ProjectFile(
+            [.. Includes(file, "ProjectReference").Select(path => Path.GetFileNameWithoutExtension(path.Replace('\\', '/')))],
+            [.. Includes(file, "PackageReference")],
+            [.. Includes(file, "FrameworkReference")]);
+    }
+
+    private static IEnumerable<string> Includes(XDocument file, string item) =>
+        file.Descendants(item).Select(element => (string)element.Attribute("Include")!);
+
+    // The solution file is found above the test's output directory, in the source tree the test was built from.
+    private static Dictionary<string, string> ReadProjectFilesFromSolution()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(root.FullName, SolutionFile)))
+        {
+            root = root.Parent ?? throw new InvalidOperationException($"{SolutionFile} was not found above the test's output directory.");
+        }
+
+        return XDocument.Load(Path.Combine(root.FullName, SolutionFile)).Descendants("Project")
+            .Select(project => Path.Combine(root.FullName, (string)project.Attribute("Path")!))
+            .ToDictionary(path => Path.GetFileNameWithoutExtension(path)!, path => path);
+    }
 
     private static Dictionary<string, IReadOnlyList<string>> ReadProjectReferencesFromDepsFile()
     {
@@ -70,3 +101,8 @@ internal static partial class Solution
     [GeneratedRegex(@"^(?<module>[A-Za-z]+)\.(Contracts|Domain|Application|Infrastructure|Api)$")]
     private static partial Regex ModuleProjectName();
 }
+
+internal sealed record ProjectFile(
+    IReadOnlyList<string> ProjectReferences,
+    IReadOnlyList<string> PackageReferences,
+    IReadOnlyList<string> FrameworkReferences);
