@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="NetArchTest.eNhancedEdition" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit.v3" />
@@ -13,6 +14,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Api\Api.csproj" />
+  </ItemGroup>
+
+  <!-- The test standard (section 9) is read from every test assembly. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Audit\Audit.IntegrationTests\Audit.IntegrationTests.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.IntegrationTests\ControlPlane.IntegrationTests.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.UnitTests\ControlPlane.UnitTests.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Notifications.IntegrationTests\Notifications.IntegrationTests.csproj" />
+    <ProjectReference Include="..\..\src\Shared\SharedKernel.UnitTests\SharedKernel.UnitTests.csproj" />
+    <ProjectReference Include="..\..\src\Shared\Tenancy.IntegrationTests\Tenancy.IntegrationTests.csproj" />
+    <ProjectReference Include="..\Api.IntegrationTests\Api.IntegrationTests.csproj" />
+    <ProjectReference Include="..\Onboarding.EndToEndTests\Onboarding.EndToEndTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

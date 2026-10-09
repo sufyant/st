@@ -20,7 +20,7 @@ internal static partial class Solution
 
     // The deps file marks the solution's own projects apart from third-party packages, some of which follow the module
     // naming pattern too (OpenTelemetry.Api), and lists each project's direct project references. The test project references
-    // only the host, so these are exactly the projects the host ships.
+    // the host and the other test projects, so without the test projects these are exactly the projects the host ships.
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ProjectReferences { get; } = ReadProjectReferencesFromDepsFile();
 
     private static IReadOnlyList<string> ProjectNames { get; } = [.. ProjectReferences.Keys];
@@ -69,6 +69,16 @@ internal static partial class Solution
             [.. Includes(file, "FrameworkReference")]);
     }
 
+    // The C# files of a project: every file under its folder, without the build output.
+    public static IEnumerable<string> SourceFilesOf(string project)
+    {
+        var folder = Path.GetDirectoryName(ProjectFiles[project])!;
+        string[] buildOutput = [$"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"];
+
+        return Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !buildOutput.Any(output => file[folder.Length..].Contains(output, StringComparison.Ordinal)));
+    }
+
     private static IEnumerable<string> Includes(XDocument file, string item) =>
         file.Descendants(item).Select(element => (string)element.Attribute("Include")!);
 
@@ -95,7 +105,7 @@ internal static partial class Solution
         var projects = deps.RootElement.GetProperty("libraries").EnumerateObject()
             .Where(library => library.Value.GetProperty("type").GetString() == "project")
             .Select(library => library.Name)
-            .Where(library => !library.StartsWith($"{typeof(Solution).Assembly.GetName().Name}/", StringComparison.Ordinal))
+            .Where(library => !IsTestProject(NameOf(library)))
             .ToList();
         var targets = deps.RootElement.GetProperty("targets").EnumerateObject().First().Value;
         var names = projects.Select(NameOf).ToHashSet();
