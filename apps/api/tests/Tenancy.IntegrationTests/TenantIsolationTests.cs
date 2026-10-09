@@ -52,7 +52,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
 
-        var count = await _notes.InTenantAsync(Tenants.New(), notes => notes.Notes.IgnoreQueryFilters().CountAsync(Cancellation));
+        var count = await _notes.InTenantAsync(Tenants.New(), notes => notes.Notes.CountAsync(Cancellation));
 
         count.ShouldBe(0);
     }
@@ -66,9 +66,9 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         await using var asOwner = new Notes(database.OwnerConnectionString);
 
         var inAnotherTenant = await asOwner.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
+            notes.Notes.CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
         var withoutATenant = await asOwner.WithoutTenantAsync(notes =>
-            notes.Notes.IgnoreQueryFilters().CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
+            notes.Notes.CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
 
         inAnotherTenant.ShouldBe(0);
         withoutATenant.ShouldBe(0);
@@ -81,7 +81,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var note = await WriteNoteAsync(other, "original");
 
         var updated = await _notes.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().Where(row => row.Id == note.Id)
+            notes.Notes.Where(row => row.Id == note.Id)
                 .ExecuteUpdateAsync(set => set.SetProperty(row => row.Text, "changed"), Cancellation));
 
         updated.ShouldBe(0);
@@ -95,7 +95,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var note = await WriteNoteAsync(other, "kept");
 
         var deleted = await _notes.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().Where(row => row.Id == note.Id).ExecuteDeleteAsync(Cancellation));
+            notes.Notes.Where(row => row.Id == note.Id).ExecuteDeleteAsync(Cancellation));
 
         deleted.ShouldBe(0);
         (await ReadTextAsync(other, note.Id)).ShouldBe("kept");
@@ -123,7 +123,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     {
         await WriteNoteAsync(Tenants.New(), "secret");
 
-        var count = await _notes.WithoutTenantAsync(notes => notes.Notes.IgnoreQueryFilters().CountAsync(Cancellation));
+        var count = await _notes.WithoutTenantAsync(notes => notes.Notes.CountAsync(Cancellation));
 
         count.ShouldBe(0);
     }

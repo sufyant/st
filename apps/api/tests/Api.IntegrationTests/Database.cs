@@ -209,8 +209,7 @@ public sealed class Database : IAsyncLifetime
     private async Task CreateProbesAsOwnerAsync()
     {
         await using (var probes = new ProbeDbContext(
-            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, OwnerConnectionString),
-            new TenantContext()))
+            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, OwnerConnectionString)))
         {
             await probes.GetService<IRelationalDatabaseCreator>().CreateTablesAsync();
         }

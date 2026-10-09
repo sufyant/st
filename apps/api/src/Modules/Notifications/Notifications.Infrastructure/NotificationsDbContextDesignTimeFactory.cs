@@ -7,7 +7,5 @@ namespace Notifications.Infrastructure;
 internal sealed class NotificationsDbContextDesignTimeFactory : IDesignTimeDbContextFactory<NotificationsDbContext>
 {
     public NotificationsDbContext CreateDbContext(string[] args) =>
-        new(
-            TenancyServiceCollectionExtensions.ModuleDbContextOptions<NotificationsDbContext>(NotificationsDbContext.Schema, "Host=design-time"),
-            new TenantContext());
+        new(TenancyServiceCollectionExtensions.ModuleDbContextOptions<NotificationsDbContext>(NotificationsDbContext.Schema, "Host=design-time"));
 }
