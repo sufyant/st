@@ -11,8 +11,8 @@ internal static class PersistenceExtensions
 
     public static WebApplicationBuilder AddPersistence(this WebApplicationBuilder builder)
     {
-        // Checked on first use rather than on start: the build starts the host to write the OpenAPI document, without a database.
-        // Until the setting is there, the readiness check fails and the pod receives no traffic.
+        // Both connections are checked on start (DatabaseAccountCheck), which runs before Wolverine starts.
+        builder.Services.AddHostedService<DatabaseAccountCheck>();
         builder.Services.AddOptions<ConnectionStringOptions>()
             .BindConfiguration("ConnectionStrings")
             .Validate(options => !string.IsNullOrWhiteSpace(options.Pooled), "ConnectionStrings:Pooled must name the application role's pooled connection.");

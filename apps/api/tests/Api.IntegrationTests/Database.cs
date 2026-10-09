@@ -76,12 +76,13 @@ public sealed class Database : IAsyncLifetime
         await close.ExecuteNonQueryAsync();
     }
 
-    // Whether another transaction holds a lock on the rows the query selects FOR UPDATE NOWAIT.
-    public async Task<bool> IsLockedAsync(string selectForUpdateNoWait)
+    // Whether another transaction holds a lock on the rows the query selects FOR UPDATE NOWAIT in the tenant.
+    public async Task<bool> IsLockedAsync(Guid tenantId, string selectForUpdateNoWait)
     {
         await using var connection = new NpgsqlConnection(ApplicationConnectionString);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
+        await DeclareTenantAsync(connection, transaction, tenantId);
         await using var command = new NpgsqlCommand(selectForUpdateNoWait, connection, transaction);
         try
         {
@@ -135,6 +136,52 @@ public sealed class Database : IAsyncLifetime
         return value is null or DBNull ? default : (T)value;
     }
 
+    // What is really in a table: the container's superuser is bound by no policy, so it sees the rows of every tenant.
+    public async Task<T?> ScalarAsSuperuserAsync<T>(string sql, string database = MainDatabase)
+    {
+        await using var connection = new NpgsqlConnection(
+            new NpgsqlConnectionStringBuilder(SuperuserConnectionString) { Database = database }.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        var value = await command.ExecuteScalarAsync();
+
+        return value is null or DBNull ? default : (T)value;
+    }
+
+    // Runs the SQL as the role in a transaction that declares the tenant first, the way the application does; returns the rows
+    // it changed.
+    public async Task<int> ExecuteInTenantAsync(Guid tenantId, string sql, string? role = null)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionStringFor(role ?? DatabaseRoles.Application));
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await DeclareTenantAsync(connection, transaction, tenantId);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        var changed = await command.ExecuteNonQueryAsync();
+        await transaction.CommitAsync();
+
+        return changed;
+    }
+
+    public async Task<T?> ScalarInTenantAsync<T>(Guid tenantId, string sql, string? role = null)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionStringFor(role ?? DatabaseRoles.Application));
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await DeclareTenantAsync(connection, transaction, tenantId);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        var value = await command.ExecuteScalarAsync();
+
+        return value is null or DBNull ? default : (T)value;
+    }
+
+    private static async Task DeclareTenantAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid tenantId)
+    {
+        await using var declare = new NpgsqlCommand("SELECT set_config('app.tenant_id', @tenant, true)", connection, transaction);
+        declare.Parameters.AddWithValue("tenant", tenantId.ToString());
+        await declare.ExecuteNonQueryAsync();
+    }
+
     private async Task MigrateAsync(string database)
     {
         await using var services = new ServiceCollection()
@@ -162,8 +209,7 @@ public sealed class Database : IAsyncLifetime
     private async Task CreateProbesAsOwnerAsync()
     {
         await using (var probes = new ProbeDbContext(
-            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, OwnerConnectionString),
-            new TenantContext()))
+            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, OwnerConnectionString)))
         {
             await probes.GetService<IRelationalDatabaseCreator>().CreateTablesAsync();
         }

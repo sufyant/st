@@ -30,8 +30,15 @@ public sealed class Database : IAsyncLifetime
 
     public FakeInvitationSender Sender { get; } = new();
 
-    public string ConnectionStringFor(string role) =>
-        new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Username = role, Password = Password }.ConnectionString;
+    public string ConnectionStringFor(string role, string? database = null) =>
+        new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            Username = role,
+            Password = Password,
+            Database = database ?? MainDatabase,
+        }.ConnectionString;
+
+    private string MainDatabase => new NpgsqlConnectionStringBuilder(_container.GetConnectionString()).Database!;
 
     public async ValueTask InitializeAsync()
     {
@@ -55,7 +62,8 @@ public sealed class Database : IAsyncLifetime
     public ServiceProvider BuildServices(
         Action<IServiceCollection>? configure = null,
         Dictionary<string, string?>? settings = null,
-        bool realIdentityProvider = false)
+        bool realIdentityProvider = false,
+        string? database = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -69,7 +77,7 @@ public sealed class Database : IAsyncLifetime
             .AddSingleton<IConfiguration>(configuration)
             .AddLogging()
             .AddSingleton(TimeProvider.System)
-            .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application))
+            .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
             .AddControlPlaneModule();
         if (!realIdentityProvider)
         {
@@ -82,15 +90,44 @@ public sealed class Database : IAsyncLifetime
         return services.BuildServiceProvider();
     }
 
-    public async Task RunScriptAsync(string script, params string[] variables)
+    public Task RunScriptAsync(string script, params string[] variables) => RunScriptInAsync(MainDatabase, script, variables);
+
+    // A database with the roles but no migrations, for a test that migrates it step by step.
+    public async Task<string> CreateEmptyDatabaseAsync()
+    {
+        var name = $"empty_{Guid.NewGuid():N}";
+        await ExecuteAsSuperuserAsync($"CREATE DATABASE {name}");
+        await RunScriptInAsync(name, "bootstrap.sql", "-v", $"owner_password={Password}", "-v", $"application_password={Password}");
+
+        return name;
+    }
+
+    // What is really in a table: the container's superuser is bound by no policy, so it sees the rows of every tenant.
+    public async Task<T> ScalarAsSuperuserAsync<T>(string sql, string? database = null)
+    {
+        await using var connection = new NpgsqlConnection(SuperuserConnectionStringFor(database));
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+
+        return (T)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+    }
+
+    public async Task ExecuteAsSuperuserAsync(string sql, string? database = null)
+    {
+        await using var connection = new NpgsqlConnection(SuperuserConnectionStringFor(database));
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
+    private string SuperuserConnectionStringFor(string? database) =>
+        new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = database ?? MainDatabase }.ConnectionString;
+
+    private async Task RunScriptInAsync(string database, string script, params string[] variables)
     {
         await _container.CopyAsync(await File.ReadAllBytesAsync(script), $"/tmp/{script}");
 
-        var result = await _container.ExecAsync(
-        [
-            "psql", "--username", "postgres", "--dbname", new NpgsqlConnectionStringBuilder(_container.GetConnectionString()).Database!,
-            .. variables, "--file", $"/tmp/{script}",
-        ]);
+        var result = await _container.ExecAsync(["psql", "--username", "postgres", "--dbname", database, .. variables, "--file", $"/tmp/{script}"]);
 
         result.ExitCode.ShouldBe(0, result.Stderr);
     }

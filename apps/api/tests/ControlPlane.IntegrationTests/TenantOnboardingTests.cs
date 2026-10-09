@@ -180,12 +180,5 @@ public sealed class TenantOnboardingTests(Database database)
 
     private Task<string> StatusOfAsync(Guid tenantId) => ScalarAsync<string>($"SELECT status FROM catalog.tenants WHERE id = '{tenantId}'");
 
-    private async Task<T> ScalarAsync<T>(string sql)
-    {
-        await using var connection = new NpgsqlConnection(database.ConnectionStringFor(DatabaseRoles.Application));
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-
-        return (T)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
-    }
+    private Task<T> ScalarAsync<T>(string sql) => database.ScalarAsSuperuserAsync<T>(sql);
 }

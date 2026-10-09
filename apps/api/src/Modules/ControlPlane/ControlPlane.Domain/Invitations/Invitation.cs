@@ -8,7 +8,7 @@ namespace ControlPlane.Domain.Invitations;
 /// stored message ever carries one. Accepting it needs both the token and a verified email address of the accepting user that
 /// matches the invited one, so a forwarded link does not let someone else in.
 /// </summary>
-internal sealed class Invitation
+internal sealed class Invitation : ITenantEntity
 {
     public const int EmailMaxLength = 320;
 

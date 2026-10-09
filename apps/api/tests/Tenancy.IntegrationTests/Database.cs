@@ -47,8 +47,7 @@ public sealed class Database : IAsyncLifetime
     private async Task CreateNotesAsOwnerAsync()
     {
         await using (var notes = new NotesDbContext(
-            TenancyServiceCollectionExtensions.ModuleDbContextOptions<NotesDbContext>(NotesDbContext.Schema, OwnerConnectionString),
-            new TenantContext()))
+            TenancyServiceCollectionExtensions.ModuleDbContextOptions<NotesDbContext>(NotesDbContext.Schema, OwnerConnectionString)))
         {
             await notes.GetService<IRelationalDatabaseCreator>().CreateTablesAsync();
         }

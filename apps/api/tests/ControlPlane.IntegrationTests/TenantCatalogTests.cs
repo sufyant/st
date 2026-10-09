@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.IntegrationTests;
 
-// The catalog has no row level security; tenant-owned catalog rows are isolated by the one access point that reaches them.
+// Tenant-owned catalog rows are reached through one access point, and row level security keeps each tenant to its own.
 public sealed class TenantCatalogTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -63,7 +63,7 @@ public sealed class TenantCatalogTests(Database database)
     {
         var email = Unique.Email();
         await Handlers.InviteAndDeliverAsync(database.Services, email);
-        var tokenHash = InvitationToken.Hash(Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
+        var tokenHash = InvitationToken.Hash(Handlers.SecretOf(Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink)));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>

@@ -4,11 +4,15 @@ using ControlPlane.Domain.SystemAdmins;
 using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 
-/// <summary>The <c>catalog</c> schema: the control plane's data above tenants, without row level security.</summary>
-internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbContext(options)
+/// <summary>
+/// The <c>catalog</c> schema: the control plane's data above tenants (tenants, users, roles, system admins), and the memberships
+/// and invitations, which belong to a tenant and are under row level security.
+/// </summary>
+internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : TenantDbContext(options)
 {
     public const string Schema = "catalog";
 
@@ -24,7 +28,7 @@ internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> option
 
     public DbSet<SystemAdmin> SystemAdmins => Set<SystemAdmin>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void BuildModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
 
@@ -69,7 +73,6 @@ internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> option
             invitation.Property(i => i.TokenHash).HasMaxLength(64);
             invitation.HasIndex(i => i.TokenHash).IsUnique();
             invitation.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
-            invitation.HasIndex(i => i.TenantId);
             invitation.HasOne<Tenant>().WithMany().HasForeignKey(i => i.TenantId);
             invitation.HasOne<Role>().WithMany().HasForeignKey(i => i.RoleId).OnDelete(DeleteBehavior.Cascade);
             invitation.HasOne<User>().WithMany().HasForeignKey(i => i.InvitedBy).OnDelete(DeleteBehavior.Restrict);

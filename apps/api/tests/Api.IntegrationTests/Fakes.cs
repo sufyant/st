@@ -45,11 +45,12 @@ internal sealed class FakeInvitationSender : IInvitationSender
         return Task.CompletedTask;
     }
 
-    // The token of the accept link sent to someone who already has an account.
-    public string TokenSentTo(string email)
+    // The invitation code of the accept link sent to someone who already has an account.
+    public string CodeSentTo(string email)
     {
         var link = Sent.Single(sent => sent.Email == email).Link;
-        return Uri.UnescapeDataString(link.Query["?token=".Length..]);
+        link.Query.ShouldStartWith("?code=");
+        return Uri.UnescapeDataString(link.Query["?code=".Length..]);
     }
 }
 

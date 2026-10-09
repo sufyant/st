@@ -4,8 +4,7 @@ using Tenancy;
 namespace Notifications.Infrastructure;
 
 /// <summary>The <c>notifications</c> schema, under row level security. It holds no table at present.</summary>
-internal sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options, TenantContext tenant)
-    : TenantDbContext(options, tenant)
+internal sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options) : TenantDbContext(options)
 {
     public const string Schema = "notifications";
 

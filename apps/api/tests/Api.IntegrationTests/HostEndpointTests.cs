@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
 using Tenancy;
 
 namespace Api.IntegrationTests;
@@ -28,7 +29,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Wolverine registers the node and checks its message storage while it starts, so the database must be there.
+    // The account check connects first while the application starts, so the database must be there.
     [Fact]
     public async Task Without_its_database_the_application_does_not_start()
     {
@@ -36,7 +37,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<AggregateException>();
+        start.ShouldThrow<NpgsqlException>();
     }
 
     [Fact]
@@ -54,53 +55,81 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
 
-    // Row level security does not hold for a superuser, a role with BYPASSRLS or a table's owner, so a pod connected as one must
-    // never receive traffic.
+    // R10: row level security does not bind a superuser, a role that bypasses it or a table's owner, so the application does not
+    // start as one. Both of its connections are checked: the pooled one requests use, and the direct one Wolverine keeps its
+    // messages over.
     [Fact]
-    public async Task Connected_as_the_owner_the_application_is_not_ready()
+    public async Task StartApplication_AsTheMigrationAccount_FailsNamingTheProblem()
     {
-        var ready = await ReadyStatusAsync(database.OwnerConnectionString);
+        await using var api = new ApiFactory(database.OwnerConnectionString, directConnectionString: database.ApplicationConnectionString);
 
-        ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Pooled connection's role owns tables");
     }
 
     [Fact]
-    public async Task Connected_as_a_superuser_the_application_is_not_ready()
+    public async Task StartApplication_AsASuperuser_FailsNamingTheProblem()
     {
-        var ready = await ReadyStatusAsync(database.SuperuserConnectionString);
+        await using var api = new ApiFactory(database.SuperuserConnectionString, directConnectionString: database.ApplicationConnectionString);
 
-        ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Pooled connection's role is a superuser");
     }
 
     [Fact]
-    public async Task Connected_as_a_role_that_bypasses_row_level_security_the_application_is_not_ready()
+    public async Task StartApplication_AsARoleThatBypassesRowLevelSecurity_FailsNamingTheProblem()
     {
         var bypassing = await database.CreateLoginRoleAsync("BYPASSRLS");
+        await using var api = new ApiFactory(bypassing, directConnectionString: database.ApplicationConnectionString);
 
-        var ready = await ReadyStatusAsync(bypassing);
+        var start = () => api.CreateClient();
 
-        ready.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        start.ShouldThrow<InvalidOperationException>().Message
+            .ShouldContain("ConnectionStrings:Pooled connection's role bypasses row level security");
     }
 
-    // The direct connection is the application's too: Wolverine keeps its messages over it.
     [Fact]
-    public async Task Connected_as_the_owner_over_the_direct_connection_the_application_is_not_ready()
+    public async Task StartApplication_AsTheMigrationAccountOverTheDirectConnection_FailsNamingTheProblem()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: database.OwnerConnectionString);
 
-        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+        var start = () => api.CreateClient();
 
-        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Direct connection's role owns tables");
     }
 
-    // Like the pooled one, the setting is checked once the application runs rather than on start: the build starts the host to
-    // write the OpenAPI document, without any connection.
     [Fact]
-    public async Task Without_the_direct_connection_the_application_is_not_ready()
+    public async Task StartApplication_WithoutTheDirectConnection_FailsNamingTheSetting()
     {
         await using var api = new ApiFactory(database.ApplicationConnectionString, directConnectionString: "");
 
-        var ready = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("ConnectionStrings:Direct");
+    }
+
+    [Fact]
+    public async Task StartApplication_AsTheApplicationAccount_Starts()
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString);
+
+        var live = await api.CreateClient().GetAsync("/health/live", TestContext.Current.CancellationToken);
+
+        live.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    // A role can change while the application runs; the readiness check keeps checking it.
+    [Fact]
+    public async Task CheckReadiness_TheRoleGainsBypassRowLevelSecurityWhileRunning_IsNotReady()
+    {
+        var role = await database.CreateLoginRoleAsync("");
+        await using var api = new ApiFactory(role);
+        var client = api.CreateClient();
+        await database.ScalarAsSuperuserAsync<object>($"ALTER ROLE {new NpgsqlConnectionStringBuilder(role).Username} BYPASSRLS");
+
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
 
         ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
@@ -146,14 +175,6 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
-    }
-
-    private async Task<HttpStatusCode> ReadyStatusAsync(string pooledConnectionString)
-    {
-        await using var api = new ApiFactory(pooledConnectionString, directConnectionString: database.ApplicationConnectionString);
-        var response = await api.CreateClient().GetAsync("/health/ready", TestContext.Current.CancellationToken);
-
-        return response.StatusCode;
     }
 
     [Fact]

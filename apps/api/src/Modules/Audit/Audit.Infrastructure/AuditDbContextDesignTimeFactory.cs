@@ -7,5 +7,5 @@ namespace Audit.Infrastructure;
 internal sealed class AuditDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AuditDbContext>
 {
     public AuditDbContext CreateDbContext(string[] args) =>
-        new(TenancyServiceCollectionExtensions.ModuleDbContextOptions<AuditDbContext>(AuditDbContext.Schema, "Host=design-time"), new TenantContext());
+        new(TenancyServiceCollectionExtensions.ModuleDbContextOptions<AuditDbContext>(AuditDbContext.Schema, "Host=design-time"));
 }

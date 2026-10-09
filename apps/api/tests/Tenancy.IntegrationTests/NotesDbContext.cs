@@ -11,7 +11,7 @@ internal sealed class Note : ITenantEntity
     public required string Text { get; set; }
 }
 
-internal sealed class NotesDbContext(DbContextOptions<NotesDbContext> options, TenantContext tenant) : TenantDbContext(options, tenant)
+internal sealed class NotesDbContext(DbContextOptions<NotesDbContext> options) : TenantDbContext(options)
 {
     public const string Schema = "fixture";
 

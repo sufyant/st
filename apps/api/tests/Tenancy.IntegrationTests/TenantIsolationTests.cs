@@ -52,25 +52,26 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
 
-        var count = await _notes.InTenantAsync(Tenants.New(), notes => notes.Notes.IgnoreQueryFilters().CountAsync(Cancellation));
+        var count = await _notes.InTenantAsync(Tenants.New(), notes => notes.Notes.CountAsync(Cancellation));
 
         count.ShouldBe(0);
     }
 
-    // The owner owns the table and is not subject to row level security, so only the query filter stands between it and the row.
+    // R1: row level security is forced, so it binds the owner of the table too, which runs the migrations.
     [Fact]
-    public async Task The_query_filter_alone_hides_rows_of_another_tenant()
+    public async Task ReadNotes_AsTheOwner_SeesNoRowsOfAnotherTenantNorWithoutATenant()
     {
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
         await using var asOwner = new Notes(database.OwnerConnectionString);
 
-        var count = await asOwner.InTenantAsync(Tenants.New(), notes => notes.Notes.CountAsync(note => note.Text == "secret", Cancellation));
-        var withoutFilter = await asOwner.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
+        var inAnotherTenant = await asOwner.InTenantAsync(Tenants.New(), notes =>
+            notes.Notes.CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
+        var withoutATenant = await asOwner.WithoutTenantAsync(notes =>
+            notes.Notes.CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
 
-        count.ShouldBe(0);
-        withoutFilter.ShouldBe(1);
+        inAnotherTenant.ShouldBe(0);
+        withoutATenant.ShouldBe(0);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var note = await WriteNoteAsync(other, "original");
 
         var updated = await _notes.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().Where(row => row.Id == note.Id)
+            notes.Notes.Where(row => row.Id == note.Id)
                 .ExecuteUpdateAsync(set => set.SetProperty(row => row.Text, "changed"), Cancellation));
 
         updated.ShouldBe(0);
@@ -94,7 +95,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         var note = await WriteNoteAsync(other, "kept");
 
         var deleted = await _notes.InTenantAsync(Tenants.New(), notes =>
-            notes.Notes.IgnoreQueryFilters().Where(row => row.Id == note.Id).ExecuteDeleteAsync(Cancellation));
+            notes.Notes.Where(row => row.Id == note.Id).ExecuteDeleteAsync(Cancellation));
 
         deleted.ShouldBe(0);
         (await ReadTextAsync(other, note.Id)).ShouldBe("kept");
@@ -122,7 +123,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     {
         await WriteNoteAsync(Tenants.New(), "secret");
 
-        var count = await _notes.WithoutTenantAsync(notes => notes.Notes.IgnoreQueryFilters().CountAsync(Cancellation));
+        var count = await _notes.WithoutTenantAsync(notes => notes.Notes.CountAsync(Cancellation));
 
         count.ShouldBe(0);
     }

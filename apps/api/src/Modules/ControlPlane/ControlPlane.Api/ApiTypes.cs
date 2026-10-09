@@ -2,8 +2,8 @@ namespace ControlPlane.Api;
 
 // The API's own types: what clients send and receive, kept apart from the commands they become.
 
-/// <summary>The token from the invitation link.</summary>
-public sealed record AcceptInvitationRequest(string Token);
+/// <summary>The invitation code from the invitation link.</summary>
+public sealed record AcceptInvitationRequest(string Code);
 
 public sealed record AcceptedInvitationResponse(string TenantSlug);
 

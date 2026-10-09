@@ -15,7 +15,7 @@ public sealed class Probe : ITenantEntity
     public required string Value { get; init; }
 }
 
-public sealed class ProbeDbContext(DbContextOptions<ProbeDbContext> options, TenantContext tenant) : TenantDbContext(options, tenant)
+public sealed class ProbeDbContext(DbContextOptions<ProbeDbContext> options) : TenantDbContext(options)
 {
     public const string Schema = "probes";
 

@@ -37,7 +37,7 @@ public static class DeliverInvitationHandler
             return;
         }
 
-        var acceptLink = settings.AcceptLink(token);
+        var acceptLink = settings.AcceptLink(new InvitationCode(invitation.TenantId, token));
         var link = await identity.HasAccountAsync(invitation.Email, cancellationToken)
             ? acceptLink
             : await identity.InviteAsync(invitation.Email, invitation.Id, acceptLink, cancellationToken);

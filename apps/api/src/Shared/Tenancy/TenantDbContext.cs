@@ -1,21 +1,15 @@
-using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Tenancy;
 
 /// <summary>
-/// Base for a module DbContext that holds tenant entities. Every <see cref="ITenantEntity"/> gets a shadow tenant column that
-/// defaults to the active tenant setting and a query filter on the active tenant; the migrations add the matching row level
-/// security policy.
+/// Base for a module DbContext that holds tenant entities. Every <see cref="ITenantEntity"/> gets a tenant column that defaults
+/// to the declared tenant; the migrations add the matching row level security, enabled and forced. Row level security is the
+/// only filter: there is no query filter on the tenant.
 /// </summary>
-public abstract class TenantDbContext(DbContextOptions options, TenantContext tenant) : DbContext(options)
+public abstract class TenantDbContext(DbContextOptions options) : DbContext(options)
 {
-    private const string QueryFilter = "Tenant";
-
-    // EF Core reads this from the context running the query, not from the one the model was built with.
-    private Guid? CurrentTenantId => tenant.TenantId;
-
     protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
     {
         BuildModel(modelBuilder);
@@ -28,20 +22,28 @@ public abstract class TenantDbContext(DbContextOptions options, TenantContext te
         {
             var builder = modelBuilder.Entity(entity.ClrType);
             builder.Property<Guid>(TenantColumn.Property).HasDefaultValueSql(TenantColumn.CurrentTenantSql);
-            builder.HasIndex(TenantColumn.Property);
-            builder.HasQueryFilter(QueryFilter, BelongsToCurrentTenant(entity.ClrType));
+
+            // A key that leads with the tenant column indexes it already.
+            if (entity.FindPrimaryKey()?.Properties[0].Name != TenantColumn.Property)
+            {
+                builder.HasIndex(TenantColumn.Property);
+            }
         }
     }
 
-    protected abstract void BuildModel(ModelBuilder modelBuilder);
-
-    private LambdaExpression BelongsToCurrentTenant(Type entityType)
+    /// <summary>
+    /// Declares the tenant for the rest of the current transaction (R4). Outside a transaction the setting would end with the
+    /// statement, so it is refused.
+    /// </summary>
+    public async Task DeclareTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
-        var entity = Expression.Parameter(entityType, "entity");
-        var tenantColumn = Expression.Call(
-            typeof(EF), nameof(EF.Property), [typeof(Guid?)], entity, Expression.Constant(TenantColumn.Property));
-        var currentTenant = Expression.Property(Expression.Constant(this, typeof(TenantDbContext)), nameof(CurrentTenantId));
+        if (Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("A tenant is declared inside a transaction, never on the connection.");
+        }
 
-        return Expression.Lambda(Expression.Equal(tenantColumn, currentTenant), entity);
+        await Database.ExecuteSqlAsync($"SELECT set_config({TenantColumn.Setting}, {tenantId.ToString()}, true)", cancellationToken);
     }
+
+    protected abstract void BuildModel(ModelBuilder modelBuilder);
 }
