@@ -10,9 +10,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Application\ControlPlane.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Domain\ControlPlane.Domain.csproj" />
+    <ProjectReference Include="..\SharedKernel\SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Xunit.TraitAttribute">
+      <_Parameter1>TestClassification</_Parameter1>
+      <_Parameter2>Unit</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

@@ -76,7 +76,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task A_tenant_sees_its_own_rows()
+    public async Task ReadNotes_InItsOwnTenant_ReturnsItsRows()
     {
         var tenant = Tenants.New();
         await WriteNoteAsync(tenant, "own note");
@@ -87,7 +87,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task A_new_row_belongs_to_the_active_tenant()
+    public async Task WriteNote_InATenant_BelongsToThatTenant()
     {
         var tenant = Tenants.New();
 
@@ -99,7 +99,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Rows_of_another_tenant_are_not_returned()
+    public async Task ReadNotes_OfAnotherTenant_ReturnsNoRows()
     {
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
@@ -110,7 +110,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Row_level_security_alone_hides_rows_of_another_tenant()
+    public async Task ReadNotes_WithRowLevelSecurityAlone_HidesAnotherTenantsRows()
     {
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
@@ -138,7 +138,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Rows_of_another_tenant_cannot_be_updated()
+    public async Task UpdateNotes_OfAnotherTenant_ChangesNoRow()
     {
         var other = Tenants.New();
         var note = await WriteNoteAsync(other, "original");
@@ -152,7 +152,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Rows_of_another_tenant_cannot_be_deleted()
+    public async Task DeleteNotes_OfAnotherTenant_RemovesNoRow()
     {
         var other = Tenants.New();
         var note = await WriteNoteAsync(other, "kept");
@@ -165,7 +165,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task A_row_cannot_be_written_for_another_tenant()
+    public async Task WriteNote_ForAnotherTenant_IsRefused()
     {
         var other = Tenants.New();
 
@@ -182,7 +182,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Without_a_tenant_no_rows_are_returned()
+    public async Task ReadNotes_WithoutATenant_ReturnsNoRows()
     {
         await WriteNoteAsync(Tenants.New(), "secret");
 
@@ -192,7 +192,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Without_a_tenant_no_row_can_be_written()
+    public async Task WriteNote_WithoutATenant_IsRefused()
     {
         var write = () => _notes.WithoutTenantAsync(async notes =>
         {
@@ -205,7 +205,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Work_that_is_not_committed_is_discarded()
+    public async Task WriteNote_NotCommitted_IsDiscarded()
     {
         var tenant = Tenants.New();
         var note = new Note { Text = "abandoned" };
@@ -223,7 +223,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
 
     // A save of several rows would begin a transaction of its own; it joins the transaction in progress instead.
     [Fact]
-    public async Task Several_rows_saved_together_are_discarded_with_their_transaction()
+    public async Task WriteNotes_SavedTogetherNotCommitted_AreAllDiscarded()
     {
         var tenant = Tenants.New();
         Note[] written = [new() { Text = "first" }, new() { Text = "second" }];
@@ -241,7 +241,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
 
     // Requests share pooled connections; the tenant set for one transaction must be gone when the connection is used again.
     [Fact]
-    public async Task The_tenant_setting_ends_with_its_transaction()
+    public async Task DeclareTenant_InATransaction_EndsWithTheTransaction()
     {
         await using var scope = _notes.CreateScope();
         var notes = scope.ServiceProvider.GetRequiredService<NotesDbContext>();
@@ -259,7 +259,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
     }
 
     [Fact]
-    public async Task No_database_role_bypasses_row_level_security()
+    public async Task ReadRoles_OwnerAndApplication_NeitherBypassesRowLevelSecurity()
     {
         await using var connection = new NpgsqlConnection(database.ApplicationConnectionString);
         await connection.OpenAsync(Cancellation);

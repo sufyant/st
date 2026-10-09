@@ -19,7 +19,7 @@ public sealed class OpenApiDocumentTests : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public void A_result_with_a_value_is_described_as_the_value()
+    public void DescribeEndpoint_ResultWithAValue_IsTheValue()
     {
         var success = Responses("/v1/greetings", "post").GetProperty("200");
 
@@ -28,7 +28,7 @@ public sealed class OpenApiDocumentTests : IAsyncLifetime
     }
 
     [Fact]
-    public void A_result_without_a_value_is_described_as_no_content()
+    public void DescribeEndpoint_ResultWithoutAValue_IsNoContent()
     {
         var responses = Responses("/v1/acknowledgements", "post");
 
@@ -42,7 +42,7 @@ public sealed class OpenApiDocumentTests : IAsyncLifetime
     [InlineData("404")]
     [InlineData("409")]
     [InlineData("422")]
-    public void The_failures_of_a_result_are_described_as_problem_details(string status)
+    public void DescribeEndpoint_FailuresOfAResult_AreProblemDetails(string status)
     {
         var failure = Responses("/v1/greetings", "post").GetProperty(status);
 
@@ -50,7 +50,7 @@ public sealed class OpenApiDocumentTests : IAsyncLifetime
     }
 
     [Fact]
-    public void The_result_type_itself_is_not_part_of_the_document()
+    public void DescribeEndpoint_ResultType_IsNotInTheDocument()
     {
         var schemas = _document.GetProperty("components").GetProperty("schemas").EnumerateObject().Select(schema => schema.Name);
 

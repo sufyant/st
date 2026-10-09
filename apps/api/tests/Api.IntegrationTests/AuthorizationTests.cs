@@ -13,7 +13,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_member_whose_role_lacks_the_permission_is_forbidden_with_problem_details()
+    public async Task CallGuardedEndpoint_RoleLacksThePermission_IsForbiddenWithProblemDetails()
     {
         var tenant = await _catalog.AddTenantAsync();
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
@@ -26,7 +26,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
 
     // A tenant the user cannot enter looks the same as one that does not exist, also behind a permission.
     [Fact]
-    public async Task A_user_who_is_not_a_member_does_not_find_the_tenant()
+    public async Task CallGuardedEndpoint_UserNotAMember_IsNotFound()
     {
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
@@ -39,7 +39,7 @@ public sealed class AuthorizationTests(Database database) : IAsyncLifetime
 
     // A system admin is not a member, so the tenant routes do not let them in.
     [Fact]
-    public async Task A_system_admin_who_is_not_a_member_does_not_find_the_tenant()
+    public async Task CallGuardedEndpoint_SystemAdminNotAMember_IsNotFound()
     {
         var tenant = await _catalog.AddTenantAsync();
         var admin = await _catalog.AddSystemAdminAsync();

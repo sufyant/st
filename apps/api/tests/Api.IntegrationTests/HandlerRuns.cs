@@ -9,22 +9,10 @@ namespace Api.IntegrationTests;
 public sealed class HandlerRuns
 {
     private readonly ConcurrentQueue<(string Host, Type Message)> _runs = new();
-    private readonly ConcurrentDictionary<Type, TaskCompletionSource> _handled = new();
 
     public IEnumerable<Type> In(string host) => _runs.Where(run => run.Host == host).Select(run => run.Message);
 
-    // Completes when a handler of the message has run in any host, or fails after the time a test may wait.
-    public Task HandledAsync<TMessage>() =>
-        Signal(typeof(TMessage)).Task.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
-
-    internal void Record(string host, Type message)
-    {
-        _runs.Enqueue((host, message));
-        Signal(message).TrySetResult();
-    }
-
-    private TaskCompletionSource Signal(Type message) =>
-        _handled.GetOrAdd(message, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+    internal void Record(string host, Type message) => _runs.Enqueue((host, message));
 }
 
 // Puts a host's handlers on the record, each after it handled its message.

@@ -12,7 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\Notifications\Notifications.Infrastructure\Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\Notifications.Infrastructure\Notifications.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Xunit.TraitAttribute">
+      <_Parameter1>TestClassification</_Parameter1>
+      <_Parameter2>Integration</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

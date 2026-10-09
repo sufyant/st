@@ -12,7 +12,7 @@ public class TenantTests
     [InlineData("a1b")]
     [InlineData("tenant-2024-eu")]
     [InlineData("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk")]
-    public void A_tenant_is_created_with_a_url_safe_slug(string slug)
+    public void CreateTenant_UrlSafeSlug_IsCreatedWithThatSlug(string slug)
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", slug);
 
@@ -31,7 +31,7 @@ public class TenantTests
     [InlineData("acme-")]
     [InlineData("acme--corp")]
     [InlineData("acmé")]
-    public void A_slug_that_is_not_url_safe_is_rejected(string slug)
+    public void CreateTenant_SlugNotUrlSafe_IsRejected(string slug)
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", slug);
 
@@ -70,7 +70,7 @@ public class TenantTests
     }
 
     [Fact]
-    public void A_new_tenant_is_provisioning()
+    public void CreateTenant_New_IsProvisioning()
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
 
@@ -78,7 +78,7 @@ public class TenantTests
     }
 
     [Fact]
-    public void An_activated_tenant_is_active()
+    public void ActivateTenant_WhenProvisioning_IsActive()
     {
         var tenant = Tenant.Create(Id, "Acme Ltd", "acme").Value;
 

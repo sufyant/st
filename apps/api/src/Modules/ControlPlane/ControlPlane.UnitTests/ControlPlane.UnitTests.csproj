@@ -5,24 +5,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Shouldly" />
-    <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Api\Api.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\db\bootstrap.sql" Link="bootstrap.sql" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="..\ControlPlane.Application\ControlPlane.Application.csproj" />
+    <ProjectReference Include="..\ControlPlane.Contracts\ControlPlane.Contracts.csproj" />
+    <ProjectReference Include="..\ControlPlane.Domain\ControlPlane.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="Xunit.TraitAttribute">
       <_Parameter1>TestClassification</_Parameter1>
-      <_Parameter2>EndToEnd</_Parameter2>
+      <_Parameter2>Unit</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 

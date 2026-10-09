@@ -10,7 +10,7 @@ namespace ControlPlane.IntegrationTests;
 public sealed class InvitationTests(Database database)
 {
     [Fact]
-    public async Task Accepting_creates_the_user_and_the_membership_with_the_invited_role()
+    public async Task AcceptInvitation_NewUser_CreatesTheUserAndTheMembershipWithTheInvitedRole()
     {
         var (tenantId, email, code) = await InviteAsync();
         var invitee = Unique.ExternalId();
@@ -29,7 +29,7 @@ public sealed class InvitationTests(Database database)
     }
 
     [Fact]
-    public async Task An_existing_user_accepting_an_invitation_joins_another_tenant()
+    public async Task AcceptInvitation_ExistingUser_JoinsAnotherTenant()
     {
         var other = await Catalog.AddTenantAsync(database.Services);
         var invitee = await Catalog.AddUserAsync(database.Services);
@@ -44,7 +44,7 @@ public sealed class InvitationTests(Database database)
     }
 
     [Fact]
-    public async Task A_failed_acceptance_leaves_no_user_behind()
+    public async Task AcceptInvitation_Rejected_LeavesNoUserBehind()
     {
         var (_, _, code) = await InviteAsync();
         var stranger = Unique.ExternalId();
@@ -57,7 +57,7 @@ public sealed class InvitationTests(Database database)
     }
 
     [Fact]
-    public async Task An_invitation_token_cannot_be_used_twice()
+    public async Task AcceptInvitation_CodeUsedTwice_IsRejected()
     {
         var (tenantId, email, code) = await InviteAsync();
         var first = Unique.ExternalId();
@@ -73,7 +73,7 @@ public sealed class InvitationTests(Database database)
     }
 
     [Fact]
-    public async Task An_invitation_token_cannot_be_used_after_the_invitation_expires()
+    public async Task AcceptInvitation_AfterItExpires_IsRejected()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
         await using var services = database.BuildServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(time)));

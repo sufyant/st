@@ -22,7 +22,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_command_from_a_tenant_request_runs_under_that_tenant()
+    public async Task RunCommand_FromATenantRequest_RunsUnderThatTenant()
     {
         var tenant = await _catalog.AddTenantAsync();
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
@@ -34,7 +34,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_tenant_request_does_not_see_the_data_of_another_tenant()
+    public async Task ReadProbes_InATenantRequest_SeesNoDataOfAnotherTenant()
     {
         var tenant = await _catalog.AddTenantAsync();
         var other = await _catalog.AddTenantAsync();
@@ -49,7 +49,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
 
     // Property level: a client cannot choose the tenant of a row by sending it (mass assignment).
     [Fact]
-    public async Task A_row_is_written_in_the_tenant_of_the_request_whatever_the_body_says()
+    public async Task WriteProbe_BodyNamesAnotherTenant_IsWrittenInTheTenantOfThePath()
     {
         var tenant = await _catalog.AddTenantAsync();
         var other = await _catalog.AddTenantAsync();
@@ -62,7 +62,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_command_that_fails_leaves_nothing_written()
+    public async Task RunCommand_Fails_LeavesNothingWritten()
     {
         var tenant = await _catalog.AddTenantAsync();
         var member = _host.CreateClient(await _catalog.AddMemberAsync(tenant.Id));
@@ -111,7 +111,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_cascaded_message_keeps_the_tenant_of_the_message_that_caused_it()
+    public async Task CascadeMessage_FromATenantMessage_KeepsItsTenant()
     {
         var tenant = Guid.NewGuid();
 
@@ -121,7 +121,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_published_message_is_handled_under_its_tenant()
+    public async Task PublishMessage_WithATenant_IsHandledUnderItsTenant()
     {
         var tenant = Guid.NewGuid();
 
@@ -182,7 +182,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_message_with_a_malformed_tenant_is_not_handled()
+    public async Task InvokeMessage_MalformedTenant_IsNotHandled()
     {
         var invoke = () => Bus().InvokeForTenantAsync<TenantObservation>("not-a-tenant-id", new ObserveTenant(), Cancellation);
 

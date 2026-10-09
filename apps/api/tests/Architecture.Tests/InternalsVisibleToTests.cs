@@ -10,7 +10,7 @@ public class InternalsVisibleToTests
 
     [Theory]
     [MemberData(nameof(ModuleProjects))]
-    public void Module_projects_expose_internals_only_within_their_module(string module, string project)
+    public void ExposeInternals_ModuleProject_OnlyWithinItsModule(string module, string project)
     {
         var friends = FriendAssembliesOf(project);
 
@@ -18,7 +18,7 @@ public class InternalsVisibleToTests
     }
 
     [Fact]
-    public void SharedKernel_exposes_internals_only_to_its_own_tests()
+    public void ExposeInternals_SharedKernel_OnlyToItsOwnTests()
     {
         var friends = FriendAssembliesOf(Solution.SharedKernel);
 
@@ -26,7 +26,7 @@ public class InternalsVisibleToTests
     }
 
     [Fact]
-    public void Tenancy_exposes_internals_only_to_its_own_tests()
+    public void ExposeInternals_Tenancy_OnlyToItsOwnTests()
     {
         var friends = FriendAssembliesOf(Solution.Tenancy);
 
@@ -34,7 +34,7 @@ public class InternalsVisibleToTests
     }
 
     [Fact]
-    public void Host_exposes_internals_only_to_its_own_tests()
+    public void ExposeInternals_Host_OnlyToItsOwnTests()
     {
         var friends = FriendAssembliesOf(Solution.Host);
 

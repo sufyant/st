@@ -15,12 +15,18 @@ internal static partial class Solution
 
     public static IReadOnlyList<string> Layers { get; } = ["Contracts", "Domain", "Application", "Infrastructure", "Api"];
 
+    // A test project is known by its name, not by its folder: module tests sit next to their module (section 2).
+    public static IReadOnlyList<string> TestProjectSuffixes { get; } = [".UnitTests", ".IntegrationTests", ".EndToEndTests", ".Tests"];
+
     // The deps file marks the solution's own projects apart from third-party packages, some of which follow the module
     // naming pattern too (OpenTelemetry.Api), and lists each project's direct project references. The test project references
-    // only the host, so these are exactly the projects the host ships.
+    // the host and the other test projects, so without the test projects these are exactly the projects the host ships.
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ProjectReferences { get; } = ReadProjectReferencesFromDepsFile();
 
     private static IReadOnlyList<string> ProjectNames { get; } = [.. ProjectReferences.Keys];
+
+    // The folder of the solution file: found above the test's output directory, in the source tree the test was built from.
+    public static string Root { get; } = FindRoot();
 
     // The project files themselves, as the solution file lists them.
     private static Dictionary<string, string> ProjectFiles { get; } = ReadProjectFilesFromSolution();
@@ -38,6 +44,14 @@ internal static partial class Solution
     public static IReadOnlyList<string> ModuleProjects { get; } = [.. Modules.SelectMany(ProjectsOf)];
 
     public static IReadOnlyList<string> AllProjects { get; } = [SharedKernel, Tenancy, Host, .. ModuleProjects];
+
+    // Every project the solution file lists, test projects and production projects.
+    public static IReadOnlyList<string> TestProjects { get; } = [.. ProjectFiles.Keys.Where(IsTestProject).Order()];
+
+    public static IReadOnlyList<string> ProductionProjects { get; } = [.. ProjectFiles.Keys.Where(project => !IsTestProject(project)).Order()];
+
+    public static bool IsTestProject(string project) =>
+        TestProjectSuffixes.Any(suffix => project.EndsWith(suffix, StringComparison.Ordinal));
 
     public static IEnumerable<string> ProjectsOf(string module) => Layers.Select(layer => $"{module}.{layer}");
 
@@ -58,11 +72,20 @@ internal static partial class Solution
             [.. Includes(file, "FrameworkReference")]);
     }
 
+    // The C# files of a project: every file under its folder, without the build output.
+    public static IEnumerable<string> SourceFilesOf(string project)
+    {
+        var folder = Path.GetDirectoryName(ProjectFiles[project])!;
+        string[] buildOutput = [$"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"];
+
+        return Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !buildOutput.Any(output => file[folder.Length..].Contains(output, StringComparison.Ordinal)));
+    }
+
     private static IEnumerable<string> Includes(XDocument file, string item) =>
         file.Descendants(item).Select(element => (string)element.Attribute("Include")!);
 
-    // The solution file is found above the test's output directory, in the source tree the test was built from.
-    private static Dictionary<string, string> ReadProjectFilesFromSolution()
+    private static string FindRoot()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(root.FullName, SolutionFile)))
@@ -70,10 +93,18 @@ internal static partial class Solution
             root = root.Parent ?? throw new InvalidOperationException($"{SolutionFile} was not found above the test's output directory.");
         }
 
-        return XDocument.Load(Path.Combine(root.FullName, SolutionFile)).Descendants("Project")
-            .Select(project => Path.Combine(root.FullName, (string)project.Attribute("Path")!))
-            .ToDictionary(path => Path.GetFileNameWithoutExtension(path)!, path => path);
+        return root.FullName;
     }
+
+    private static Dictionary<string, string> ReadProjectFilesFromSolution() =>
+        XDocument.Load(Path.Combine(Root, SolutionFile)).Descendants("Project")
+            .Select(project => Path.Combine(Root, (string)project.Attribute("Path")!))
+            .ToDictionary(path => Path.GetFileNameWithoutExtension(path)!, path => path);
+
+    // What NuGet restored for a project: the packages it uses, direct and transitive, and the folders they are in.
+    public static string AssetsFileOf(string project) => Path.Combine(Path.GetDirectoryName(ProjectFiles[project])!, "obj", "project.assets.json");
+
+    public static IReadOnlyList<string> SolutionProjects => [.. ProjectFiles.Keys.Order()];
 
     private static Dictionary<string, IReadOnlyList<string>> ReadProjectReferencesFromDepsFile()
     {
@@ -84,7 +115,7 @@ internal static partial class Solution
         var projects = deps.RootElement.GetProperty("libraries").EnumerateObject()
             .Where(library => library.Value.GetProperty("type").GetString() == "project")
             .Select(library => library.Name)
-            .Where(library => !library.StartsWith($"{typeof(Solution).Assembly.GetName().Name}/", StringComparison.Ordinal))
+            .Where(library => !IsTestProject(NameOf(library)))
             .ToList();
         var targets = deps.RootElement.GetProperty("targets").EnumerateObject().First().Value;
         var names = projects.Select(NameOf).ToHashSet();

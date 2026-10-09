@@ -7,7 +7,7 @@ namespace ControlPlane.IntegrationTests;
 public sealed class TenantDirectoryTests(Database database)
 {
     [Fact]
-    public async Task A_member_of_an_active_tenant_resolves_to_the_tenant()
+    public async Task ResolveTenant_MemberOfAnActiveTenant_FindsTheMembership()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var user = await Catalog.AddUserAsync(database.Services);
@@ -19,7 +19,7 @@ public sealed class TenantDirectoryTests(Database database)
     }
 
     [Fact]
-    public async Task A_user_who_is_not_a_member_does_not_resolve()
+    public async Task ResolveTenant_UserNotAMember_FindsNothing()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
         var other = await Catalog.AddTenantAsync(database.Services);
@@ -32,7 +32,7 @@ public sealed class TenantDirectoryTests(Database database)
     }
 
     [Fact]
-    public async Task An_unknown_tenant_does_not_resolve()
+    public async Task ResolveTenant_UnknownTenant_FindsNothing()
     {
         var user = await Catalog.AddUserAsync(database.Services);
 
@@ -42,7 +42,7 @@ public sealed class TenantDirectoryTests(Database database)
     }
 
     [Fact]
-    public async Task An_unknown_user_does_not_resolve()
+    public async Task ResolveTenant_UnknownUser_FindsNothing()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
@@ -52,7 +52,7 @@ public sealed class TenantDirectoryTests(Database database)
     }
 
     [Fact]
-    public async Task A_member_of_a_provisioning_tenant_does_not_resolve()
+    public async Task ResolveTenant_MemberOfAProvisioningTenant_FindsNothing()
     {
         var tenant = await Catalog.AddTenantAsync(database.Services, TenantStatus.Provisioning);
         var user = await Catalog.AddUserAsync(database.Services);

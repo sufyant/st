@@ -5,7 +5,7 @@ public class ResultTests
     private static readonly Error TenantNotFound = Error.NotFound("tenant.not_found", "The tenant was not found.");
 
     [Fact]
-    public void A_successful_result_carries_its_value()
+    public void CreateResult_FromAValue_CarriesTheValue()
     {
         Result<int> result = 42;
 
@@ -14,7 +14,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void A_failed_result_carries_its_error()
+    public void CreateResult_FromAnError_CarriesTheError()
     {
         Result<int> result = TenantNotFound;
 
@@ -23,7 +23,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Reading_the_value_of_a_failed_result_is_a_programming_error()
+    public void ReadValue_OfAFailedResult_Throws()
     {
         Result<int> result = TenantNotFound;
 
@@ -31,7 +31,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Reading_the_error_of_a_successful_result_is_a_programming_error()
+    public void ReadError_OfASuccessfulResult_Throws()
     {
         var result = Result.Success();
 
@@ -39,7 +39,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void A_result_without_a_value_can_fail_with_an_error()
+    public void CreateResultWithoutValue_FromAnError_CarriesTheError()
     {
         Result result = TenantNotFound;
 
@@ -48,7 +48,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Mapping_a_successful_result_maps_its_value()
+    public void MapResult_WhenSuccessful_MapsTheValue()
     {
         Result<int> result = 42;
 
@@ -58,7 +58,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Mapping_a_failed_result_keeps_its_error()
+    public void MapResult_WhenFailed_KeepsTheError()
     {
         Result<int> result = TenantNotFound;
 

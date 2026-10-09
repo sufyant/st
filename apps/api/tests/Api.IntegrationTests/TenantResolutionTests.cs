@@ -12,7 +12,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_member_reaches_the_tenant()
+    public async Task ResolveTenant_Member_ReachesTheTenant()
     {
         var tenant = await _catalog.AddTenantAsync();
         var member = await _catalog.AddMemberAsync(tenant.Id);
@@ -35,7 +35,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_request_without_a_user_is_unauthorized()
+    public async Task ResolveTenant_WithoutAUser_IsUnauthorized()
     {
         var tenant = await _catalog.AddTenantAsync();
 
@@ -47,7 +47,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
 
     // A tenant the user cannot enter looks the same as one that does not exist, so its existence is not revealed.
     [Fact]
-    public async Task A_user_who_is_not_a_member_does_not_find_the_tenant()
+    public async Task ResolveTenant_UserNotAMember_IsNotFound()
     {
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
@@ -59,7 +59,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_unknown_tenant_is_not_found()
+    public async Task ResolveTenant_UnknownTenant_IsNotFound()
     {
         var user = await _catalog.AddUserAsync();
 
@@ -70,7 +70,7 @@ public sealed class TenantResolutionTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_member_of_a_tenant_that_is_not_active_does_not_find_it()
+    public async Task ResolveTenant_MemberOfATenantNotActive_IsNotFound()
     {
         var tenant = await _catalog.AddTenantAsync(status: "Provisioning");
         var member = await _catalog.AddMemberAsync(tenant.Id);

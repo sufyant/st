@@ -26,7 +26,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     public async ValueTask DisposeAsync() => await _api.DisposeAsync();
 
     [Fact]
-    public async Task A_new_tenant_answers_as_provisioning_and_becomes_active_with_its_first_owner_invited()
+    public async Task CreateTenant_Valid_AnswersProvisioningAndBecomesActiveWithItsOwnerInvited()
     {
         var admin = await AdminAsync();
         var slug = Slug();
@@ -41,7 +41,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     }
 
     [Fact]
-    public async Task A_slug_another_tenant_has_is_a_conflict()
+    public async Task CreateTenant_SlugTaken_IsAConflict()
     {
         var admin = await AdminAsync();
         var existing = await _catalog.AddTenantAsync();
@@ -55,7 +55,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     [Theory]
     [InlineData("Not A Slug", "owner@example.com")]
     [InlineData("valid-slug", "not an email")]
-    public async Task A_tenant_needs_a_url_safe_slug_and_an_owner_email(string slug, string ownerEmail)
+    public async Task CreateTenant_InvalidSlugOrOwnerEmail_IsABadRequest(string slug, string ownerEmail)
     {
         var admin = await AdminAsync();
 
@@ -165,7 +165,7 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     }
 
     [Fact]
-    public async Task A_member_cannot_create_a_tenant()
+    public async Task CreateTenant_AsATenantMember_IsForbidden()
     {
         var tenant = await _catalog.AddTenantAsync();
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");

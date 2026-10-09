@@ -55,7 +55,7 @@ public class TenantCreationRequestTests
     }
 
     [Fact]
-    public void CheckKey_256Characters_IsNotAKey()
+    public void CheckKey_LongerThan255Characters_IsNotAKey()
     {
         TenantCreationRequest.IsKey(new string('k', 256)).ShouldBeFalse();
     }

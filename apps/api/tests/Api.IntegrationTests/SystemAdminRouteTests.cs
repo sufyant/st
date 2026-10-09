@@ -15,7 +15,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_system_admin_with_a_second_factor_reaches_the_system_routes()
+    public async Task EnterSystemDoor_SystemAdminWithASecondFactor_IsLetIn()
     {
         var admin = await _catalog.AddSystemAdminAsync();
 
@@ -25,7 +25,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_system_admin_without_a_second_factor_is_forbidden()
+    public async Task EnterSystemDoor_SystemAdminWithoutASecondFactor_IsForbidden()
     {
         var admin = await _catalog.AddSystemAdminAsync();
 
@@ -37,7 +37,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
 
     // Only the host's reading of fva may vouch for a second factor; a claim of that name inside the token proves nothing.
     [Fact]
-    public async Task A_second_factor_claimed_by_the_token_itself_is_not_trusted()
+    public async Task EnterSystemDoor_SecondFactorClaimedByTheTokenItself_IsForbidden()
     {
         var admin = await _catalog.AddSystemAdminAsync();
         var token = TestTokens.For(admin, secondFactor: false, extraClaims: new Dictionary<string, object> { ["second_factor_verified"] = "true" });
@@ -48,7 +48,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_user_who_is_not_a_system_admin_is_forbidden()
+    public async Task EnterSystemDoor_UserNotASystemAdmin_IsForbidden()
     {
         var tenant = await _catalog.AddTenantAsync();
         var owner = await _catalog.AddMemberAsync(tenant.Id, role: "Owner");
@@ -59,7 +59,7 @@ public sealed class SystemAdminRouteTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_request_without_a_token_is_unauthorized()
+    public async Task EnterSystemDoor_WithoutAToken_IsUnauthorized()
     {
         var response = await _host.CreateClient().GetAsync("/v1/system/ping", Cancellation);
 

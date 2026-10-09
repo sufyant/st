@@ -59,7 +59,7 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_user_who_is_not_a_member_is_limited_as_a_user()
+    public async Task LimitRequests_UserNotAMember_IsLimitedAsAUser()
     {
         var tenant = await _catalog.AddTenantAsync();
         var outsider = await _catalog.AddUserAsync();
@@ -71,7 +71,7 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Outside_a_tenant_each_user_has_their_own_limit()
+    public async Task LimitRequests_OutsideATenant_EachUserHasTheirOwnLimit()
     {
         await GetAsync("/v1/ping", "user_1");
         await GetAsync("/v1/ping", "user_1");
@@ -82,7 +82,7 @@ public sealed class RateLimitingTests(Database database) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Outside_a_tenant_and_without_a_user_each_ip_address_has_its_own_limit()
+    public async Task LimitRequests_WithoutAUser_EachAddressHasItsOwnLimit()
     {
         await SendFromAsync("203.0.113.1");
         var limited = await SendFromAsync("203.0.113.1");

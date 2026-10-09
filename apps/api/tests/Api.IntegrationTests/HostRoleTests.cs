@@ -37,12 +37,13 @@ public sealed class HostRoleTests(Database database)
         var admin = web.CreateClient(await AddSystemAdminAsync(name), secondFactor: true);
 
         var created = await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = "acme", ownerEmail = "owner@acme.test" });
-        await runs.HandledAsync<InvitationEmailSent>();
+        var tenantId = await IdOfAsync(created);
+        await Waiting.UntilAsync(async () => await OnboardingStateAsync(name, tenantId) == "Completed");
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         runs.In("web").ShouldBe([typeof(StartTenantOnboarding)]);
         runs.In("worker").Distinct().ShouldBe(StepsAfterTheFirst, ignoreOrder: true);
-        (await OnboardingStateAsync(name, await IdOfAsync(created))).ShouldBe("Completed");
+        (await OnboardingStateAsync(name, tenantId)).ShouldBe("Completed");
         worker.Email.Sent.ShouldHaveSingleItem().To.ShouldBe("owner@acme.test");
     }
 
@@ -67,7 +68,7 @@ public sealed class HostRoleTests(Database database)
 
         await using var worker = Host(name, "worker", runs);
         _ = worker.Services;
-        await runs.HandledAsync<InvitationEmailSent>();
+        await Waiting.UntilAsync(async () => await OnboardingStateAsync(name, tenantId) == "Completed");
 
         waiting.ShouldBe("Registering");
         queued.ShouldBe(1L);

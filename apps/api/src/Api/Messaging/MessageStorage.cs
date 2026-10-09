@@ -5,6 +5,7 @@ using Tenancy;
 using Wolverine;
 using Wolverine.Postgresql;
 using Wolverine.Runtime;
+using Wolverine.Runtime.Agents;
 using Wolverine.Transports;
 
 namespace Api.Messaging;
@@ -46,6 +47,11 @@ internal static class MessageStorage
         if (role is HostRole.Web)
         {
             options.Durability.DurabilityAgentEnabled = false;
+
+            // A web host can win the leader election, and the leader assigns only the agent families it knows. Wolverine adds the
+            // durability agents' family only on a node that may run them, so a web leader would assign them to no node, and nothing
+            // would recover a dead worker's messages. The family gives its agents only to nodes that may run them: the workers.
+            options.Services.AddSingleton<IAgentFamily>(services => services.GetRequiredService<IWolverineRuntime>().Stores);
         }
     }
 

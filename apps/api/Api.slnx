@@ -9,6 +9,7 @@
     <Project Path="src/Modules/Audit/Audit.Contracts/Audit.Contracts.csproj" />
     <Project Path="src/Modules/Audit/Audit.Domain/Audit.Domain.csproj" />
     <Project Path="src/Modules/Audit/Audit.Infrastructure/Audit.Infrastructure.csproj" />
+    <Project Path="src/Modules/Audit/Audit.IntegrationTests/Audit.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/src/Modules/ControlPlane/">
     <Project Path="src/Modules/ControlPlane/ControlPlane.Api/ControlPlane.Api.csproj" />
@@ -16,6 +17,8 @@
     <Project Path="src/Modules/ControlPlane/ControlPlane.Contracts/ControlPlane.Contracts.csproj" />
     <Project Path="src/Modules/ControlPlane/ControlPlane.Domain/ControlPlane.Domain.csproj" />
     <Project Path="src/Modules/ControlPlane/ControlPlane.Infrastructure/ControlPlane.Infrastructure.csproj" />
+    <Project Path="src/Modules/ControlPlane/ControlPlane.IntegrationTests/ControlPlane.IntegrationTests.csproj" />
+    <Project Path="src/Modules/ControlPlane/ControlPlane.UnitTests/ControlPlane.UnitTests.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Notifications/">
     <Project Path="src/Modules/Notifications/Notifications.Api/Notifications.Api.csproj" />
@@ -23,20 +26,17 @@
     <Project Path="src/Modules/Notifications/Notifications.Contracts/Notifications.Contracts.csproj" />
     <Project Path="src/Modules/Notifications/Notifications.Domain/Notifications.Domain.csproj" />
     <Project Path="src/Modules/Notifications/Notifications.Infrastructure/Notifications.Infrastructure.csproj" />
+    <Project Path="src/Modules/Notifications/Notifications.IntegrationTests/Notifications.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />
+    <Project Path="src/Shared/SharedKernel.UnitTests/SharedKernel.UnitTests.csproj" />
     <Project Path="src/Shared/Tenancy/Tenancy.csproj" />
+    <Project Path="src/Shared/Tenancy.IntegrationTests/Tenancy.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
     <Project Path="tests/Api.IntegrationTests/Api.IntegrationTests.csproj" />
-    <Project Path="tests/Audit.IntegrationTests/Audit.IntegrationTests.csproj" />
-    <Project Path="tests/ControlPlane.IntegrationTests/ControlPlane.IntegrationTests.csproj" />
-    <Project Path="tests/ControlPlane.UnitTests/ControlPlane.UnitTests.csproj" />
-    <Project Path="tests/Notifications.IntegrationTests/Notifications.IntegrationTests.csproj" />
     <Project Path="tests/Onboarding.EndToEndTests/Onboarding.EndToEndTests.csproj" />
-    <Project Path="tests/SharedKernel.UnitTests/SharedKernel.UnitTests.csproj" />
-    <Project Path="tests/Tenancy.IntegrationTests/Tenancy.IntegrationTests.csproj" />
   </Folder>
 </Solution>

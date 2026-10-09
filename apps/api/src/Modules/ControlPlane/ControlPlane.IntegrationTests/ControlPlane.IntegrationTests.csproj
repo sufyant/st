@@ -13,11 +13,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Infrastructure\ControlPlane.Infrastructure.csproj" />
+    <ProjectReference Include="..\ControlPlane.Infrastructure\ControlPlane.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\db\bootstrap.sql" Link="bootstrap.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\db\bootstrap.sql" Link="bootstrap.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Xunit.TraitAttribute">
+      <_Parameter1>TestClassification</_Parameter1>
+      <_Parameter2>Integration</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

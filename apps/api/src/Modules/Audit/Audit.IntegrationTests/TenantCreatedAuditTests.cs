@@ -52,7 +52,7 @@ public sealed class TenantCreatedAuditTests(Database database)
     [Theory]
     [InlineData("UPDATE audit.entries SET operation = 'rewritten'")]
     [InlineData("DELETE FROM audit.entries")]
-    public async Task The_application_cannot_change_or_remove_entries(string sql)
+    public async Task ChangeAuditEntry_AsTheApplication_IsRefused(string sql)
     {
         var activated = Activated();
         await InTenant.RunAsync(database.Services, activated.TenantId, scope => RecordAsync(scope, activated));

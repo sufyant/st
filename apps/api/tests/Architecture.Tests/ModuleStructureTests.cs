@@ -10,7 +10,7 @@ public class ModuleStructureTests
     public static TheoryData<string> NamespacedProjects => [Solution.SharedKernel, Solution.Tenancy, .. Solution.ModuleProjects];
 
     [Fact]
-    public void The_template_modules_are_found()
+    public void FindModules_InTheSolution_IncludesTheTemplateModules()
     {
         string[] templateModules = ["Audit", "ControlPlane", "Notifications"];
 
@@ -19,7 +19,7 @@ public class ModuleStructureTests
 
     [Theory]
     [MemberData(nameof(Modules))]
-    public void Every_module_has_all_five_projects(string module)
+    public void ShipModule_AnyModule_HasAllFiveProjects(string module)
     {
         var missing = Solution.ProjectsOf(module).Where(project => !Solution.IsShipped(project));
 
@@ -29,7 +29,7 @@ public class ModuleStructureTests
     // Dependency rules match on namespaces, so a type outside its project's namespace would escape them.
     [Theory]
     [MemberData(nameof(NamespacedProjects))]
-    public void Types_live_under_their_project_namespace(string project)
+    public void PlaceTypes_InAProject_LiveUnderItsNamespace(string project)
     {
         var strays = TypesOutsideTheNamespaceOf(project);
 

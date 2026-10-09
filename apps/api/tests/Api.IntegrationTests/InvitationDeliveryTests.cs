@@ -20,7 +20,7 @@ public sealed class InvitationDeliveryTests(Database database)
     private readonly Catalog _catalog = new(database);
 
     [Fact]
-    public async Task In_development_the_invitation_link_is_written_to_the_log()
+    public async Task DeliverInvitation_InDevelopment_WritesTheLinkToTheLog()
     {
         await using var api = Api(Environments.Development);
         var email = $"{Guid.NewGuid():N}@example.com";
@@ -32,7 +32,7 @@ public sealed class InvitationDeliveryTests(Database database)
     }
 
     [Fact]
-    public async Task Outside_development_the_invitation_email_is_sent_through_resend()
+    public async Task DeliverInvitation_OutsideDevelopment_SendsTheEmailThroughResend()
     {
         using var resend = new StubResend();
         await using var api = Api(Environments.Production, resend, Resend);
@@ -52,7 +52,7 @@ public sealed class InvitationDeliveryTests(Database database)
 
     // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email does not start.
     [Fact]
-    public async Task Outside_development_the_application_does_not_start_without_resend()
+    public async Task StartApplication_OutsideDevelopmentWithoutResend_Fails()
     {
         await using var api = Api(Environments.Production);
 

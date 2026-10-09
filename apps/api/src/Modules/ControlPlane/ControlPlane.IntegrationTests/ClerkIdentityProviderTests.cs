@@ -16,7 +16,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     public void Dispose() => _clerk.Dispose();
 
     [Fact]
-    public async Task Requests_are_authorized_with_the_secret_key()
+    public async Task CallClerk_AnyRequest_IsAuthorizedWithTheSecretKey()
     {
         _clerk.Respond("[]");
 
@@ -26,7 +26,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     }
 
     [Fact]
-    public async Task An_account_exists_when_a_user_owns_the_email()
+    public async Task HasAccount_UserOwnsTheEmail_IsTrue()
     {
         _clerk.Respond("""[{"id":"user_1","email_addresses":[{"email_address":"Ada@Example.com","verification":{"status":"verified"}}]}]""");
 
@@ -37,7 +37,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     }
 
     [Fact]
-    public async Task No_account_exists_when_no_user_owns_the_email()
+    public async Task HasAccount_NoUserOwnsTheEmail_IsFalse()
     {
         _clerk.Respond("[]");
 
@@ -48,7 +48,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
 
     // Clerk matches some email filters partially; only a user who owns exactly this address counts.
     [Fact]
-    public async Task A_user_whose_email_only_resembles_it_is_not_an_account()
+    public async Task HasAccount_UserEmailOnlyResemblesIt_IsFalse()
     {
         _clerk.Respond("""[{"id":"user_1","email_addresses":[{"email_address":"bada@example.com","verification":{"status":"verified"}}]}]""");
 
@@ -58,7 +58,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     }
 
     [Fact]
-    public async Task An_invitation_is_created_without_a_clerk_email_and_carries_our_invitation_id()
+    public async Task InviteOwner_ThroughClerk_SendsNoClerkEmailAndCarriesOurInvitationId()
     {
         var invitationId = new Guid("0199a8f0-0000-7000-8000-000000000401");
         _clerk.Respond("""{"object":"invitation","id":"inv_1","url":"https://accounts.clerk.test/sign-up?__clerk_ticket=t"}""");
@@ -113,7 +113,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     }
 
     [Fact]
-    public async Task Only_verified_email_addresses_count()
+    public async Task FindVerifiedEmails_SomeUnverified_ReturnsOnlyTheVerified()
     {
         _clerk.Respond("""
             {"id":"user_1","email_addresses":[
@@ -129,7 +129,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     }
 
     [Fact]
-    public async Task A_request_that_keeps_failing_is_an_error()
+    public async Task CallClerk_KeepsFailing_IsAnError()
     {
         _clerk.Respond("""{"errors":[{"code":"internal"}]}""", HttpStatusCode.InternalServerError);
 
@@ -140,7 +140,7 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
 
     // Every call to Clerk has a time limit, set from configuration.
     [Fact]
-    public async Task A_call_that_takes_longer_than_the_timeout_is_given_up()
+    public async Task CallClerk_SlowerThanTheTimeout_IsGivenUp()
     {
         _clerk.Delay = TimeSpan.FromSeconds(30);
 

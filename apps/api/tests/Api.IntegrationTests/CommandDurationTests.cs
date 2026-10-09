@@ -26,7 +26,7 @@ public sealed class CommandDurationTests : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _host.DisposeAsync();
 
     [Fact]
-    public async Task A_command_slower_than_the_threshold_logs_a_warning_naming_the_command()
+    public async Task RunCommand_SlowerThanTheThreshold_LogsAWarningNamingTheCommand()
     {
         await _client.PostAsJsonAsync("/v1/slow-work", new { duration = "00:00:03" }, TestContext.Current.CancellationToken);
 
@@ -36,7 +36,7 @@ public sealed class CommandDurationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_command_within_the_threshold_logs_no_warning()
+    public async Task RunCommand_WithinTheThreshold_LogsNoWarning()
     {
         await _client.PostAsJsonAsync("/v1/slow-work", new { duration = "00:00:01" }, TestContext.Current.CancellationToken);
 

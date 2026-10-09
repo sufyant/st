@@ -22,7 +22,7 @@ public sealed class ResendEmailChannelTests : IDisposable
     public void Dispose() => _resend.Dispose();
 
     [Fact]
-    public async Task An_email_is_sent_through_resend_from_the_configured_address()
+    public async Task SendEmail_ThroughResend_PostsItFromTheConfiguredAddress()
     {
         await Notifications().SendAsync(Email, Cancellation);
 
@@ -38,7 +38,7 @@ public sealed class ResendEmailChannelTests : IDisposable
 
     // Every send to Resend has a time limit, set from configuration.
     [Fact]
-    public async Task A_send_that_takes_longer_than_the_timeout_is_given_up()
+    public async Task SendEmail_SlowerThanTheTimeout_IsGivenUp()
     {
         _resend.Delay = TimeSpan.FromSeconds(30);
 
@@ -60,7 +60,7 @@ public sealed class ResendEmailChannelTests : IDisposable
     }
 
     [Fact]
-    public async Task An_email_resend_refuses_is_an_error()
+    public async Task SendEmail_ResendRefuses_IsAnError()
     {
         _resend.Respond(HttpStatusCode.UnprocessableEntity);
 

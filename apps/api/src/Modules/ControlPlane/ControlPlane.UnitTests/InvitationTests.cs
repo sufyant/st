@@ -72,7 +72,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void A_new_invitation_is_pending_until_its_lifetime_ends()
+    public void InviteOwner_NewInvitation_IsPendingUntilItsLifetimeEnds()
     {
         var invitation = Invite("ada@example.com");
 
@@ -81,7 +81,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void An_invitation_is_accepted_by_a_user_whose_verified_email_matches()
+    public void AcceptInvitation_VerifiedEmailMatches_IsAccepted()
     {
         var invitation = Invite("ada@example.com");
 
@@ -93,7 +93,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void Matching_the_email_ignores_case()
+    public void AcceptInvitation_EmailInAnotherCase_IsAccepted()
     {
         var invitation = Invite("Ada@Example.com");
 
@@ -103,7 +103,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void An_invitation_cannot_be_accepted_twice()
+    public void AcceptInvitation_AlreadyAccepted_IsRejected()
     {
         var invitation = Invite("ada@example.com");
         invitation.Accept(["ada@example.com"], AccepterId, Now);
@@ -114,7 +114,7 @@ public class InvitationTests
     }
 
     [Fact]
-    public void An_invitation_cannot_be_accepted_once_its_lifetime_has_ended()
+    public void AcceptInvitation_AfterItsLifetime_IsRejectedAsExpired()
     {
         var invitation = Invite("ada@example.com");
 
@@ -126,7 +126,7 @@ public class InvitationTests
 
     // The token alone is not enough: a forwarded link does not let someone else in.
     [Fact]
-    public void An_invitation_cannot_be_accepted_by_a_user_without_the_invited_email()
+    public void AcceptInvitation_WithoutTheInvitedEmail_IsRejected()
     {
         var invitation = Invite("ada@example.com");
 

@@ -15,8 +15,8 @@ indent_size = 2
 csharp_style_namespace_declarations = file_scoped:warning
 csharp_prefer_braces = true:warning
 
-# Test names describe behaviour in words separated by underscores.
-[tests/**/*.cs]
+# Test names describe behaviour in words separated by underscores. A test project is known by its name, wherever it sits.
+[**/*.{UnitTests,IntegrationTests,EndToEndTests,Tests}/**.cs]
 dotnet_diagnostic.CA1707.severity = none
 
 # Migrations are written by `dotnet ef migrations add`; analyzers treat them as generated code.
