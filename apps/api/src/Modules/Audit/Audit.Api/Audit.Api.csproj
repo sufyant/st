@@ -3,7 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Audit.Application\Audit.Application.csproj" />
     <ProjectReference Include="..\Audit.Contracts\Audit.Contracts.csproj" />
-    <ProjectReference Include="..\Audit.Infrastructure\Audit.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
   </ItemGroup>
 

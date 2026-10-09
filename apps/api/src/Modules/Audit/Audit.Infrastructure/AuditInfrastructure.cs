@@ -4,7 +4,11 @@ using Tenancy;
 
 namespace Audit.Infrastructure;
 
-internal static class AuditInfrastructure
+/// <summary>
+/// The module's infrastructure entry point: the host calls it to register the module's DbContext, adapters and contract
+/// implementations.
+/// </summary>
+public static class AuditInfrastructure
 {
     public static IServiceCollection AddAuditInfrastructure(this IServiceCollection services)
     {

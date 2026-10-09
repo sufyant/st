@@ -1,12 +1,12 @@
 using Api.Persistence;
-using Audit.Api;
-using ControlPlane.Api;
+using Audit.Infrastructure;
+using ControlPlane.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Notifications.Api;
+using Notifications.Infrastructure;
 using Npgsql;
 using Tenancy;
 using Testcontainers.PostgreSql;
@@ -220,9 +220,9 @@ public sealed class Database : IAsyncLifetime
     {
         await using var services = new ServiceCollection()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
-            .AddControlPlaneModule()
-            .AddNotificationsModule()
-            .AddAuditModule()
+            .AddControlPlaneInfrastructure()
+            .AddNotificationsInfrastructure()
+            .AddAuditInfrastructure()
             .BuildServiceProvider();
 
         await MigrationStep.RunAsync(services, ConnectionStringFor(DatabaseRoles.Owner, database), CancellationToken.None);
