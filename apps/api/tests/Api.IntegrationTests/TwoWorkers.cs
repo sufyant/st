@@ -61,6 +61,18 @@ internal sealed class TwoWorkers : IAsyncDisposable
         return workers;
     }
 
+    // The node a worker registered as in Wolverine's node table.
+    public Guid NodeOf(string worker) => _workers[worker].Services.GetRequiredService<IWolverineRuntime>().Options.UniqueNodeId;
+
+    // The node that runs the durability agent of the message store, once the leader has assigned it.
+    public async Task<Guid> DurabilityAgentNodeAsync()
+    {
+        await Waiting.UntilAsync(async () => await _database.ScalarAsSuperuserAsync<long>(
+            "SELECT count(*) FROM wolverine.wolverine_node_assignments WHERE id LIKE 'wolverinedb://%'", DatabaseName) == 1);
+        return (await _database.ScalarAsSuperuserAsync<Guid>(
+            "SELECT node_id FROM wolverine.wolverine_node_assignments WHERE id LIKE 'wolverinedb://%'", DatabaseName));
+    }
+
     // The worker that is not the given one.
     public string Survivor(string worker) => _workers.Keys.Single(name => name != worker);
 

@@ -8,6 +8,17 @@ namespace Api.IntegrationTests;
 // other worker runs the handler again, so the handler's second run must have no effect (O4).
 public sealed class TwoWorkerTests(Database database)
 {
+    // W5: a web host runs no durability agent, even when it leads the cluster; it gives the agent to a worker.
+    [Fact]
+    public async Task AssignDurabilityAgent_WebHostLeadsTheCluster_GivesItToAWorker()
+    {
+        await using var workers = await TwoWorkers.StartAsync(database);
+
+        var node = await workers.DurabilityAgentNodeAsync();
+
+        node.ShouldBeOneOf(workers.NodeOf(TwoWorkers.First), workers.NodeOf(TwoWorkers.Second));
+    }
+
     [Fact]
     public async Task HandleQueuedMessages_TwoWorkers_EachIsHandledOnceAndBothWorkersTakePart()
     {
