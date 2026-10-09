@@ -197,7 +197,7 @@ A tenant has two descriptive fields. `name` is free text, cannot be empty, has a
 | R8 | A background handler gets the tenant from the message and declares it in the same way | Requirement 7 |
 | R9 | Each tenant table is tested with real PostgreSQL: read, update, insert for another tenant | Khorikov, Chapter 10 |
 | R10 | At startup the application checks its own account. If the account is a table owner or can bypass RLS, the application does not start | Nygard, Chapter 5 (Fail Fast) |
-| R11 | The membership table has one more policy: a user sees their own memberships | For `GET /v1/me/tenants` |
+| R11 | The membership table has one more policy, `own_memberships`: `FOR SELECT` only, on `user_id` = the declared user (`app.user_id`, set in the transaction like the tenant). It serves `GET /v1/me/tenants`. Any policy other than `tenant_isolation` must be on an explicit list, and a test fails on any other | Postgres combines permissive policies with OR. A write policy would widen access |
 | R12 | The system admin sees tenant and member counts from ControlPlane's own summary data | Golding, Chapter 2 |
 
 Work across tenants goes through the tenant list and declares each tenant in turn. RLS does not protect a cache or data that leaves the database. An EF Core query filter is not added as a second layer. RLS is the single source of truth.

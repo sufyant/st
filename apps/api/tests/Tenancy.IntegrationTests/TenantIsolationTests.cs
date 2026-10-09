@@ -12,6 +12,40 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _notes.DisposeAsync();
 
+    // R11 declares the user the way R4 declares the tenant: local to a transaction, never on the connection.
+    [Fact]
+    public async Task DeclareUser_OutsideATransaction_IsRefused()
+    {
+        var declare = () => _notes.WithoutTenantAsync(async notes =>
+        {
+            await notes.DeclareUserAsync(Guid.NewGuid(), Cancellation);
+            return true;
+        });
+
+        await declare.ShouldThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task DeclareUser_InATransaction_EndsWithTheTransaction()
+    {
+        var userId = Guid.NewGuid();
+
+        var (inside, after) = await _notes.WithoutTenantAsync(async notes =>
+        {
+            await using (var transaction = await notes.Database.BeginTransactionAsync(Cancellation))
+            {
+                await notes.DeclareUserAsync(userId, Cancellation);
+                var declared = await UserSettingAsync(notes);
+                await transaction.CommitAsync(Cancellation);
+
+                return (declared, await UserSettingAsync(notes));
+            }
+        });
+
+        inside.ShouldBe(userId.ToString());
+        after.ShouldBeNullOrEmpty();
+    }
+
     [Fact]
     public async Task A_tenant_sees_its_own_rows()
     {
@@ -218,4 +252,7 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
 
     private Task<string> ReadTextAsync(Guid tenant, Guid id) =>
         _notes.InTenantAsync(tenant, notes => notes.Notes.Where(note => note.Id == id).Select(note => note.Text).SingleAsync(Cancellation));
+
+    private static Task<string?> UserSettingAsync(NotesDbContext notes) =>
+        notes.Database.SqlQueryRaw<string?>("SELECT current_setting('app.user_id', true) AS \"Value\"").SingleAsync(Cancellation);
 }
