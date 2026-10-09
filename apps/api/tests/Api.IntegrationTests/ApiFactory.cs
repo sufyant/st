@@ -76,20 +76,30 @@ internal sealed class ApiFactory(
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment ?? Environments.Development);
-        builder.UseSetting("Host:Role", "all");
-        builder.UseSetting("ConnectionStrings:Database", databaseConnectionString);
-        builder.UseSetting("ConnectionStrings:Messaging", messagingConnectionString);
-        builder.UseSetting("ConnectionStrings:Migrations", migrationsConnectionString);
-        builder.UseSetting("ControlPlane:Invitations:AcceptUrl", AcceptUrl);
-        builder.UseSetting("ControlPlane:Clerk:SecretKey", "sk_test_unused");
-        builder.UseSetting("ControlPlane:FirstSystemAdminEmail", FirstSystemAdminEmail);
-        builder.UseSetting("Authentication:Clerk:Issuer", TestTokens.Issuer);
+
+        Dictionary<string, string?> configuration = new()
+        {
+            ["Host:Role"] = "all",
+            ["ConnectionStrings:Database"] = databaseConnectionString,
+            ["ConnectionStrings:Messaging"] = messagingConnectionString,
+            ["ConnectionStrings:Migrations"] = migrationsConnectionString,
+            ["ControlPlane:Invitations:AcceptUrl"] = AcceptUrl,
+            ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
+            ["ControlPlane:FirstSystemAdminEmail"] = FirstSystemAdminEmail,
+            ["Authentication:Clerk:Issuer"] = TestTokens.Issuer,
+        };
         foreach (var (party, index) in (authorizedParties ?? [TestTokens.AuthorizedParty]).Select((party, index) => (party, index)))
         {
-            builder.UseSetting($"Authentication:Clerk:AuthorizedParties:{index}", party);
+            configuration[$"Authentication:Clerk:AuthorizedParties:{index}"] = party;
         }
 
         foreach (var (key, value) in ShortRetries.Concat(settings ?? new Dictionary<string, string?>()))
+        {
+            configuration[key] = value;
+        }
+
+        // A host setting given as null would read as an empty value, not as a missing one.
+        foreach (var (key, value) in configuration.Where(setting => setting.Value is not null))
         {
             builder.UseSetting(key, value);
         }

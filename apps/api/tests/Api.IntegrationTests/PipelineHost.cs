@@ -69,6 +69,7 @@ internal sealed class PipelineHost : IAsyncDisposable
 
         var app = builder.Build();
         app.UseApiPipeline();
+        app.MapApiDocuments();
         var v1 = app.MapV1();
         var system = v1.MapSystem();
         TestEndpoints.Map(v1);

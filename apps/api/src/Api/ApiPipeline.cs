@@ -28,8 +28,9 @@ internal static class ApiPipeline
     private const string HealthPath = "/health";
 
     // FluentValidation validators are found only in the handler assemblies known when validation is switched on, so they are
-    // passed here rather than added to Wolverine's discovery afterwards.
-    public static WebApplicationBuilder AddApiPipeline(this WebApplicationBuilder builder, params Assembly[] handlerAssemblies)
+    // passed here rather than added to Wolverine's discovery afterwards. Returns the role the host runs as, or null when the setting
+    // is wrong and the host will not start.
+    public static HostRole? AddApiPipeline(this WebApplicationBuilder builder, params Assembly[] handlerAssemblies)
     {
         // The OpenAPI document build only describes the API: it has no configuration and no database, so it registers no database
         // and checks nothing while it starts. Every other start checks every setting first (section 7).
@@ -43,7 +44,8 @@ internal static class ApiPipeline
             builder.AddPersistence();
         }
 
-        _ = builder.AddHostSettings();
+        var host = builder.AddHostSettings();
+        var role = openApiBuild ? HostRole.All : host.RoleOrNull;
         builder.Services.AddSingleton(TimeProvider.System);
 
         builder.AddObservability();
@@ -74,8 +76,11 @@ internal static class ApiPipeline
             // never starts it; any other host without it does not start (PersistenceExtensions).
             if (!openApiBuild && PersistenceExtensions.MessagingConnectionOf(builder.Configuration) is { ConnectionString: var messaging })
             {
-                MessageStorage.Configure(options, NpgsqlDataSource.Create(messaging));
+                MessageStorage.Configure(options, NpgsqlDataSource.Create(messaging), role);
             }
+
+            // A stopping host stops taking messages and finishes the ones it has, within the host's shutdown time.
+            options.Durability.DrainTimeout = host.ShutdownTimeout;
 
             // A message that fails for good goes to the dead letter queue, and its fault is published for a flow that has to react,
             // such as a saga's compensation. Faults are stored messages, so they carry only the exception's type.
@@ -99,7 +104,7 @@ internal static class ApiPipeline
         builder.Services.AddHealthChecks();
         builder.Services.AddOpenApi();
 
-        return builder;
+        return role;
     }
 
     public static WebApplication UseApiPipeline(this WebApplication app)
@@ -126,6 +131,12 @@ internal static class ApiPipeline
         app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false }).AllowAnonymous();
         app.MapHealthChecks($"{HealthPath}/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
 
+        return app;
+    }
+
+    // The API's documents, in Development only, on a host that serves the API.
+    public static WebApplication MapApiDocuments(this WebApplication app)
+    {
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi().AllowAnonymous();
