@@ -29,6 +29,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="Xunit.TraitAttribute">
+      <_Parameter1>TestClassification</_Parameter1>
+      <_Parameter2>Architecture</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Shouldly" />
     <Using Include="Xunit" />
   </ItemGroup>
