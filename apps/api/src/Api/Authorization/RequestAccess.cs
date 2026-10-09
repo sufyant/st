@@ -1,4 +1,4 @@
-using Tenancy;
+using ControlPlane.Contracts;
 
 namespace Api.Authorization;
 

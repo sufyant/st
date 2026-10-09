@@ -39,6 +39,10 @@ internal static class ApiPipeline
             context.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
         builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 
+        // A request an endpoint cannot read answers 400 in every environment. Development would otherwise throw, and the exception
+        // handler would answer 500 (OWASP API8).
+        builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
+
         builder.Services.AddOptions<PipelineOptions>()
             .BindConfiguration(PipelineOptions.Section)
             .Validate(options => options.SlowCommandThreshold > TimeSpan.Zero, "Pipeline:SlowCommandThreshold must be positive.")
@@ -99,24 +103,26 @@ internal static class ApiPipeline
         app.UseRateLimiter();
         app.UseAuthorization();
 
-        app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false });
-        app.MapHealthChecks($"{HealthPath}/ready", new() { Predicate = check => check.Tags.Contains("ready") });
+        app.MapHealthChecks($"{HealthPath}/live", new() { Predicate = _ => false }).AllowAnonymous();
+        app.MapHealthChecks($"{HealthPath}/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
-            app.MapScalarApiReference();
+            app.MapOpenApi().AllowAnonymous();
+            app.MapScalarApiReference().AllowAnonymous();
         }
 
         return app;
     }
 
     // Every API route lives under a version segment; expected failures returned as results become Problem Details here.
-    // Every endpoint in it needs a signed-in user unless it says otherwise.
+    // The group grants no access: each endpoint states its own (A5).
     public static RouteGroupBuilder MapV1(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()
             .DescribeResults()
-            .RequireRateLimiting(TenantRateLimiting.Policy)
-            .RequireAuthorization();
+            .RequireRateLimiting(TenantRateLimiting.Policy);
+
+    // The endpoints of the version group that any signed-in user may call, without a permission (A5).
+    public static RouteGroupBuilder MapSignedIn(this RouteGroupBuilder v1) => v1.MapGroup("").RequireSignedIn();
 }

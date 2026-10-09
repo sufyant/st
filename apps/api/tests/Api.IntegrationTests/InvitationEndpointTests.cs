@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Time.Testing;
@@ -155,6 +156,33 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
 
         accepted.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await CodeOfAsync(accepted)).ShouldBe("invitation.not_found");
+    }
+
+    // OWASP API8: a request that leaves out the code, or sends it as null, is a bad request, never a server error.
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"code":null}""")]
+    public async Task AcceptInvitation_WithoutACode_IsABadRequest(string body)
+    {
+        var accepted = await _api.CreateClient($"user_{Guid.NewGuid():N}")
+            .PostAsync("/v1/invitations/accept", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await CodeOfAsync(accepted)).ShouldBe("invitation.code_required");
+    }
+
+    // A body the endpoint cannot read at all is a bad request in every environment, never a server error.
+    [Theory]
+    [InlineData("")]
+    [InlineData("null")]
+    [InlineData("{")]
+    public async Task AcceptInvitation_WithoutAReadableBody_IsABadRequest(string body)
+    {
+        var accepted = await _api.CreateClient($"user_{Guid.NewGuid():N}")
+            .PostAsync("/v1/invitations/accept", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        accepted.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
     [Fact]

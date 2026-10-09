@@ -1,4 +1,4 @@
-using Audit.Api;
+using Audit.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Tenancy;
@@ -37,7 +37,7 @@ public sealed class Database : IAsyncLifetime
 
         _services = new ServiceCollection()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application))
-            .AddAuditModule()
+            .AddAuditInfrastructure()
             .BuildServiceProvider();
         foreach (var migrator in _services.GetServices<IModuleMigrator>())
         {

@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using ControlPlane.Application.Tenants;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using Tenancy;
@@ -116,6 +118,39 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { slug = Slug(), ownerEmail = "ali@acme.com" }, Cancellation);
 
         created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    // OWASP API8: a field the request leaves out, or sends as null, is a validation problem, never a server error.
+    [Theory]
+    [InlineData("""{"name":"Acme Ltd","ownerEmail":"ali@acme.com"}""", "Slug")]
+    [InlineData("""{"name":"Acme Ltd","slug":null,"ownerEmail":"ali@acme.com"}""", "Slug")]
+    [InlineData("""{"name":"Acme Ltd","slug":"acme-ltd"}""", "OwnerEmail")]
+    [InlineData("""{"name":"Acme Ltd","slug":"acme-ltd","ownerEmail":null}""", "OwnerEmail")]
+    [InlineData("""{"slug":"acme-ltd","ownerEmail":"ali@acme.com"}""", "Name")]
+    [InlineData("""{"name":null,"slug":"acme-ltd","ownerEmail":"ali@acme.com"}""", "Name")]
+    public async Task CreateTenant_WithoutARequiredField_IsAValidationProblem(string body, string field)
+    {
+        var admin = await AdminAsync();
+
+        var created = await admin.PostAsync("/v1/system/tenants", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await created.Content.ReadFromJsonAsync<HttpValidationProblemDetails>(Cancellation))!.Errors.Keys.ShouldBe([field]);
+    }
+
+    // A body the endpoint cannot read at all is a bad request in every environment, never a server error.
+    [Theory]
+    [InlineData("")]
+    [InlineData("null")]
+    [InlineData("{")]
+    public async Task CreateTenant_WithoutAReadableBody_IsABadRequest(string body)
+    {
+        var admin = await AdminAsync();
+
+        var created = await admin.PostAsync("/v1/system/tenants", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        created.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
     [Fact]

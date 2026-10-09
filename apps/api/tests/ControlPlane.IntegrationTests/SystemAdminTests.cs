@@ -1,6 +1,6 @@
+using ControlPlane.Contracts;
+using ControlPlane.Domain;
 using Microsoft.Extensions.DependencyInjection;
-using SharedKernel;
-using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
@@ -14,7 +14,7 @@ public sealed class SystemAdminTests(Database database)
 
         await SeedAsync(externalId);
 
-        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(Permissions.SystemPool, ignoreOrder: true);
+        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(PermissionPools.SystemPool, ignoreOrder: true);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class SystemAdminTests(Database database)
 
         await SeedAsync(externalId);
 
-        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(Permissions.SystemPool, ignoreOrder: true);
+        (await FindSystemPermissionsAsync(externalId)).ShouldNotBeNull().ShouldBe(PermissionPools.SystemPool, ignoreOrder: true);
     }
 
     [Fact]
@@ -55,6 +55,6 @@ public sealed class SystemAdminTests(Database database)
         await using var scope = database.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ISystemAdminDirectory>()
-            .FindSystemPermissionsAsync(externalId, TestContext.Current.CancellationToken);
+            .FindSystemPermissionsAsync(externalId, secondFactorVerified: true, TestContext.Current.CancellationToken);
     }
 }

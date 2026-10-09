@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Api.Authorization;
+using ControlPlane.Contracts;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -20,8 +22,10 @@ internal static class TestEndpoints
         var open = v1.MapGroup("").AllowAnonymous();
         MapOpen(open);
 
-        // Every other endpoint of the version group needs a signed-in user.
-        v1.MapGet("/whoami", (ClaimsPrincipal user) => Results.Ok(user.FindFirstValue(ClaimTypes.NameIdentifier)));
+        v1.MapGet("/whoami", (ClaimsPrincipal user) => Results.Ok(user.FindFirstValue(ClaimTypes.NameIdentifier))).RequireSignedIn();
+
+        // An endpoint that states no access at all (A5).
+        v1.MapGet("/unstated", () => Results.Ok());
     }
 
     private static void MapOpen(RouteGroupBuilder v1)
@@ -44,26 +48,32 @@ internal static class TestEndpoints
         v1.MapGet("/ping", () => Results.Ok());
     }
 
+    // Tenant endpoints require a permission (A5); every built-in role holds this one, so any member gets in.
     public static void MapTenant(RouteGroupBuilder tenant)
     {
-        tenant.MapGet("/ping", () => Results.Ok());
+        tenant.MapGet("/ping", () => Results.Ok()).RequireAuthorization(Permissions.MembersRead);
 
         tenant.MapPost("/probes", (WriteProbe command, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(command, cancellationToken));
+                bus.InvokeAsync<Result>(command, cancellationToken))
+            .RequireAuthorization(Permissions.MembersRead);
 
         tenant.MapPost("/failing-probes", (WriteProbeThenFail command, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync(command, cancellationToken));
+                bus.InvokeAsync(command, cancellationToken))
+            .RequireAuthorization(Permissions.MembersRead);
 
         tenant.MapPost("/rejected-probes", (WriteProbeThenReject command, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(command, cancellationToken));
+                bus.InvokeAsync<Result>(command, cancellationToken))
+            .RequireAuthorization(Permissions.MembersRead);
 
         tenant.MapGet("/probes", (IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken));
+                bus.InvokeAsync<Result<string[]>>(new ReadProbes(), cancellationToken))
+            .RequireAuthorization(Permissions.MembersRead);
 
         tenant.MapPost("/guarded", () => Results.Ok()).RequireAuthorization(GuardedPermission);
     }
 
-    public static void MapSystem(RouteGroupBuilder system) => system.MapGet("/ping", () => Results.Ok());
+    public static void MapSystem(RouteGroupBuilder system) =>
+        system.MapGet("/ping", () => Results.Ok()).RequireAuthorization(Permissions.SystemTenantsCreate);
 }
 
 // Wolverine only discovers public handlers, messages and validators.

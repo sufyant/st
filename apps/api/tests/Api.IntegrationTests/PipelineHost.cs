@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using Api.SystemAdmins;
 using Api.Tenants;
-using ControlPlane.Api;
+using ControlPlane.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Notifications.Api;
+using Notifications.Infrastructure;
 using Tenancy;
 
 namespace Api.IntegrationTests;
@@ -54,8 +54,8 @@ internal sealed class PipelineHost : IAsyncDisposable
         builder.Configuration.AddInMemoryCollection(settings ?? new Dictionary<string, string?>());
 
         builder.AddApiPipeline(typeof(PipelineHost).Assembly);
-        builder.Services.AddControlPlaneModule();
-        builder.Services.AddNotificationsModule();
+        builder.Services.AddControlPlaneInfrastructure();
+        builder.Services.AddNotificationsInfrastructure();
         builder.Services.AddModuleDbContext<ProbeDbContext>(ProbeDbContext.Schema);
         builder.Services.TrustTestKey();
         configureServices?.Invoke(builder.Services);

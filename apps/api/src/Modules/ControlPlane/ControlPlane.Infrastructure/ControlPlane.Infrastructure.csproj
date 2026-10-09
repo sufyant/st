@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <InternalsVisibleTo Include="ControlPlane.Api" />
     <InternalsVisibleTo Include="ControlPlane.IntegrationTests" />
   </ItemGroup>
 

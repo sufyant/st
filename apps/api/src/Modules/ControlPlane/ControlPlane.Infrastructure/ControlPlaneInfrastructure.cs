@@ -1,5 +1,6 @@
 using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
+using ControlPlane.Contracts;
 using ControlPlane.Infrastructure.Clerk;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,7 +8,11 @@ using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 
-internal static class ControlPlaneInfrastructure
+/// <summary>
+/// The module's infrastructure entry point: the host calls it to register the module's DbContext, adapters and contract
+/// implementations.
+/// </summary>
+public static class ControlPlaneInfrastructure
 {
     public static IServiceCollection AddControlPlaneInfrastructure(this IServiceCollection services)
     {

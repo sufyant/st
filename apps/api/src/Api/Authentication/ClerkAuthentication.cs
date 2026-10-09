@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -41,6 +42,9 @@ internal static class ClerkAuthentication
 
         return builder;
     }
+
+    /// <summary>Whether the session verified a second factor: a neutral fact the host hands on, not a rule (A6).</summary>
+    public static bool HasVerifiedSecondFactor(this ClaimsPrincipal user) => user.HasClaim(claim => claim.Type == SecondFactorClaim);
 
     private static Task CheckClerkClaimsAsync(TokenValidatedContext context)
     {

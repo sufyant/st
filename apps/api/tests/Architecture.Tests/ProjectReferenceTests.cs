@@ -1,15 +1,17 @@
 namespace Architecture.Tests;
 
 // The reference table checked on the project files themselves. The type rules in ReferenceRuleTests see only references
-// that some type uses; an unused project reference still lets the next change use it without anyone noticing.
+// that some type uses; an unused project reference still lets the next change use it without anyone noticing. Anything the
+// table does not list is forbidden.
 public class ProjectReferenceTests
 {
-    public static TheoryData<string> Modules => [.. Solution.Modules];
+    public static TheoryData<string, string> ModuleProjects =>
+        [.. Solution.Modules.SelectMany(module => Solution.Layers.Select(layer => (module, layer)))];
 
     [Fact]
     public void SharedKernel_references_no_project()
     {
-        var references = Solution.ProjectReferencesOf(Solution.SharedKernel);
+        var references = Solution.ReadProjectFile(Solution.SharedKernel).ProjectReferences;
 
         references.ShouldBeEmpty();
     }
@@ -17,63 +19,63 @@ public class ProjectReferenceTests
     [Fact]
     public void Tenancy_references_only_SharedKernel()
     {
-        var references = Solution.ProjectReferencesOf(Solution.Tenancy);
+        var references = Solution.ReadProjectFile(Solution.Tenancy).ProjectReferences;
 
         references.Except([Solution.SharedKernel]).ShouldBeEmpty();
     }
 
     [Theory]
-    [MemberData(nameof(Modules))]
-    public void Domain_references_only_SharedKernel(string module)
+    [MemberData(nameof(ModuleProjects))]
+    public void ReferenceProjects_ModuleProject_StaysInsideTheTable(string module, string layer)
     {
-        var references = Solution.ProjectReferencesOf($"{module}.Domain");
+        var file = Solution.ReadProjectFile($"{module}.{layer}");
+        var allowed = ReferenceTable.For(module, layer);
 
-        references.Except([Solution.SharedKernel]).ShouldBeEmpty();
+        file.ProjectReferences.Except(allowed.Projects).ShouldBeEmpty();
+        file.PackageReferences.Where(package => !allowed.Packages.Any(pattern => Matches(pattern, package))).ShouldBeEmpty();
+        file.FrameworkReferences.Except(allowed.Frameworks).ShouldBeEmpty();
     }
 
-    [Theory]
-    [MemberData(nameof(Modules))]
-    public void Contracts_reference_only_SharedKernel(string module)
-    {
-        var references = Solution.ProjectReferencesOf($"{module}.Contracts");
-
-        references.Except([Solution.SharedKernel]).ShouldBeEmpty();
-    }
-
-    [Theory]
-    [MemberData(nameof(Modules))]
-    public void Application_references_only_its_Domain_any_Contracts_and_SharedKernel(string module)
-    {
-        var references = Solution.ProjectReferencesOf($"{module}.Application");
-
-        references.Except([$"{module}.Domain", .. Solution.LayerOfEveryModule("Contracts"), Solution.SharedKernel]).ShouldBeEmpty();
-    }
-
-    [Theory]
-    [MemberData(nameof(Modules))]
-    public void Infrastructure_references_only_its_Application_Domain_Contracts_SharedKernel_and_Tenancy(string module)
-    {
-        var references = Solution.ProjectReferencesOf($"{module}.Infrastructure");
-
-        references.Except([$"{module}.Application", $"{module}.Domain", $"{module}.Contracts", Solution.SharedKernel, Solution.Tenancy])
-            .ShouldBeEmpty();
-    }
-
-    [Theory]
-    [MemberData(nameof(Modules))]
-    public void Api_references_only_its_Application_Contracts_Infrastructure_and_SharedKernel(string module)
-    {
-        var references = Solution.ProjectReferencesOf($"{module}.Api");
-
-        references.Except([$"{module}.Application", $"{module}.Contracts", $"{module}.Infrastructure", Solution.SharedKernel])
-            .ShouldBeEmpty();
-    }
-
+    // The host composes every module and may use any package it needs.
     [Fact]
-    public void Host_references_only_module_Api_projects_SharedKernel_and_Tenancy()
+    public void ReferenceProjects_Host_StaysInsideTheTable()
     {
-        var references = Solution.ProjectReferencesOf(Solution.Host);
+        var references = Solution.ReadProjectFile(Solution.Host).ProjectReferences;
 
-        references.Except([.. Solution.LayerOfEveryModule("Api"), Solution.SharedKernel, Solution.Tenancy]).ShouldBeEmpty();
+        references.Except([
+                .. Solution.LayerOfEveryModule("Api"),
+                .. Solution.LayerOfEveryModule("Infrastructure"),
+                Solution.SharedKernel,
+                Solution.Tenancy,
+            ])
+            .ShouldBeEmpty();
+    }
+
+    // A pattern ending in ".*" names a package family: the package of that name and every package under it.
+    private static bool Matches(string pattern, string package) =>
+        pattern.EndsWith(".*", StringComparison.Ordinal)
+            ? package == pattern[..^2] || package.StartsWith(pattern[..^1], StringComparison.Ordinal)
+            : package == pattern;
+
+    private sealed record ReferenceTable(IReadOnlyList<string> Projects, IReadOnlyList<string> Packages, IReadOnlyList<string> Frameworks)
+    {
+        private const string AspNetCore = "Microsoft.AspNetCore.App";
+        private const string Wolverine = "WolverineFx.*";
+
+        public static ReferenceTable For(string module, string layer) => layer switch
+        {
+            "Contracts" => new([Solution.SharedKernel], [], []),
+            "Domain" => new([Solution.SharedKernel], [], []),
+            "Application" => new(
+                [$"{module}.Domain", .. Solution.LayerOfEveryModule("Contracts"), Solution.SharedKernel],
+                [Wolverine, "FluentValidation.*"],
+                []),
+            "Api" => new([$"{module}.Application", $"{module}.Contracts", Solution.SharedKernel], [Wolverine], [AspNetCore]),
+            "Infrastructure" => new(
+                [$"{module}.Application", $"{module}.Domain", $"{module}.Contracts", Solution.SharedKernel, Solution.Tenancy],
+                ["Microsoft.EntityFrameworkCore.*", "Npgsql.*", "Microsoft.Extensions.*"],
+                []),
+            _ => throw new ArgumentOutOfRangeException(nameof(layer), layer, "Every layer has a row in the table."),
+        };
     }
 }

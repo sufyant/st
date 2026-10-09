@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Api\ControlPlane.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.Infrastructure\ControlPlane.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

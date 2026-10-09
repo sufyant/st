@@ -1,5 +1,5 @@
-using ControlPlane.Api;
 using ControlPlane.Application.Ports;
+using ControlPlane.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -78,7 +78,7 @@ public sealed class Database : IAsyncLifetime
             .AddLogging()
             .AddSingleton(TimeProvider.System)
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
-            .AddControlPlaneModule();
+            .AddControlPlaneInfrastructure();
         if (!realIdentityProvider)
         {
             services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(Identity));

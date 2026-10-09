@@ -1,17 +1,18 @@
-using Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.Extensions.Options;
 
 namespace Api.Authorization;
 
-// Authorization asks for permissions, never roles. An endpoint names the permission it needs as its policy; the route
-// groups add who may reach them at all.
+// Authorization asks for permissions, never roles. Every endpoint states its access (A5): public with AllowAnonymous, signed-in
+// only with RequireSignedIn, or the permission it needs as its policy. The route groups add who may reach them at all.
 internal static class AccessPolicies
 {
     public const string TenantMember = "tenant-member";
 
     public const string SystemAdmin = "system-admin";
+
+    public const string SignedIn = "signed-in";
 
     public static IServiceCollection AddAccessAuthorization(this IServiceCollection services)
     {
@@ -22,12 +23,18 @@ internal static class AccessPolicies
 
         return services.AddAuthorizationBuilder()
             .AddPolicy(TenantMember, policy => policy.RequireAuthenticatedUser().AddRequirements(new TenantMemberRequirement()))
-            .AddPolicy(SystemAdmin, policy => policy
-                .RequireAuthenticatedUser()
-                .RequireClaim(ClerkAuthentication.SecondFactorClaim)
-                .AddRequirements(new SystemAdminRequirement()))
+            .AddPolicy(SystemAdmin, policy => policy.RequireAuthenticatedUser().AddRequirements(new SystemAdminRequirement()))
+            .AddPolicy(SignedIn, policy => policy.RequireAuthenticatedUser())
+
+            // An endpoint that states no access is refused, never opened.
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().AddRequirements(new AccessStatedRequirement()).Build())
             .Services;
     }
+
+    /// <summary>The signed-in only state (A5): any signed-in user may call the endpoint, without a permission.</summary>
+    public static TBuilder RequireSignedIn<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.RequireAuthorization(SignedIn).WithMetadata(new SignedInEndpoint());
 
     private sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> options) : DefaultAuthorizationPolicyProvider(options)
     {
@@ -68,6 +75,10 @@ internal sealed record TenantMemberRequirement : IAuthorizationRequirement;
 
 internal sealed record SystemAdminRequirement : IAuthorizationRequirement;
 
+// The fallback policy's only requirement. It reaches a request whose endpoint states no access; a request that matched no route
+// (an unknown path, or a method the route does not take) has nothing to open and keeps its 404 or 405.
+internal sealed record AccessStatedRequirement : IAuthorizationRequirement;
+
 internal sealed class AccessHandler : IAuthorizationHandler
 {
     public Task HandleAsync(AuthorizationHandlerContext context)
@@ -85,6 +96,7 @@ internal sealed class AccessHandler : IAuthorizationHandler
                 PermissionRequirement permission => access.Has(permission.Permission),
                 TenantMemberRequirement => access.Membership is not null,
                 SystemAdminRequirement => access.SystemPermissions is not null,
+                AccessStatedRequirement => http.GetEndpoint() is not RouteEndpoint,
                 _ => false,
             };
 
@@ -97,3 +109,6 @@ internal sealed class AccessHandler : IAuthorizationHandler
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Marks an endpoint any signed-in user may call, without a permission (A5).</summary>
+public sealed class SignedInEndpoint;

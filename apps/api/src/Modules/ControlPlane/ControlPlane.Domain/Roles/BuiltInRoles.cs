@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using SharedKernel;
 
 namespace ControlPlane.Domain.Roles;
 
@@ -17,13 +16,13 @@ internal static class BuiltInRoles
 
     public static IReadOnlyList<Role> All { get; } = [Owner, Admin, Member];
 
-    private static readonly FrozenSet<string> OwnerPermissions = Permissions.TenantPool.ToFrozenSet(StringComparer.Ordinal);
+    private static readonly FrozenSet<string> OwnerPermissions = PermissionPools.TenantPool.ToFrozenSet(StringComparer.Ordinal);
 
     // Admins hold what owners hold: the tenant pool has no permission that is the owners' alone.
     private static readonly FrozenSet<string> AdminPermissions = OwnerPermissions;
 
     // Members get the permissions of the capabilities that modules add for them.
-    private static readonly FrozenSet<string> MemberPermissions = FrozenSet.Create(StringComparer.Ordinal, Permissions.MembersRead);
+    private static readonly FrozenSet<string> MemberPermissions = FrozenSet.Create(StringComparer.Ordinal, PermissionPools.MembersRead);
 
     public static IReadOnlySet<string> PermissionsOf(BuiltInRole role) => role switch
     {

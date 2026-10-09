@@ -1,8 +1,7 @@
-namespace Tenancy;
+namespace ControlPlane.Contracts;
 
 /// <summary>
-/// The catalog lookups tenant resolution needs before any tenant is known. Implemented by the module that owns the
-/// catalog, so the host never knows it.
+/// The catalog lookup tenant resolution needs before any tenant is known: the host asks it on every tenant route (T7).
 /// </summary>
 public interface ITenantDirectory
 {

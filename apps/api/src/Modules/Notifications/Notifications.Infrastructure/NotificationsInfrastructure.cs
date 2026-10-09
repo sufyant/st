@@ -8,7 +8,11 @@ using Tenancy;
 
 namespace Notifications.Infrastructure;
 
-internal static class NotificationsInfrastructure
+/// <summary>
+/// The module's infrastructure entry point: the host calls it to register the module's DbContext, adapters and contract
+/// implementations.
+/// </summary>
+public static class NotificationsInfrastructure
 {
     public static IServiceCollection AddNotificationsInfrastructure(this IServiceCollection services)
     {
