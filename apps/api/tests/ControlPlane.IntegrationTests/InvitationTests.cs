@@ -105,14 +105,14 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task Accepting_creates_the_user_and_the_membership_with_the_invited_role()
     {
-        var (slug, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteAsync();
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
 
         var accepted = await Handlers.AcceptAsync(database.Services, code, invitee);
 
-        accepted.Value.TenantSlug.ShouldBe(slug);
-        (await FindMembershipAsync(slug, invitee)).ShouldNotBeNull();
+        accepted.Value.TenantSlug.ShouldBe(await ScalarAsync<string>($"SELECT slug FROM catalog.tenants WHERE id = '{tenantId}'"));
+        (await FindMembershipAsync(tenantId, invitee)).ShouldNotBeNull();
         (await ScalarAsync<string>(
             $"""
             SELECT roles.built_in FROM catalog.memberships
@@ -127,12 +127,12 @@ public sealed class InvitationTests(Database database)
         var other = await Catalog.AddTenantAsync(database.Services);
         var invitee = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, other, invitee);
-        var (slug, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteAsync();
         database.Identity.AddAccount(invitee.ExternalId, email);
 
         await Handlers.AcceptAsync(database.Services, code, invitee.ExternalId);
 
-        (await FindMembershipAsync(slug, invitee.ExternalId)).ShouldNotBeNull();
+        (await FindMembershipAsync(tenantId, invitee.ExternalId)).ShouldNotBeNull();
         (await ScalarAsync<long>($"SELECT count(*) FROM catalog.users WHERE external_id = '{invitee.ExternalId}'")).ShouldBe(1);
     }
 
@@ -152,7 +152,7 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task An_invitation_token_cannot_be_used_twice()
     {
-        var (slug, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteAsync();
         var first = Unique.ExternalId();
         var second = Unique.ExternalId();
         database.Identity.AddAccount(first, email);
@@ -162,7 +162,7 @@ public sealed class InvitationTests(Database database)
         var reused = await Handlers.AcceptAsync(database.Services, code, second);
 
         reused.Error.Code.ShouldBe("invitation.not_pending");
-        (await FindMembershipAsync(slug, second)).ShouldBeNull();
+        (await FindMembershipAsync(tenantId, second)).ShouldBeNull();
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class InvitationTests(Database database)
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
         await using var services = database.BuildServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(time)));
-        var (slug, email, code) = await InviteAsync(services);
+        var (tenantId, email, code) = await InviteAsync(services);
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
         time.Advance(TimeSpan.FromDays(7));
@@ -178,23 +178,23 @@ public sealed class InvitationTests(Database database)
         var accepted = await Handlers.AcceptAsync(services, code, invitee);
 
         accepted.Error.Code.ShouldBe("invitation.expired");
-        (await FindMembershipAsync(slug, invitee)).ShouldBeNull();
+        (await FindMembershipAsync(tenantId, invitee)).ShouldBeNull();
     }
 
-    private async Task<(string Slug, string Email, string Code)> InviteAsync(IServiceProvider? services = null)
+    private async Task<(Guid TenantId, string Email, string Code)> InviteAsync(IServiceProvider? services = null)
     {
         var email = Unique.Email();
-        var (_, slug, _) = await Handlers.InviteAndDeliverAsync(services ?? database.Services, email);
+        var (tenantId, _, _) = await Handlers.InviteAndDeliverAsync(services ?? database.Services, email);
 
-        return (slug, email, Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
+        return (tenantId, email, Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
     }
 
-    private async Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId)
+    private async Task<TenantMembership?> FindMembershipAsync(Guid tenantId, string externalUserId)
     {
         await using var scope = database.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ITenantDirectory>()
-            .FindMembershipAsync(slug, externalUserId, TestContext.Current.CancellationToken);
+            .FindMembershipAsync(tenantId, externalUserId, TestContext.Current.CancellationToken);
     }
 
     private static string Sha256(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));

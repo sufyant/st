@@ -13,7 +13,7 @@ public sealed class TenantDirectoryTests(Database database)
         var user = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, tenant, user);
 
-        var membership = await FindMembershipAsync(tenant.Slug, user.ExternalId);
+        var membership = await FindMembershipAsync(tenant.Id, user.ExternalId);
 
         membership.ShouldNotBeNull().TenantId.ShouldBe(tenant.Id);
     }
@@ -26,17 +26,17 @@ public sealed class TenantDirectoryTests(Database database)
         var user = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, other, user);
 
-        var membership = await FindMembershipAsync(tenant.Slug, user.ExternalId);
+        var membership = await FindMembershipAsync(tenant.Id, user.ExternalId);
 
         membership.ShouldBeNull();
     }
 
     [Fact]
-    public async Task An_unknown_slug_does_not_resolve()
+    public async Task An_unknown_tenant_does_not_resolve()
     {
         var user = await Catalog.AddUserAsync(database.Services);
 
-        var membership = await FindMembershipAsync("no-such-tenant", user.ExternalId);
+        var membership = await FindMembershipAsync(Guid.CreateVersion7(), user.ExternalId);
 
         membership.ShouldBeNull();
     }
@@ -46,7 +46,7 @@ public sealed class TenantDirectoryTests(Database database)
     {
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
-        var membership = await FindMembershipAsync(tenant.Slug, Unique.ExternalId());
+        var membership = await FindMembershipAsync(tenant.Id, Unique.ExternalId());
 
         membership.ShouldBeNull();
     }
@@ -58,16 +58,16 @@ public sealed class TenantDirectoryTests(Database database)
         var user = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, tenant, user);
 
-        var membership = await FindMembershipAsync(tenant.Slug, user.ExternalId);
+        var membership = await FindMembershipAsync(tenant.Id, user.ExternalId);
 
         membership.ShouldBeNull();
     }
 
-    private async Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId)
+    private async Task<TenantMembership?> FindMembershipAsync(Guid tenantId, string externalUserId)
     {
         await using var scope = database.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ITenantDirectory>()
-            .FindMembershipAsync(slug, externalUserId, TestContext.Current.CancellationToken);
+            .FindMembershipAsync(tenantId, externalUserId, TestContext.Current.CancellationToken);
     }
 }
