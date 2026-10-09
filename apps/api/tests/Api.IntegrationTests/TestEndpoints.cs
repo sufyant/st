@@ -63,7 +63,7 @@ internal static class TestEndpoints
         tenant.MapPost("/guarded", () => Results.Ok()).RequireAuthorization(GuardedPermission);
     }
 
-    public static void MapAdmin(RouteGroupBuilder admin) => admin.MapGet("/ping", () => Results.Ok());
+    public static void MapSystem(RouteGroupBuilder system) => system.MapGet("/ping", () => Results.Ok());
 }
 
 // Wolverine only discovers public handlers, messages and validators.

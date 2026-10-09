@@ -5,7 +5,7 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/v1/admin/tenants": {
+    "/v1/system/tenants": {
       "post": {
         "tags": [
           "Api"

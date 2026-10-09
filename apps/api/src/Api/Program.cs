@@ -1,5 +1,5 @@
 using Api;
-using Api.Admin;
+using Api.SystemAdmins;
 using Api.Persistence;
 using Audit.Api;
 using ControlPlane.Api;
@@ -22,6 +22,6 @@ if (args is [MigrationStep.Command, ..])
 app.UseApiPipeline();
 
 var v1 = app.MapV1();
-v1.MapControlPlaneEndpoints(v1.MapAdmin());
+v1.MapControlPlaneEndpoints(v1.MapSystem());
 
 app.Run();

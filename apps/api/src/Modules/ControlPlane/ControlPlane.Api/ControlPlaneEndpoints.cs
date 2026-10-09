@@ -10,7 +10,7 @@ using Wolverine;
 namespace ControlPlane.Api;
 
 /// <summary>
-/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the admin routes. Each endpoint names the
+/// The module's endpoints, mapped into the host's route groups: <c>/v1</c> and the system routes. Each endpoint names the
 /// permission it needs and sends one command; the host maps its result.
 /// </summary>
 public static class ControlPlaneEndpoints
@@ -19,7 +19,7 @@ public static class ControlPlaneEndpoints
 
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder v1,
-        RouteGroupBuilder admin)
+        RouteGroupBuilder system)
     {
         // Accepting starts outside any tenant. The invitation code names the tenant, which is declared before the invitation is
         // looked up by its secret, so a wrong tenant, a wrong secret and a malformed code all answer the same 404. The identity
@@ -43,7 +43,7 @@ public static class ControlPlaneEndpoints
         });
 
         // Onboarding runs inside the tenant it creates. The tenant's id is chosen here, by the server, never by the client.
-        admin.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
+        system.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
                 (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
                     Guid.CreateVersion7(time.GetUtcNow()).ToString(),
                     new StartTenantOnboarding(user.Id(), request.Slug, request.OwnerEmail),

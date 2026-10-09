@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Security.Claims;
-using Api.Admin;
+using Api.SystemAdmins;
 using Api.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog;
@@ -11,7 +11,7 @@ using Wolverine;
 namespace Api.Tenants;
 
 // Resolves the tenant of a request and what the caller may do there, never from the client's word alone. On a tenant
-// route the tenant comes from the slug and the user's membership, with the permissions of the member's role; on an admin
+// route the tenant comes from the slug and the user's membership, with the permissions of the member's role; on a system
 // route the user's system permissions are read.
 // It rejects nothing: the rate limiter runs next and limits the others by user or address, and authorization turns them
 // away afterwards.
@@ -37,7 +37,7 @@ internal sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         var slug = context.GetRouteValue(TenantRoutes.SlugParameter) as string;
         Guid? tenantId = null;
-        if (metadata.GetMetadata<SystemAdminEndpoint>() is not null)
+        if (metadata.GetMetadata<SystemEndpoint>() is not null)
         {
             access.SystemPermissions = await systemAdmins.FindSystemPermissionsAsync(userId, context.RequestAborted);
         }
