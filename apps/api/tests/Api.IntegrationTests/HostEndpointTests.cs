@@ -29,7 +29,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Wolverine registers the node and checks its message storage while it starts, so the database must be there.
+    // The account check connects first while the application starts, so the database must be there.
     [Fact]
     public async Task Without_its_database_the_application_does_not_start()
     {
@@ -37,7 +37,7 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<AggregateException>();
+        start.ShouldThrow<NpgsqlException>();
     }
 
     [Fact]
