@@ -8,6 +8,8 @@ public class ProjectReferenceTests
     public static TheoryData<string, string> ModuleProjects =>
         [.. Solution.Modules.SelectMany(module => Solution.Layers.Select(layer => (module, layer)))];
 
+    public static TheoryData<string> ProductionProjects => [.. Solution.ProductionProjects];
+
     [Fact]
     public void SharedKernel_references_no_project()
     {
@@ -60,6 +62,16 @@ public class ProjectReferenceTests
                 Solution.Tenancy,
             ])
             .ShouldBeEmpty();
+    }
+
+    // A test project may reference the production code it tests, never the other way round.
+    [Theory]
+    [MemberData(nameof(ProductionProjects))]
+    public void ReferenceProjects_ProductionProject_ReferencesNoTestProject(string project)
+    {
+        var references = Solution.ReadProjectFile(project).ProjectReferences;
+
+        references.Where(Solution.IsTestProject).ShouldBeEmpty();
     }
 
     // A pattern ending in ".*" names a package family: the package of that name and every package under it.

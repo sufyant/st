@@ -15,6 +15,9 @@ internal static partial class Solution
 
     public static IReadOnlyList<string> Layers { get; } = ["Contracts", "Domain", "Application", "Infrastructure", "Api"];
 
+    // A test project is known by its name, not by its folder: module tests sit next to their module (section 2).
+    public static IReadOnlyList<string> TestProjectSuffixes { get; } = [".UnitTests", ".IntegrationTests", ".EndToEndTests", ".Tests"];
+
     // The deps file marks the solution's own projects apart from third-party packages, some of which follow the module
     // naming pattern too (OpenTelemetry.Api), and lists each project's direct project references. The test project references
     // only the host, so these are exactly the projects the host ships.
@@ -38,6 +41,14 @@ internal static partial class Solution
     public static IReadOnlyList<string> ModuleProjects { get; } = [.. Modules.SelectMany(ProjectsOf)];
 
     public static IReadOnlyList<string> AllProjects { get; } = [SharedKernel, Tenancy, Host, .. ModuleProjects];
+
+    // Every project the solution file lists, test projects and production projects.
+    public static IReadOnlyList<string> TestProjects { get; } = [.. ProjectFiles.Keys.Where(IsTestProject).Order()];
+
+    public static IReadOnlyList<string> ProductionProjects { get; } = [.. ProjectFiles.Keys.Where(project => !IsTestProject(project)).Order()];
+
+    public static bool IsTestProject(string project) =>
+        TestProjectSuffixes.Any(suffix => project.EndsWith(suffix, StringComparison.Ordinal));
 
     public static IEnumerable<string> ProjectsOf(string module) => Layers.Select(layer => $"{module}.{layer}");
 
