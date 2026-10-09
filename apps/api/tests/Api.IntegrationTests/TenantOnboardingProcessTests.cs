@@ -80,6 +80,10 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         (await TenantStatusAsync(tenantId)).ShouldBe("Cancelled");
         (await database.ScalarAsSuperuserAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'"))
             .ShouldBe("identity_provider_failed");
+        _api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record =>
+            record.Id.Name == "TenantCancelled"
+            && record.Message.Contains(tenantId.ToString(), StringComparison.Ordinal)
+            && record.Message.Contains("identity_provider_failed", StringComparison.Ordinal));
         (await InvitationStatusAsync(tenantId)).ShouldBe("Cancelled");
         (await OnboardingStateAsync(tenantId)).ShouldBe("Cancelled");
         _api.Email.Attempts.ShouldNotContain(attempt => attempt.Email.To == owner);
@@ -172,9 +176,10 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         (await OnboardingStateAsync(tenantId)).ShouldBe("Completed");
     }
 
-    // W6, spike T9: the activation and the email's report reach the saga at the same moment. Both read its record before either
-    // writes; the version check refuses the second write, and the retry applies it to the first one's result. Without the check the
-    // later write would put the saga back to waiting for an email that was already sent.
+    // W6, spike T9: the activation and the email's report reach the saga at the same moment, and both read its record before either
+    // writes. The report writes first and completes the onboarding. The activation's write then fails on the version check, and its
+    // retry finds the onboarding completed. Without the check, the activation would put the saga back to waiting for an email that
+    // was already sent.
     [Fact]
     public async Task UpdateOnboarding_TwoMessagesAtOnce_KeepsBothChanges()
     {
@@ -187,19 +192,22 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
             VALUES ('{tenantId}', 'Activating', '{invitationId}', interval '2 hours', 0)
             """);
         var now = DateTimeOffset.UtcNow;
-        var activated = new TenantActivated(Guid.CreateVersion7(), now, tenantId, "Acme Ltd", Guid.CreateVersion7());
         var emailSent = new Notifications.Contracts.InvitationEmailSent(Guid.CreateVersion7(), now, tenantId, invitationId);
+        var activated = new TenantActivated(Guid.CreateVersion7(), now, tenantId, "Acme Ltd", Guid.CreateVersion7());
         await using var hold = await HoldOnboardingAsync(tenantId);
 
         var messages = await _api.TrackMessagesAsync(async () =>
         {
-            await Bus().PublishAsync(activated, new DeliveryOptions { TenantId = tenantId.ToString() });
             await Bus().PublishAsync(emailSent, new DeliveryOptions { TenantId = tenantId.ToString() });
-            await hold.ReleaseOnceBlockingAsync(waiters: 2);
+            await hold.WaitForWritersAsync(1);
+            await Bus().PublishAsync(activated, new DeliveryOptions { TenantId = tenantId.ToString() });
+            await hold.WaitForWritersAsync(2);
+            await hold.ReleaseAsync();
         });
 
-        messages.AllExceptions().OfType<SagaConcurrencyException>().ShouldNotBeEmpty();
         (await OnboardingStateAsync(tenantId)).ShouldBe("Completed");
+        messages.MovedToErrorQueue.Envelopes().ShouldBeEmpty();
+        _api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record => record.Exception is SagaConcurrencyException);
     }
 
     private Task<HttpResponseMessage> CreateTenantAsync(string admin, string slug, string ownerEmail) =>
@@ -238,8 +246,12 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         await connection.OpenAsync(Cancellation);
         await using var command = new NpgsqlCommand(
             $"""
-            CREATE FUNCTION catalog.{name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused'; END $$;
-            CREATE TRIGGER {name} BEFORE {statement} ON catalog.{table} FOR EACH ROW WHEN ({when}) EXECUTE FUNCTION catalog.{name}();
+            CREATE FUNCTION catalog.{name}() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+                IF {when} THEN RAISE EXCEPTION 'refused'; END IF;
+                RETURN NEW;
+            END $$;
+            CREATE TRIGGER {name} BEFORE {statement} ON catalog.{table} FOR EACH ROW EXECUTE FUNCTION catalog.{name}();
             """,
             connection);
         await command.ExecuteNonQueryAsync(Cancellation);
@@ -263,22 +275,27 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
 
     private sealed class OnboardingHold(Database database, NpgsqlConnection connection, NpgsqlTransaction transaction) : IAsyncDisposable
     {
-        // Waits until the given number of sessions wait on the lock, then lets them go.
-        public async Task ReleaseOnceBlockingAsync(int waiters)
+        // Waits until the given number of sessions wait to write the saga's record. Only the first waits on this transaction itself;
+        // PostgreSQL queues the others behind it, and lets them write in that order.
+        public async Task WaitForWritersAsync(int writers)
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             timeout.CancelAfter(TimeSpan.FromSeconds(20));
             await using var observer = new NpgsqlConnection(database.SuperuserConnectionString);
             await observer.OpenAsync(timeout.Token);
-            await using var blocked = new NpgsqlCommand(
-                $"SELECT count(*) FROM pg_stat_activity WHERE {connection.ProcessID} = ANY(pg_blocking_pids(pid))", observer);
-            while ((long)(await blocked.ExecuteScalarAsync(timeout.Token))! < waiters)
+            await using var waiting = new NpgsqlCommand(
+                $"""
+                SELECT count(*) FROM pg_stat_activity
+                WHERE pid <> {connection.ProcessID} AND wait_event_type = 'Lock' AND query LIKE '%UPDATE catalog.tenant_onboardings%'
+                """,
+                observer);
+            while ((long)(await waiting.ExecuteScalarAsync(timeout.Token))! < writers)
             {
                 timeout.Token.ThrowIfCancellationRequested();
             }
-
-            await transaction.RollbackAsync(timeout.Token);
         }
+
+        public Task ReleaseAsync() => transaction.RollbackAsync(Cancellation);
 
         public async ValueTask DisposeAsync()
         {

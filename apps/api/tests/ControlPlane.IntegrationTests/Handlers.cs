@@ -4,6 +4,7 @@ using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
 using ControlPlane.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using Wolverine;
 using Wolverine.Persistence;
@@ -55,7 +56,11 @@ internal static class Handlers
             Cancellation));
 
     public static Task<TenantCancelled> CancelTenantAsync(IServiceProvider services, Guid tenantId, CancelTenant step) =>
-        InTenant.RunAsync(services, tenantId, scope => CancelTenantHandler.HandleAsync(step, scope.GetRequiredService<ITenantCatalog>(), Cancellation));
+        InTenant.RunAsync(services, tenantId, scope => CancelTenantHandler.HandleAsync(
+            step,
+            scope.GetRequiredService<ITenantCatalog>(),
+            scope.GetRequiredService<ILogger<TenantOnboarding>>(),
+            Cancellation));
 
     public static Task CancelInvitationAsync(IServiceProvider services, Guid tenantId, CancelInvitation step) =>
         InTenant.RunAsync(services, tenantId, scope => CancelInvitationHandler.HandleAsync(step, scope.GetRequiredService<ITenantCatalog>(), Cancellation));
