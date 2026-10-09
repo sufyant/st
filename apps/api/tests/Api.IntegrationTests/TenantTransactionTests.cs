@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Tenancy;
 using Wolverine;
 using Wolverine.Tracking;
 
@@ -54,7 +53,7 @@ public sealed class TenantTransactionTests(Database database) : IAsyncLifetime
 
         await member.PostAsJsonAsync($"/v1/tenants/{tenant.Slug}/probes", new { value, tenantId = other.Id }, Cancellation);
 
-        (await database.ScalarAsync<Guid>($"SELECT tenant_id FROM probes.probes WHERE value = '{value}'", DatabaseRoles.Owner)).ShouldBe(tenant.Id);
+        (await database.ScalarAsSuperuserAsync<Guid>($"SELECT tenant_id FROM probes.probes WHERE value = '{value}'")).ShouldBe(tenant.Id);
     }
 
     [Fact]

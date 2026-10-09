@@ -4,7 +4,6 @@ using ControlPlane.Application.Ports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
-using Npgsql;
 using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
@@ -25,6 +24,32 @@ public sealed class InvitationTests(Database database)
         database.Sender.LinkSentTo(email).ShouldBe(new Uri($"https://clerk.test/invitations/{invitationId}"));
     }
 
+    // The link carries one invitation code, `<tenantId>.<secret>`, also when the provider's sign-up leads to it.
+    [Fact]
+    public async Task DeliverInvitation_ToSomeoneWithoutAnAccount_LinksThroughTheProviderToTheInvitationCode()
+    {
+        var email = Unique.Email();
+
+        var (tenantId, _, _) = await Handlers.InviteAndDeliverAsync(database.Services, email);
+
+        var code = Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink);
+        Handlers.TenantIdOf(code).ShouldBe(tenantId);
+        Handlers.SecretOf(code).ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task DeliverInvitation_ToSomeoneWithAnAccount_SendsTheInvitationCode()
+    {
+        var email = Unique.Email();
+        database.Identity.AddAccount(Unique.ExternalId(), email);
+
+        var (tenantId, _, _) = await Handlers.InviteAndDeliverAsync(database.Services, email);
+
+        var code = Handlers.CodeOf(database.Sender.LinkSentTo(email));
+        Handlers.TenantIdOf(code).ShouldBe(tenantId);
+        Handlers.SecretOf(code).ShouldNotBeEmpty();
+    }
+
     [Fact]
     public async Task Delivering_to_someone_with_an_account_sends_our_accept_link_only()
     {
@@ -37,7 +62,7 @@ public sealed class InvitationTests(Database database)
         database.Sender.LinkSentTo(email).GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl);
     }
 
-    // The token is born in the delivery and only its SHA-256 hash is stored.
+    // The secret is born in the delivery and only its SHA-256 hash is stored.
     [Fact]
     public async Task Delivery_stores_the_hash_of_the_token_it_sends()
     {
@@ -46,8 +71,8 @@ public sealed class InvitationTests(Database database)
 
         var (_, _, invitationId) = await Handlers.InviteAndDeliverAsync(database.Services, email);
 
-        var token = Handlers.TokenOf(database.Sender.LinkSentTo(email));
-        (await ScalarAsync<string>($"SELECT token_hash FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe(Sha256(token));
+        var secret = Handlers.SecretOf(Handlers.CodeOf(database.Sender.LinkSentTo(email)));
+        (await ScalarAsync<string>($"SELECT token_hash FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe(Sha256(secret));
     }
 
     // A message may arrive twice; the second delivery must not send another link.
@@ -80,11 +105,11 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task Accepting_creates_the_user_and_the_membership_with_the_invited_role()
     {
-        var (slug, email, token) = await InviteAsync();
+        var (slug, email, code) = await InviteAsync();
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
 
-        var accepted = await Handlers.AcceptAsync(database.Services, token, invitee);
+        var accepted = await Handlers.AcceptAsync(database.Services, code, invitee);
 
         accepted.Value.TenantSlug.ShouldBe(slug);
         (await FindMembershipAsync(slug, invitee)).ShouldNotBeNull();
@@ -102,10 +127,10 @@ public sealed class InvitationTests(Database database)
         var other = await Catalog.AddTenantAsync(database.Services);
         var invitee = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, other, invitee);
-        var (slug, email, token) = await InviteAsync();
+        var (slug, email, code) = await InviteAsync();
         database.Identity.AddAccount(invitee.ExternalId, email);
 
-        await Handlers.AcceptAsync(database.Services, token, invitee.ExternalId);
+        await Handlers.AcceptAsync(database.Services, code, invitee.ExternalId);
 
         (await FindMembershipAsync(slug, invitee.ExternalId)).ShouldNotBeNull();
         (await ScalarAsync<long>($"SELECT count(*) FROM catalog.users WHERE external_id = '{invitee.ExternalId}'")).ShouldBe(1);
@@ -114,11 +139,11 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task A_failed_acceptance_leaves_no_user_behind()
     {
-        var (_, _, token) = await InviteAsync();
+        var (_, _, code) = await InviteAsync();
         var stranger = Unique.ExternalId();
         database.Identity.AddAccount(stranger, Unique.Email());
 
-        var accepted = await Handlers.AcceptAsync(database.Services, token, stranger);
+        var accepted = await Handlers.AcceptAsync(database.Services, code, stranger);
 
         accepted.Error.Code.ShouldBe("invitation.email_mismatch");
         (await ScalarAsync<long>($"SELECT count(*) FROM catalog.users WHERE external_id = '{stranger}'")).ShouldBe(0);
@@ -127,14 +152,14 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task An_invitation_token_cannot_be_used_twice()
     {
-        var (slug, email, token) = await InviteAsync();
+        var (slug, email, code) = await InviteAsync();
         var first = Unique.ExternalId();
         var second = Unique.ExternalId();
         database.Identity.AddAccount(first, email);
         database.Identity.AddAccount(second, email);
-        await Handlers.AcceptAsync(database.Services, token, first);
+        await Handlers.AcceptAsync(database.Services, code, first);
 
-        var reused = await Handlers.AcceptAsync(database.Services, token, second);
+        var reused = await Handlers.AcceptAsync(database.Services, code, second);
 
         reused.Error.Code.ShouldBe("invitation.not_pending");
         (await FindMembershipAsync(slug, second)).ShouldBeNull();
@@ -145,23 +170,23 @@ public sealed class InvitationTests(Database database)
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
         await using var services = database.BuildServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(time)));
-        var (slug, email, token) = await InviteAsync(services);
+        var (slug, email, code) = await InviteAsync(services);
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
         time.Advance(TimeSpan.FromDays(7));
 
-        var accepted = await Handlers.AcceptAsync(services, token, invitee);
+        var accepted = await Handlers.AcceptAsync(services, code, invitee);
 
         accepted.Error.Code.ShouldBe("invitation.expired");
         (await FindMembershipAsync(slug, invitee)).ShouldBeNull();
     }
 
-    private async Task<(string Slug, string Email, string Token)> InviteAsync(IServiceProvider? services = null)
+    private async Task<(string Slug, string Email, string Code)> InviteAsync(IServiceProvider? services = null)
     {
         var email = Unique.Email();
         var (_, slug, _) = await Handlers.InviteAndDeliverAsync(services ?? database.Services, email);
 
-        return (slug, email, Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
+        return (slug, email, Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
     }
 
     private async Task<TenantMembership?> FindMembershipAsync(string slug, string externalUserId)
@@ -174,12 +199,5 @@ public sealed class InvitationTests(Database database)
 
     private static string Sha256(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-    private async Task<T> ScalarAsync<T>(string sql)
-    {
-        await using var connection = new NpgsqlConnection(database.ConnectionStringFor(DatabaseRoles.Application));
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-
-        return (T)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
-    }
+    private Task<T> ScalarAsync<T>(string sql) => database.ScalarAsSuperuserAsync<T>(sql);
 }

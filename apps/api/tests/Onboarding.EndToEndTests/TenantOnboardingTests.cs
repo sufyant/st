@@ -32,7 +32,7 @@ public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
             admin.PostAsJsonAsync("/v1/admin/tenants", new { slug, ownerEmail }, Cancellation));
         var invitation = _app.Identity.Invitations.Single(invited => invited.Email == ownerEmail);
         _app.Identity.SignUp("user_e2e_owner", ownerEmail);
-        var accepted = await owner.PostAsJsonAsync("/v1/invitations/accept", new { token = TokenOf(invitation.AcceptLink) }, Cancellation);
+        var accepted = await owner.PostAsJsonAsync("/v1/invitations/accept", new { code = CodeOf(invitation.AcceptLink) }, Cancellation);
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         _app.Sender.Sent.Single(sent => sent.Email == ownerEmail).Link.ShouldBe(new Uri($"https://clerk.test/invitations/{invitation.InvitationId}"));
@@ -40,6 +40,6 @@ public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
         (await accepted.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("tenantSlug").GetString().ShouldBe(slug);
     }
 
-    private static string TokenOf(Uri acceptLink) =>
-        Uri.UnescapeDataString(acceptLink.Query.TrimStart('?').Split('&').Single(pair => pair.StartsWith("token=", StringComparison.Ordinal))["token=".Length..]);
+    private static string CodeOf(Uri acceptLink) =>
+        Uri.UnescapeDataString(acceptLink.Query.TrimStart('?').Split('&').Single(pair => pair.StartsWith("code=", StringComparison.Ordinal))["code=".Length..]);
 }

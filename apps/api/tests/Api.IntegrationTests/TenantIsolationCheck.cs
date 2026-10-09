@@ -7,8 +7,8 @@ using Tenancy;
 
 namespace Api.IntegrationTests;
 
-// Finds every ITenantEntity of every module database, with no list to keep up to date, and reports what it lacks: its query
-// filter, row level security, exactly one policy limiting reads and writes to the active tenant, and the tenant column default.
+// Finds every ITenantEntity of every module database, with no list to keep up to date, and reports what it lacks: row level
+// security enabled and forced, exactly one policy limiting reads and writes to the active tenant, and the tenant column default.
 internal sealed class TenantIsolationCheck(Database database)
 {
     public static List<IEntityType> TenantEntities(IServiceProvider services)
@@ -29,12 +29,6 @@ internal sealed class TenantIsolationCheck(Database database)
         List<string> gaps = [];
         foreach (var entity in TenantEntities(services))
         {
-            var table = $"{entity.GetSchema()}.{entity.GetTableName()}";
-            if (entity.GetDeclaredQueryFilters().Count == 0)
-            {
-                gaps.Add($"{table}: no query filter");
-            }
-
             gaps.AddRange(await DatabaseGapsAsync(entity.GetSchema()!, entity.GetTableName()!));
         }
 
@@ -49,6 +43,7 @@ internal sealed class TenantIsolationCheck(Database database)
             """
             SELECT
                 c.relrowsecurity,
+                c.relforcerowsecurity,
                 (SELECT count(*) FROM pg_policies p WHERE p.schemaname = @schema AND p.tablename = @table),
                 (SELECT count(*) FROM pg_policies p
                     WHERE p.schemaname = @schema AND p.tablename = @table AND p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE'
@@ -75,12 +70,17 @@ internal sealed class TenantIsolationCheck(Database database)
             gaps.Add($"{schema}.{table}: row level security is not enabled");
         }
 
-        if (reader.GetInt64(1) != 1 || reader.GetInt64(2) != 1)
+        if (!reader.GetBoolean(1))
+        {
+            gaps.Add($"{schema}.{table}: row level security is not forced");
+        }
+
+        if (reader.GetInt64(2) != 1 || reader.GetInt64(3) != 1)
         {
             gaps.Add($"{schema}.{table}: expected exactly one policy limiting reads and writes to the active tenant");
         }
 
-        if (reader.IsDBNull(3) || !reader.GetString(3).Contains("current_setting('app.tenant_id'", StringComparison.Ordinal))
+        if (reader.IsDBNull(4) || !reader.GetString(4).Contains("current_setting('app.tenant_id'", StringComparison.Ordinal))
         {
             gaps.Add($"{schema}.{table}: the tenant column does not default to the active tenant");
         }

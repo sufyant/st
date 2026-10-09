@@ -63,7 +63,7 @@ public sealed class TenantCatalogTests(Database database)
     {
         var email = Unique.Email();
         await Handlers.InviteAndDeliverAsync(database.Services, email);
-        var tokenHash = InvitationToken.Hash(Handlers.TokenOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
+        var tokenHash = InvitationToken.Hash(Handlers.SecretOf(Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink)));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>

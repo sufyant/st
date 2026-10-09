@@ -25,6 +25,15 @@ public sealed class TenantIsolationCoverageTests(Database database)
         gaps.ShouldBeEmpty();
     }
 
+    // R6: a table is either on the explicit list of tables without a tenant or isolated; a new table that is neither fails here.
+    [Fact]
+    public async Task CheckTables_EveryTableInTheDatabase_IsOnTheListOrIsolated()
+    {
+        var gaps = await new DatabaseTables(database).GapsAsync();
+
+        gaps.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task The_application_role_owns_no_table()
     {

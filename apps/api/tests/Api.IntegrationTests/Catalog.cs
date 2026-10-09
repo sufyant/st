@@ -1,7 +1,7 @@
 namespace Api.IntegrationTests;
 
 // Writes catalog rows with plain SQL: the host's tests may not see ControlPlane's internals. Built-in roles are found by
-// name, the way the catalog stores them.
+// name, the way the catalog stores them. A membership belongs to a tenant, so it is written with its tenant declared.
 internal sealed class Catalog(Database database)
 {
     public async Task<(Guid Id, string Slug)> AddTenantAsync(string status = "Active", string? slug = null)
@@ -16,7 +16,8 @@ internal sealed class Catalog(Database database)
     public async Task<string> AddMemberAsync(Guid tenantId, string? externalId = null, string role = "Member")
     {
         externalId ??= await AddUserAsync();
-        await database.ScalarAsync<object>(
+        await database.ExecuteInTenantAsync(
+            tenantId,
             $"""
             INSERT INTO catalog.memberships (tenant_id, user_id, role_id)
             SELECT '{tenantId}', users.id, roles.id FROM catalog.users, catalog.roles

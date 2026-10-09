@@ -46,20 +46,18 @@ internal static class Handlers
         return (tenantId, slug, invitationId);
     }
 
-    // Accepting starts outside any tenant: the token leads to the tenant, the identity provider is asked for the user's verified
-    // email addresses, and then the invitation is accepted in its tenant.
-    public static async Task<Result<InvitationAccepted>> AcceptAsync(IServiceProvider services, string token, string userId)
+    // Accepting starts outside any tenant: the invitation code names the tenant, the identity provider is asked for the user's
+    // verified email addresses, and then the invitation is found by its secret in that tenant.
+    public static async Task<Result<InvitationAccepted>> AcceptAsync(IServiceProvider services, string code, string userId)
     {
-        Guid? tenantId;
         IReadOnlyList<string> verifiedEmails;
         await using (var scope = services.CreateAsyncScope())
         {
-            tenantId = await scope.ServiceProvider.GetRequiredService<IInvitationDirectory>().FindTenantAsync(token, Cancellation);
             verifiedEmails = await scope.ServiceProvider.GetRequiredService<IIdentityProvider>().FindVerifiedEmailsAsync(userId, Cancellation);
         }
 
-        return await InTenant.RunAsync(services, tenantId!.Value, scope => AcceptInvitationHandler.HandleAsync(
-            new AcceptInvitation(token, userId, verifiedEmails),
+        return await InTenant.RunAsync(services, TenantIdOf(code), scope => AcceptInvitationHandler.HandleAsync(
+            new AcceptInvitation(SecretOf(code), userId, verifiedEmails),
             scope.GetRequiredService<ITenantCatalog>(),
             scope.GetRequiredService<TimeProvider>(),
             Cancellation));
@@ -108,6 +106,11 @@ internal static class Handlers
             scope.GetRequiredService<ITenantCatalog>(),
             Cancellation));
 
-    public static string TokenOf(Uri link) =>
-        Uri.UnescapeDataString(link.Query.TrimStart('?').Split('&').Single(pair => pair.StartsWith("token=", StringComparison.Ordinal))["token=".Length..]);
+    // The invitation code an accept link carries: `<tenantId>.<secret>`.
+    public static string CodeOf(Uri link) =>
+        Uri.UnescapeDataString(link.Query.TrimStart('?').Split('&').Single(pair => pair.StartsWith("code=", StringComparison.Ordinal))["code=".Length..]);
+
+    public static Guid TenantIdOf(string code) => Guid.Parse(code[..code.IndexOf('.', StringComparison.Ordinal)]);
+
+    public static string SecretOf(string code) => code[(code.IndexOf('.', StringComparison.Ordinal) + 1)..];
 }

@@ -3,6 +3,7 @@ using ControlPlane.Domain.Tenants;
 using ControlPlane.Domain.Users;
 using ControlPlane.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 
@@ -29,7 +30,7 @@ internal static class Catalog
     }
 
     public static Task AddMemberAsync(IServiceProvider services, Tenant tenant, User user, Role? role = null) =>
-        SaveAsync(services, catalog => catalog.Memberships.Add(new Membership(tenant.Id, user.Id, (role ?? BuiltInRoles.Member).Id)));
+        SaveInTenantAsync(services, tenant.Id, catalog => catalog.Memberships.Add(new Membership(tenant.Id, user.Id, (role ?? BuiltInRoles.Member).Id)));
 
     public static async Task<User> AddMemberAsync(IServiceProvider services, Tenant tenant, Role role)
     {
@@ -44,6 +45,18 @@ internal static class Catalog
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         change(catalog);
         await catalog.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    // A membership belongs to a tenant, so it is written in a transaction that declares its tenant.
+    private static async Task SaveInTenantAsync(IServiceProvider services, Guid tenantId, Action<CatalogDbContext> change)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var transaction = scope.ServiceProvider.GetRequiredService<TenantTransaction>();
+        await transaction.BeginAsync(tenantId, TestContext.Current.CancellationToken);
+        var catalog = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        change(catalog);
+        await catalog.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await transaction.CommitAsync(TestContext.Current.CancellationToken);
     }
 }
 

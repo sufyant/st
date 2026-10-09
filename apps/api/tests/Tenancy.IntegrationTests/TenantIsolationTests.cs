@@ -57,20 +57,21 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         count.ShouldBe(0);
     }
 
-    // The owner owns the table and is not subject to row level security, so only the query filter stands between it and the row.
+    // R1: row level security is forced, so it binds the owner of the table too, which runs the migrations.
     [Fact]
-    public async Task The_query_filter_alone_hides_rows_of_another_tenant()
+    public async Task ReadNotes_AsTheOwner_SeesNoRowsOfAnotherTenantNorWithoutATenant()
     {
         var other = Tenants.New();
         await WriteNoteAsync(other, "secret");
         await using var asOwner = new Notes(database.OwnerConnectionString);
 
-        var count = await asOwner.InTenantAsync(Tenants.New(), notes => notes.Notes.CountAsync(note => note.Text == "secret", Cancellation));
-        var withoutFilter = await asOwner.InTenantAsync(Tenants.New(), notes =>
+        var inAnotherTenant = await asOwner.InTenantAsync(Tenants.New(), notes =>
+            notes.Notes.IgnoreQueryFilters().CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
+        var withoutATenant = await asOwner.WithoutTenantAsync(notes =>
             notes.Notes.IgnoreQueryFilters().CountAsync(note => EF.Property<Guid>(note, "TenantId") == other, Cancellation));
 
-        count.ShouldBe(0);
-        withoutFilter.ShouldBe(1);
+        inAnotherTenant.ShouldBe(0);
+        withoutATenant.ShouldBe(0);
     }
 
     [Fact]
