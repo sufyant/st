@@ -1,6 +1,6 @@
+using ControlPlane.Contracts;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
-using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 

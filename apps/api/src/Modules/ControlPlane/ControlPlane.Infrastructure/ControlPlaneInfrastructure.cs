@@ -1,5 +1,6 @@
 using ControlPlane.Application.Invitations;
 using ControlPlane.Application.Ports;
+using ControlPlane.Contracts;
 using ControlPlane.Infrastructure.Clerk;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

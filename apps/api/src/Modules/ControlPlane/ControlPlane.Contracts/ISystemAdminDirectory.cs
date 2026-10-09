@@ -1,4 +1,4 @@
-namespace Tenancy;
+namespace ControlPlane.Contracts;
 
 /// <summary>Who may use the system routes as a system admin.</summary>
 public interface ISystemAdminDirectory

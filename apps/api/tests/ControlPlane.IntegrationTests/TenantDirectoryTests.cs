@@ -1,6 +1,6 @@
+using ControlPlane.Contracts;
 using ControlPlane.Domain.Tenants;
 using Microsoft.Extensions.DependencyInjection;
-using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 

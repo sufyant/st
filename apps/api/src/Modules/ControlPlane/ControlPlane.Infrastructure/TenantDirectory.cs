@@ -1,6 +1,6 @@
+using ControlPlane.Contracts;
 using ControlPlane.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
-using Tenancy;
 
 namespace ControlPlane.Infrastructure;
 

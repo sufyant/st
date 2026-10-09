@@ -2,10 +2,10 @@ using System.Security.Cryptography;
 using System.Text;
 using ControlPlane.Application.Ports;
 using ControlPlane.Application.Tenants;
+using ControlPlane.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
-using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 

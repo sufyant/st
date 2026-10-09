@@ -1,6 +1,6 @@
+using ControlPlane.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel;
-using Tenancy;
 
 namespace ControlPlane.IntegrationTests;
 

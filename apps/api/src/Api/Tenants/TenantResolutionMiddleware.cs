@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Security.Claims;
-using Api.SystemAdmins;
 using Api.Authorization;
+using Api.SystemAdmins;
+using ControlPlane.Contracts;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog;
 using Serilog.Context;
