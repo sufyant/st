@@ -3,12 +3,14 @@ using System.Reflection;
 using Api.Authentication;
 using Api.Authorization;
 using Api.ErrorHandling;
+using Api.Hosting;
 using Api.Messaging;
 using Api.Networking;
 using Api.Observability;
 using Api.Persistence;
 using Api.RateLimiting;
 using Api.Tenants;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -29,11 +31,24 @@ internal static class ApiPipeline
     // passed here rather than added to Wolverine's discovery afterwards.
     public static WebApplicationBuilder AddApiPipeline(this WebApplicationBuilder builder, params Assembly[] handlerAssemblies)
     {
+        // The OpenAPI document build only describes the API: it has no configuration and no database, so it registers no database
+        // and checks nothing while it starts. Every other start checks every setting first (section 7).
+        var openApiBuild = OpenApiDocumentBuild.IsRunning;
+        if (openApiBuild)
+        {
+            builder.Services.AddSingleton<IStartupValidator, OpenApiDocumentBuild.NothingToCheck>();
+        }
+        else
+        {
+            builder.AddPersistence();
+        }
+
+        _ = builder.AddHostSettings();
         builder.Services.AddSingleton(TimeProvider.System);
 
         builder.AddObservability();
-        builder.AddPersistence();
         builder.AddClerkAuthentication();
+        builder.Services.AddTrustedProxies();
         builder.Services.AddAccessAuthorization();
 
         builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
@@ -55,12 +70,11 @@ internal static class ApiPipeline
                 options.Discovery.IncludeAssembly(assembly);
             }
 
-            // Wolverine takes its data source while it is configured. The build writes the OpenAPI document, and the migration step
-            // runs, from a host without the setting; a host that runs without it keeps no messages and is never ready
-            // (DatabaseHealthCheck).
-            if (builder.Configuration.GetConnectionString(PersistenceExtensions.DirectConnection) is { Length: > 0 } direct)
+            // Wolverine takes its data source while it is configured. The migration step composes the host without the setting and
+            // never starts it; any other host without it does not start (PersistenceExtensions).
+            if (!openApiBuild && PersistenceExtensions.MessagingConnectionOf(builder.Configuration) is { ConnectionString: var messaging })
             {
-                MessageStorage.Configure(options, NpgsqlDataSource.Create(direct));
+                MessageStorage.Configure(options, NpgsqlDataSource.Create(messaging));
             }
 
             // A message that fails for good goes to the dead letter queue, and its fault is published for a flow that has to react,

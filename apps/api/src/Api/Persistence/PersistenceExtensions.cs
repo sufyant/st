@@ -1,35 +1,46 @@
-using Microsoft.Extensions.Options;
 using Tenancy;
 
 namespace Api.Persistence;
 
 internal static class PersistenceExtensions
 {
-    public const string PooledConnection = "Pooled";
+    private const string Section = "ConnectionStrings";
 
-    public const string DirectConnection = "Direct";
+    public const string DatabaseConnection = "Database";
 
-    // A host name that never resolves (RFC 2606).
-    private const string Unconfigured = "Host=unconfigured.invalid";
+    public const string MessagingConnection = "Messaging";
 
     public static WebApplicationBuilder AddPersistence(this WebApplicationBuilder builder)
     {
-        // Both connections are checked on start (DatabaseAccountCheck), which runs before Wolverine starts.
-        builder.Services.AddHostedService<DatabaseAccountCheck>();
-        builder.Services.AddOptions<ConnectionStringOptions>().BindConfiguration("ConnectionStrings");
+        builder.Services.AddOptions<ConnectionStringOptions>()
+            .BindConfiguration(Section)
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Database), $"{Section}:{DatabaseConnection} must name the application role's connection.")
+            .ValidateOnStart();
 
-        // Wolverine reads the model of every module DbContext when it starts, to find the one that stores a saga (W6). The build's
-        // OpenAPI step starts the host without the setting, so there the data source names no server and is never opened; any
-        // other host without the setting does not start.
-        builder.Services.AddTenancy(services =>
-            services.GetRequiredService<IOptions<ConnectionStringOptions>>().Value.Pooled is { Length: > 0 } pooled ? pooled : Unconfigured);
+        // Both connections are checked on start (DatabaseAccountCheck), which runs before Wolverine starts. A host composed without the
+        // setting, as for the migration step, registers no database; it does not start.
+        builder.Services.AddHostedService<DatabaseAccountCheck>();
+        if (builder.Configuration.GetConnectionString(DatabaseConnection) is { Length: > 0 } database)
+        {
+            builder.Services.AddTenancy(_ => database);
+        }
+
         builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
         return builder;
     }
 
+    // Wolverine's message store holds session-level advisory locks, so it needs a connection of its own behind a pooler in transaction
+    // mode; without one it uses the database connection. The key names the setting the connection came from.
+    public static (string Key, string ConnectionString)? MessagingConnectionOf(IConfiguration configuration) =>
+        configuration.GetConnectionString(MessagingConnection) is { Length: > 0 } messaging ? ($"{Section}:{MessagingConnection}", messaging)
+        : configuration.GetConnectionString(DatabaseConnection) is { Length: > 0 } database ? ($"{Section}:{DatabaseConnection}", database)
+        : null;
+
+    public static string DatabaseKey => $"{Section}:{DatabaseConnection}";
+
     private sealed class ConnectionStringOptions
     {
-        public string? Pooled { get; set; }
+        public string? Database { get; set; }
     }
 }

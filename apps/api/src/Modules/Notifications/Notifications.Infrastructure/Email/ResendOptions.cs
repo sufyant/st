@@ -1,9 +1,10 @@
 namespace Notifications.Infrastructure.Email;
 
-// Resend's API (section Resend). The API key comes from the environment only, never from a committed file.
+// Resend's API (section Notifications:Resend), checked on start. The API key comes from the environment only, never from a committed
+// file.
 internal sealed class ResendOptions
 {
-    public const string Section = "Resend";
+    public const string Section = "Notifications:Resend";
 
     public string? ApiKey { get; set; }
 

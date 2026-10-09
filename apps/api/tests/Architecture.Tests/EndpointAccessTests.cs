@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Architecture.Tests;
 
@@ -95,17 +97,22 @@ public sealed class EndpointAccessTests : IAsyncLifetime
     private static string Describe(RouteEndpoint endpoint) =>
         $"{string.Join(",", endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["*"])} {endpoint.RoutePattern.RawText}";
 
-    // The application as Program composes it, in development, where the API documents are mapped too. The host's own start-up
-    // checks need a database; the endpoints do not.
+    // The application as Program composes it, in development, where the API documents are mapped too, in the role that serves the
+    // whole API. The host's own start-up checks need a database and its settings; the endpoints do not.
     private sealed class ComposedApplication : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment(Environments.Development);
-            builder.ConfigureTestServices(services => services
-                .Where(service => service.ServiceType == typeof(IHostedService) && service.ImplementationType?.Assembly == typeof(Program).Assembly)
-                .ToList()
-                .ForEach(check => services.Remove(check)));
+            builder.UseSetting("Host:Role", "all");
+            builder.ConfigureTestServices(services =>
+            {
+                services
+                    .Where(service => service.ServiceType == typeof(IHostedService) && service.ImplementationType?.Assembly == typeof(Program).Assembly)
+                    .ToList()
+                    .ForEach(check => services.Remove(check));
+                services.RemoveAll<IStartupValidator>();
+            });
         }
     }
 }

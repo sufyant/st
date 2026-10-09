@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 
 namespace Api.Networking;
 
@@ -9,9 +10,20 @@ internal static class TrustedProxies
 {
     private const string Section = "ForwardedHeaders";
 
+    public static IServiceCollection AddTrustedProxies(this IServiceCollection services)
+    {
+        services.AddOptions<TrustedProxyOptions>()
+            .BindConfiguration(Section)
+            .Validate(trusted => trusted.KnownProxies.All(proxy => IPAddress.TryParse(proxy, out _)), $"{Section}:KnownProxies must list IP addresses.")
+            .Validate(trusted => trusted.KnownNetworks.All(network => System.Net.IPNetwork.TryParse(network, out _)), $"{Section}:KnownNetworks must list networks in CIDR notation.")
+            .ValidateOnStart();
+
+        return services;
+    }
+
     public static WebApplication UseTrustedProxies(this WebApplication app)
     {
-        var trusted = app.Configuration.GetSection(Section).Get<TrustedProxyOptions>() ?? new TrustedProxyOptions();
+        var trusted = app.Services.GetRequiredService<IOptions<TrustedProxyOptions>>().Value;
 
         // With no proxy or network listed, the middleware would believe forwarded headers from any sender, so it is left out.
         if (trusted.KnownProxies.Length == 0 && trusted.KnownNetworks.Length == 0)
