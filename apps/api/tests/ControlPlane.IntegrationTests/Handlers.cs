@@ -71,7 +71,7 @@ internal static class Handlers
         string slug,
         string ownerEmail) =>
         InTenant.RunAsync(services, tenantId, scope => StartTenantOnboardingHandler.HandleAsync(
-            new StartTenantOnboarding(adminId, slug, ownerEmail),
+            new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail),
             scope.GetRequiredService<ITenantCatalog>(),
             scope.GetRequiredService<TimeProvider>(),
             Cancellation));

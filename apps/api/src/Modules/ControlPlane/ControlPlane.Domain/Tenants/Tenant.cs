@@ -4,26 +4,41 @@ namespace ControlPlane.Domain.Tenants;
 
 internal sealed class Tenant
 {
-    private Tenant(Guid id, string slug)
+    public const int NameMaxLength = 100;
+
+    private Tenant(Guid id, string name, string slug)
     {
         Id = id;
+        Name = name;
         Slug = slug;
         Status = TenantStatus.Provisioning;
     }
 
     public Guid Id { get; private init; }
 
-    /// <summary>The tenant's name in URLs (<c>/v1/tenants/{slug}/...</c>); it cannot change for now.</summary>
+    /// <summary>The name people see. It does not have to be unique.</summary>
+    public string Name { get; private init; }
+
+    /// <summary>A unique, URL-safe handle, given at creation. It is never part of a path (T1); it cannot change for now.</summary>
     public string Slug { get; private init; }
 
     public TenantStatus Status { get; private set; }
 
-    public static Result<Tenant> Create(Guid id, string slug) =>
-        IsUrlSafe(slug)
-            ? new Tenant(id, slug)
+    /// <summary>The name is stored without the spaces around it.</summary>
+    public static Result<Tenant> Create(Guid id, string name, string slug)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length is < 1 or > NameMaxLength)
+        {
+            return Error.Validation("tenant.name_invalid", $"A name is 1 to {NameMaxLength} characters, not counting the spaces around it.");
+        }
+
+        return IsUrlSafe(slug)
+            ? new Tenant(id, trimmed, slug)
             : Error.Validation(
                 "tenant.slug_invalid",
                 "A slug is 3 to 63 lowercase letters, digits and single hyphens, and starts and ends with a letter or digit.");
+    }
 
     /// <summary>Ends the tenant's onboarding. Only a provisioning tenant becomes active.</summary>
     public bool Activate() => Leave(TenantStatus.Active);

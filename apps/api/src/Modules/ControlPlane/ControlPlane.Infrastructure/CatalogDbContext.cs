@@ -35,6 +35,7 @@ internal sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> option
         modelBuilder.Entity<Tenant>(tenant =>
         {
             tenant.Property(t => t.Id).ValueGeneratedNever();
+            tenant.Property(t => t.Name).HasMaxLength(Tenant.NameMaxLength);
             tenant.Property(t => t.Slug).HasMaxLength(63);
             tenant.HasIndex(t => t.Slug).IsUnique();
             tenant.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);

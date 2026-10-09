@@ -73,7 +73,7 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     {
         var added = OfActiveTenant(tenant, tenant.Id);
         var inserted = await catalog.Database.ExecuteSqlAsync(
-            $"INSERT INTO catalog.tenants (id, slug, status) VALUES ({added.Id}, {added.Slug}, {added.Status.ToString()}) ON CONFLICT (slug) DO NOTHING",
+            $"INSERT INTO catalog.tenants (id, name, slug, status) VALUES ({added.Id}, {added.Name}, {added.Slug}, {added.Status.ToString()}) ON CONFLICT (slug) DO NOTHING",
             cancellationToken);
 
         return inserted == 1;

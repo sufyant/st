@@ -12,6 +12,8 @@ public sealed class CatalogMigrationTests(Database database)
 {
     private const string BeforeExpiredWasRemoved = "20261008213132_RemoveCustomRolesAndSystemRoles";
 
+    private const string BeforeTenantsHadAName = "20261009075343_IsolateMembershipsAndInvitations";
+
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     // The Expired status is gone: expiry is checked when an invitation is read, so an old expired invitation becomes pending and
@@ -44,6 +46,24 @@ public sealed class CatalogMigrationTests(Database database)
         database.Identity.AddAccount(invitee, email);
         var accepted = await Handlers.AcceptAsync(services, $"{tenantId}.{secret}", invitee);
         accepted.Error.Code.ShouldBe("invitation.expired");
+    }
+
+    [Fact]
+    public async Task MigrateCatalog_ATenantFromBeforeNames_IsNamedAfterItsSlug()
+    {
+        var name = await database.CreateEmptyDatabaseAsync();
+        await MigrateCatalogAsync(name, BeforeTenantsHadAName);
+        var tenantId = Guid.CreateVersion7();
+        await database.ExecuteAsSuperuserAsync($"INSERT INTO catalog.tenants (id, slug, status) VALUES ('{tenantId}', 'old-acme', 'Active')", name);
+
+        await using var services = database.BuildServices(database: name);
+        await services.GetServices<IModuleMigrator>().Single()
+            .MigrateAsync(services, database.ConnectionStringFor(DatabaseRoles.Owner, name), Cancellation);
+
+        (await database.ScalarAsSuperuserAsync<string>($"SELECT name FROM catalog.tenants WHERE id = '{tenantId}'", name)).ShouldBe("old-acme");
+        (await database.ScalarAsSuperuserAsync<string>(
+            "SELECT is_nullable FROM information_schema.columns WHERE table_schema = 'catalog' AND table_name = 'tenants' AND column_name = 'name'",
+            name)).ShouldBe("NO");
     }
 
     private async Task MigrateCatalogAsync(string databaseName, string targetMigration)

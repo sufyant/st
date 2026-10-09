@@ -171,11 +171,15 @@
       },
       "CreateTenantRequest": {
         "required": [
+          "name",
           "slug",
           "ownerEmail"
         ],
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string"
+          },
           "slug": {
             "type": "string"
           },
@@ -273,6 +277,7 @@
       "TenantResponse": {
         "required": [
           "id",
+          "name",
           "slug",
           "status"
         ],
@@ -281,6 +286,9 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "name": {
+            "type": "string"
           },
           "slug": {
             "type": "string"

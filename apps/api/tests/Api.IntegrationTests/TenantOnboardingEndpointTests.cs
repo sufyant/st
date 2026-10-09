@@ -109,6 +109,16 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
     }
 
     [Fact]
+    public async Task CreateTenant_WithoutAName_IsRejected()
+    {
+        var admin = await AdminAsync();
+
+        var created = await admin.PostAsJsonAsync("/v1/system/tenants", new { slug = Slug(), ownerEmail = "ali@acme.com" }, Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CreateTenant_NameOfOneHundredCharacters_IsAccepted()
     {
         var admin = await AdminAsync();

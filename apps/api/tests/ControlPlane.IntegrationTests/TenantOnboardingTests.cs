@@ -22,7 +22,7 @@ public sealed class TenantOnboardingTests(Database database)
 
         var (tenant, next) = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, slug, owner);
 
-        tenant.Value.ShouldBe(new TenantDetails(tenantId, slug, "Provisioning"));
+        tenant.Value.ShouldBe(new TenantDetails(tenantId, "Acme Ltd", slug, "Provisioning"));
         next.ShouldNotBeNull().ShouldSatisfyAllConditions(
             step => step.OwnerEmail.ShouldBe(owner),
             step => step.InvitedBy.ShouldBe(admin.Id));
@@ -159,7 +159,7 @@ public sealed class TenantOnboardingTests(Database database)
         string adminId,
         string slug) =>
         await StartTenantOnboardingHandler.HandleAsync(
-            new StartTenantOnboarding(adminId, slug, Unique.Email()),
+            new StartTenantOnboarding(adminId, "Acme Ltd", slug, Unique.Email()),
             scope.ServiceProvider.GetRequiredService<ITenantCatalog>(),
             TimeProvider.System,
             TestContext.Current.CancellationToken);

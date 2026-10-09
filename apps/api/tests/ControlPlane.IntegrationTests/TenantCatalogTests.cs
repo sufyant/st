@@ -88,7 +88,7 @@ public sealed class TenantCatalogTests(Database database)
     [Fact]
     public async Task A_tenant_cannot_add_another_tenant()
     {
-        var other = Domain.Tenants.Tenant.Create(Guid.CreateVersion7(), Unique.Slug()).Value;
+        var other = Domain.Tenants.Tenant.Create(Guid.CreateVersion7(), "Other Ltd", Unique.Slug()).Value;
 
         var add = () => InTenant.ReadAsync(database.Services, Guid.CreateVersion7(), scope =>
             ((ITenantCatalog)scope.GetRequiredService<TenantCatalog>()).TryAddAsync(other, Cancellation));

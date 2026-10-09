@@ -8,7 +8,7 @@ public sealed record AcceptInvitationRequest(string Code);
 public sealed record AcceptedInvitationResponse(string TenantSlug);
 
 /// <summary>A new tenant, and the email address of its first owner, who is invited once the tenant is ready.</summary>
-public sealed record CreateTenantRequest(string Slug, string OwnerEmail);
+public sealed record CreateTenantRequest(string Name, string Slug, string OwnerEmail);
 
 /// <summary>A tenant and where its onboarding stands: provisioning, active or failed.</summary>
-public sealed record TenantResponse(Guid Id, string Slug, string Status);
+public sealed record TenantResponse(Guid Id, string Name, string Slug, string Status);

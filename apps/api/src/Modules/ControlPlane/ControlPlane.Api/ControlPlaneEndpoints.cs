@@ -46,9 +46,9 @@ public static class ControlPlaneEndpoints
         system.MapPost("/tenants", async (CreateTenantRequest request, ClaimsPrincipal user, IMessageBus bus, TimeProvider time, CancellationToken cancellationToken) =>
                 (await bus.InvokeForTenantAsync<Result<TenantDetails>>(
                     Guid.CreateVersion7(time.GetUtcNow()).ToString(),
-                    new StartTenantOnboarding(user.Id(), request.Slug, request.OwnerEmail),
+                    new StartTenantOnboarding(user.Id(), request.Name, request.Slug, request.OwnerEmail),
                     cancellationToken))
-                    .Map(tenant => new TenantResponse(tenant.Id, tenant.Slug, tenant.Status)))
+                    .Map(tenant => new TenantResponse(tenant.Id, tenant.Name, tenant.Slug, tenant.Status)))
             .RequireAuthorization(Permissions.SystemTenantsCreate);
     }
 

@@ -12,7 +12,7 @@ internal static class Catalog
 {
     public static async Task<Tenant> AddTenantAsync(IServiceProvider services, TenantStatus status = TenantStatus.Active, string? slug = null)
     {
-        var tenant = Tenant.Create(Guid.CreateVersion7(), slug ?? Unique.Slug()).Value;
+        var tenant = Tenant.Create(Guid.CreateVersion7(), "Acme Ltd", slug ?? Unique.Slug()).Value;
         if (status == TenantStatus.Active)
         {
             tenant.Activate();
