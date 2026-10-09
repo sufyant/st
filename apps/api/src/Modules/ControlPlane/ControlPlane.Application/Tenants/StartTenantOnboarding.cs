@@ -18,8 +18,9 @@ public sealed class StartTenantOnboardingValidator : AbstractValidator<StartTena
 {
     public StartTenantOnboardingValidator()
     {
-        // The tenant checks the name itself; a request without one never reaches it.
+        // The tenant checks the name and the slug itself; a request without one never reaches it.
         RuleFor(command => command.Name).NotNull();
+        RuleFor(command => command.Slug).NotNull();
         RuleFor(command => command.OwnerEmail).NotEmpty().EmailAddress().MaximumLength(Invitation.EmailMaxLength);
     }
 }

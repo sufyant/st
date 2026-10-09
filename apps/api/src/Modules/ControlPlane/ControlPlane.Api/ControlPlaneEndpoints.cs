@@ -19,6 +19,8 @@ public static class ControlPlaneEndpoints
 {
     private static readonly Error InvitationNotFound = Error.NotFound("invitation.not_found", "The invitation was not found.");
 
+    private static readonly Error InvitationCodeRequired = Error.Validation("invitation.code_required", "The request has no invitation code.");
+
     public static void MapControlPlaneEndpoints(
         this RouteGroupBuilder signedIn,
         RouteGroupBuilder system,
@@ -34,6 +36,11 @@ public static class ControlPlaneEndpoints
             IMessageBus bus,
             CancellationToken cancellationToken) =>
         {
+            if (request.Code is null)
+            {
+                return (Result<TenantSummaryResponse>)InvitationCodeRequired;
+            }
+
             if (InvitationCode.Parse(request.Code) is not { } code)
             {
                 return (Result<TenantSummaryResponse>)InvitationNotFound;
