@@ -11,6 +11,7 @@ using Api.Persistence;
 using Api.RateLimiting;
 using Api.Tenants;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Npgsql;
 using Scalar.AspNetCore;
 using Serilog;
@@ -26,6 +27,8 @@ namespace Api;
 internal static class ApiPipeline
 {
     private const string HealthPath = "/health";
+
+    private const string IdempotencyKeyHeader = "Idempotency-Key";
 
     // FluentValidation validators are found only in the handler assemblies known when validation is switched on, so they are
     // passed here rather than added to Wolverine's discovery afterwards. Returns the role the host runs as, or null when the setting
@@ -100,6 +103,13 @@ internal static class ApiPipeline
             options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));
         });
 
+        // API8: only the configured browser origins may call, with the methods and headers the API uses, and without credentials
+        // mode: the API reads its caller from the Authorization header, never from a cookie.
+        builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
+            .WithOrigins(host.Cors.AllowedOrigins)
+            .WithMethods(HttpMethods.Get, HttpMethods.Post)
+            .WithHeaders(HeaderNames.Authorization, HeaderNames.ContentType, IdempotencyKeyHeader)));
+
         builder.Services.AddTenantRateLimiting();
         builder.Services.AddHealthChecks();
         builder.Services.AddOpenApi();
@@ -120,9 +130,11 @@ internal static class ApiPipeline
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        // Routing runs first so tenant resolution sees the tenant id, and the rate limiter the resolved tenant. Authorization comes
-        // last, so callers it turns away have been rate limited too.
+        // Routing runs first so tenant resolution sees the tenant id, and the rate limiter the resolved tenant. A browser's preflight
+        // is answered before anything asks who the caller is. Authorization comes last, so callers it turns away have been rate limited
+        // too.
         app.UseRouting();
+        app.UseCors();
         app.UseAuthentication();
         app.UseMiddleware<TenantResolutionMiddleware>();
         app.UseRateLimiter();

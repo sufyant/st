@@ -9,6 +9,18 @@ internal enum HostRole
     All,
 }
 
+// The browser origins that may call the API (Host:Cors); none when the list is empty.
+internal sealed class CorsSettings
+{
+    public string[] AllowedOrigins { get; set; } = [];
+
+    // An origin is a scheme, a host and a port, exactly as a browser sends it: no wildcard, no path, no trailing slash.
+    public bool AreOrigins => AllowedOrigins.All(origin =>
+        Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+        && uri.Scheme is "https" or "http"
+        && uri.GetLeftPart(UriPartial.Authority) == origin);
+}
+
 // The host's own settings (section Host), checked on start.
 internal sealed class HostSettings
 {
@@ -18,6 +30,8 @@ internal sealed class HostSettings
 
     // How long a stopping host may take to finish the work it has (Twelve-Factor IX).
     public TimeSpan ShutdownTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    public CorsSettings Cors { get; set; } = new();
 
     // The role, or null when the setting is missing or names no role; the start then fails on it.
     public HostRole? RoleOrNull => Role switch
@@ -39,6 +53,7 @@ internal static class HostSettingsExtensions
             .BindConfiguration(HostSettings.Section)
             .Validate(settings => settings.RoleOrNull is not null, $"{HostSettings.Section}:Role must be web, worker or all.")
             .Validate(settings => settings.ShutdownTimeout > TimeSpan.Zero, $"{HostSettings.Section}:ShutdownTimeout must be positive.")
+            .Validate(settings => settings.Cors.AreOrigins, $"{HostSettings.Section}:Cors:AllowedOrigins must list origins such as https://app.example.com, without a wildcard or a path.")
             .ValidateOnStart();
         var settings = builder.Configuration.GetSection(HostSettings.Section).Get<HostSettings>() ?? new HostSettings();
         builder.Services.Configure<HostOptions>(host => host.ShutdownTimeout = settings.ShutdownTimeout);

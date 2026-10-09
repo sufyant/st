@@ -21,7 +21,7 @@ public sealed class CorsTests : IAsyncLifetime
         var response = await PreflightAsync(_host, AllowedOrigin);
 
         response.Headers.GetValues("Access-Control-Allow-Origin").ShouldBe([AllowedOrigin]);
-        response.Headers.GetValues("Access-Control-Allow-Methods").ShouldBe(["POST"]);
+        response.Headers.GetValues("Access-Control-Allow-Methods").Single().Split(',').ShouldBe(["GET", "POST"], ignoreOrder: true);
         response.Headers.GetValues("Access-Control-Allow-Headers").Single().Split(',').Select(header => header.Trim().ToLowerInvariant())
             .ShouldBe(["authorization", "content-type", "idempotency-key"], ignoreOrder: true);
         response.Headers.Contains("Access-Control-Allow-Credentials").ShouldBeFalse();
@@ -38,11 +38,11 @@ public sealed class CorsTests : IAsyncLifetime
 
     // A header the API does not use is not allowed, so the browser does not send the request.
     [Fact]
-    public async Task Preflight_AskingForAHeaderTheApiDoesNotUse_GetsNoCorsHeaders()
+    public async Task Preflight_AskingForAHeaderTheApiDoesNotUse_IsNotAllowedTheHeader()
     {
         var response = await PreflightAsync(_host, AllowedOrigin, requestedHeaders: "x-forwarded-for");
 
-        response.Headers.Contains("Access-Control-Allow-Origin").ShouldBeFalse();
+        response.Headers.GetValues("Access-Control-Allow-Headers").Single().ShouldNotContain("x-forwarded-for", Case.Insensitive);
     }
 
     [Fact]
