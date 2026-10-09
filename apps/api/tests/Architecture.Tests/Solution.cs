@@ -25,6 +25,9 @@ internal static partial class Solution
 
     private static IReadOnlyList<string> ProjectNames { get; } = [.. ProjectReferences.Keys];
 
+    // The folder of the solution file: found above the test's output directory, in the source tree the test was built from.
+    public static string Root { get; } = FindRoot();
+
     // The project files themselves, as the solution file lists them.
     private static Dictionary<string, string> ProjectFiles { get; } = ReadProjectFilesFromSolution();
 
@@ -82,8 +85,7 @@ internal static partial class Solution
     private static IEnumerable<string> Includes(XDocument file, string item) =>
         file.Descendants(item).Select(element => (string)element.Attribute("Include")!);
 
-    // The solution file is found above the test's output directory, in the source tree the test was built from.
-    private static Dictionary<string, string> ReadProjectFilesFromSolution()
+    private static string FindRoot()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(root.FullName, SolutionFile)))
@@ -91,10 +93,18 @@ internal static partial class Solution
             root = root.Parent ?? throw new InvalidOperationException($"{SolutionFile} was not found above the test's output directory.");
         }
 
-        return XDocument.Load(Path.Combine(root.FullName, SolutionFile)).Descendants("Project")
-            .Select(project => Path.Combine(root.FullName, (string)project.Attribute("Path")!))
-            .ToDictionary(path => Path.GetFileNameWithoutExtension(path)!, path => path);
+        return root.FullName;
     }
+
+    private static Dictionary<string, string> ReadProjectFilesFromSolution() =>
+        XDocument.Load(Path.Combine(Root, SolutionFile)).Descendants("Project")
+            .Select(project => Path.Combine(Root, (string)project.Attribute("Path")!))
+            .ToDictionary(path => Path.GetFileNameWithoutExtension(path)!, path => path);
+
+    // What NuGet restored for a project: the packages it uses, direct and transitive, and the folders they are in.
+    public static string AssetsFileOf(string project) => Path.Combine(Path.GetDirectoryName(ProjectFiles[project])!, "obj", "project.assets.json");
+
+    public static IReadOnlyList<string> SolutionProjects => [.. ProjectFiles.Keys.Order()];
 
     private static Dictionary<string, IReadOnlyList<string>> ReadProjectReferencesFromDepsFile()
     {
