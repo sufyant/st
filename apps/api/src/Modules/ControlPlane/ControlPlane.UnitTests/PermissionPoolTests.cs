@@ -8,7 +8,7 @@ public class PermissionPoolTests
 {
     // A tenant's custom roles choose from the tenant pool, so a system permission must never be part of it.
     [Fact]
-    public void The_tenant_and_system_pools_share_no_permission()
+    public void ComparePools_TenantAndSystem_ShareNoPermission()
     {
         var shared = PermissionPools.TenantPool.Intersect(PermissionPools.SystemPool);
 
@@ -16,7 +16,7 @@ public class PermissionPoolTests
     }
 
     [Fact]
-    public void Every_system_permission_is_named_under_system()
+    public void NameSystemPermissions_EveryOne_StartsWithSystem()
     {
         var misnamed = PermissionPools.SystemPool.Where(permission => !permission.StartsWith("system.", StringComparison.Ordinal));
 

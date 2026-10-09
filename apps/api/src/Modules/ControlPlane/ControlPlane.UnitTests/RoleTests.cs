@@ -6,7 +6,7 @@ namespace ControlPlane.UnitTests;
 public class RoleTests
 {
     [Fact]
-    public void No_built_in_role_holds_a_system_permission()
+    public void GrantBuiltInRoles_EveryRole_HoldsNoSystemPermission()
     {
         var systemPermissions = BuiltInRoles.All.SelectMany(role => role.Permissions).Intersect(PermissionPools.SystemPool);
 
