@@ -2,7 +2,8 @@ using Api.Authorization;
 
 namespace Api.SystemAdmins;
 
-// The system door (T5): a separate route group for system admins, with its own authorization policy and a second factor.
+// The system door (T5): a separate route group for system admins, with its own authorization policy. ControlPlane decides who
+// passes, including the second factor (A6).
 internal static class SystemRoutes
 {
     public static RouteGroupBuilder MapSystem(this RouteGroupBuilder v1) =>

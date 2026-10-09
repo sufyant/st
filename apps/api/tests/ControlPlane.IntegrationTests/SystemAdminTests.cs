@@ -55,6 +55,6 @@ public sealed class SystemAdminTests(Database database)
         await using var scope = database.Services.CreateAsyncScope();
 
         return await scope.ServiceProvider.GetRequiredService<ISystemAdminDirectory>()
-            .FindSystemPermissionsAsync(externalId, TestContext.Current.CancellationToken);
+            .FindSystemPermissionsAsync(externalId, secondFactorVerified: true, TestContext.Current.CancellationToken);
     }
 }

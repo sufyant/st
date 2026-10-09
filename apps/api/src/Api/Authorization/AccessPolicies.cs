@@ -1,4 +1,3 @@
-using Api.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.Extensions.Options;
@@ -22,10 +21,7 @@ internal static class AccessPolicies
 
         return services.AddAuthorizationBuilder()
             .AddPolicy(TenantMember, policy => policy.RequireAuthenticatedUser().AddRequirements(new TenantMemberRequirement()))
-            .AddPolicy(SystemAdmin, policy => policy
-                .RequireAuthenticatedUser()
-                .RequireClaim(ClerkAuthentication.SecondFactorClaim)
-                .AddRequirements(new SystemAdminRequirement()))
+            .AddPolicy(SystemAdmin, policy => policy.RequireAuthenticatedUser().AddRequirements(new SystemAdminRequirement()))
             .Services;
     }
 
