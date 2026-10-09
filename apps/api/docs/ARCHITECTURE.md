@@ -105,12 +105,14 @@ Wolverine is the dispatcher. An endpoint sends a command or a query through `IMe
 
 | Order | Command chain | Query chain |
 | --- | --- | --- |
-| 1 | Logging and tracing | Logging and tracing |
-| 2 | The transaction opens, the tenant is declared | The transaction opens, the tenant is declared |
-| 3 | Input validation | Input validation |
-| 4 | Authorization check | Authorization check |
+| 1 | HTTP: authentication, tenant membership, rate limit, authorization (ASP.NET Core) | HTTP: authentication, tenant membership, rate limit, authorization (ASP.NET Core) |
+| 2 | Logging and tracing | Logging and tracing |
+| 3 | The transaction opens, the tenant is declared | The transaction opens, the tenant is declared |
+| 4 | Input validation | Input validation |
 | 5 | Handler | Cache (only on marked queries) |
 | 6 | Save, commit, then outbox dispatch | Handler |
+
+Authorization runs once, in ASP.NET Core, before the endpoint sends the message. A refused request opens no transaction. A message from a queue has no caller and is not authorized again.
 
 - Wolverine opens and closes the transaction. We set the rule: each handler runs in its own transaction.
 - A domain event is handled inside the module and in the same transaction. An integration event leaves the module through the outbox. Source: Vernon, Chapter 8.
@@ -190,7 +192,7 @@ A tenant has two descriptive fields. `name` is free text, cannot be empty, has a
 | R1 | Each table that belongs to a tenant has `tenant_id`. RLS is enabled and forced | Golding, Chapters 8 and 9 |
 | R2 | The application account is not the table owner and cannot bypass RLS | Golding, Chapter 9. OWASP (least privilege) |
 | R3 | Migrations run with a separate account. That account is not used at run time | Twelve-Factor, Factor XII |
-| R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted | PostgreSQL connection pool behaviour |
+| R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted. A transaction declares a tenant or a user, never both. | PostgreSQL connection pool behaviour |
 | R5 | If the tenant is not declared, a query returns no data | Nygard, Chapter 5 (Fail Fast) |
 | R6 | Tables without a tenant are on an explicit list. A test checks every table | Ford, Parsons, Kua, Chapter 2 |
 | R7 | There are only two database accounts: migration and application. Running code has no path that bypasses RLS | Golding, Chapter 9 |
