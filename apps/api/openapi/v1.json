@@ -180,7 +180,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AcceptedInvitationResponse"
+                  "$ref": "#/components/schemas/TenantSummaryResponse"
                 }
               }
             }
@@ -316,17 +316,6 @@
   },
   "components": {
     "schemas": {
-      "AcceptedInvitationResponse": {
-        "required": [
-          "tenantSlug"
-        ],
-        "type": "object",
-        "properties": {
-          "tenantSlug": {
-            "type": "string"
-          }
-        }
-      },
       "AcceptInvitationRequest": {
         "required": [
           "code"
@@ -575,7 +564,7 @@
             "type": "string"
           }
         },
-        "description": "A tenant the signed-in user belongs to."
+        "description": "A tenant the signed-in user belongs to: an item of their tenant list, and the tenant an invitation made them join."
       }
     }
   },

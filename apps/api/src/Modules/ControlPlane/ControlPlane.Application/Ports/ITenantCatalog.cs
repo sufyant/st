@@ -19,7 +19,7 @@ public interface ITenantCatalog
 {
     internal Guid TenantId { get; }
 
-    internal Task<string> FindSlugAsync(CancellationToken cancellationToken);
+    internal Task<Tenant> FindTenantAsync(CancellationToken cancellationToken);
 
     /// <summary>The active tenant, locked for the rest of the transaction, so the steps of its onboarding run one at a time.</summary>
     internal Task<Tenant> FindTenantForUpdateAsync(CancellationToken cancellationToken);

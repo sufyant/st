@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using ControlPlane.Application.Ports;
+using ControlPlane.Application.Tenants;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
@@ -111,7 +112,7 @@ public sealed class InvitationTests(Database database)
 
         var accepted = await Handlers.AcceptAsync(database.Services, code, invitee);
 
-        accepted.Value.TenantSlug.ShouldBe(await ScalarAsync<string>($"SELECT slug FROM catalog.tenants WHERE id = '{tenantId}'"));
+        accepted.Value.ShouldBe(new TenantSummary(tenantId, "Acme Ltd", await ScalarAsync<string>($"SELECT slug FROM catalog.tenants WHERE id = '{tenantId}'")));
         (await FindMembershipAsync(tenantId, invitee)).ShouldNotBeNull();
         (await ScalarAsync<string>(
             $"""

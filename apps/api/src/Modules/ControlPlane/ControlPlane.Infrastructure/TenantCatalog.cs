@@ -29,10 +29,10 @@ internal sealed class TenantCatalog(CatalogDbContext catalog, TenantContext tena
     private Guid ActiveTenant =>
         tenant.TenantId ?? throw new InvalidOperationException("Tenant-owned catalog rows are reached only inside a tenant.");
 
-    Task<string> ITenantCatalog.FindSlugAsync(CancellationToken cancellationToken)
+    Task<Tenant> ITenantCatalog.FindTenantAsync(CancellationToken cancellationToken)
     {
         var tenantId = ActiveTenant;
-        return catalog.Tenants.Where(t => t.Id == tenantId).Select(t => t.Slug).SingleAsync(cancellationToken);
+        return catalog.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
     }
 
     async Task<Tenant> ITenantCatalog.FindTenantForUpdateAsync(CancellationToken cancellationToken)

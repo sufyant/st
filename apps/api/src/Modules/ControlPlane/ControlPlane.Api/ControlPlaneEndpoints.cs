@@ -35,13 +35,13 @@ public static class ControlPlaneEndpoints
         {
             if (InvitationCode.Parse(request.Code) is not { } code)
             {
-                return (Result<AcceptedInvitationResponse>)InvitationNotFound;
+                return (Result<TenantSummaryResponse>)InvitationNotFound;
             }
 
             var verifiedEmails = await identity.FindVerifiedEmailsAsync(user.Id(), cancellationToken);
-            var accepted = await bus.InvokeForTenantAsync<Result<InvitationAccepted>>(
+            var accepted = await bus.InvokeForTenantAsync<Result<TenantSummary>>(
                 code.TenantId.ToString(), new AcceptInvitation(code.Secret, user.Id(), verifiedEmails), cancellationToken);
-            return accepted.Map(invitation => new AcceptedInvitationResponse(invitation.TenantSlug));
+            return accepted.Map(tenant => new TenantSummaryResponse(tenant.Id, tenant.Name, tenant.Slug));
         });
 
         // T4: the user's own tenants, read without a tenant.

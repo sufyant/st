@@ -1,4 +1,5 @@
 using ControlPlane.Application.Ports;
+using ControlPlane.Application.Tenants;
 using ControlPlane.Domain.Invitations;
 using ControlPlane.Domain.Users;
 using SharedKernel;
@@ -13,11 +14,9 @@ namespace ControlPlane.Application.Invitations;
 /// </summary>
 public sealed record AcceptInvitation(string Secret, string UserId, IReadOnlyList<string> VerifiedEmails);
 
-public sealed record InvitationAccepted(string TenantSlug);
-
 public static class AcceptInvitationHandler
 {
-    public static async Task<Result<InvitationAccepted>> HandleAsync(
+    public static async Task<Result<TenantSummary>> HandleAsync(
         AcceptInvitation command,
         ITenantCatalog catalog,
         TimeProvider time,
@@ -49,6 +48,7 @@ public static class AcceptInvitationHandler
 
         catalog.AddMember(user.Id, invitation.RoleId);
         await catalog.SaveChangesAsync(cancellationToken);
-        return new InvitationAccepted(await catalog.FindSlugAsync(cancellationToken));
+        var tenant = await catalog.FindTenantAsync(cancellationToken);
+        return new TenantSummary(tenant.Id, tenant.Name, tenant.Slug);
     }
 }
