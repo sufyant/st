@@ -34,7 +34,7 @@ public static class ControlPlaneEndpoints
     {
         // Accepting starts outside any tenant. The invitation code names the tenant, which is declared before the invitation is
         // looked up by its secret, so a wrong tenant, a wrong secret and a malformed code all answer the same 404; a request without
-        // a code is a bad request. The identity provider is asked first, so its call never runs while the acceptance holds the
+        // a code, or with an empty or blank one, is a bad request. The identity provider is asked first, so its call never runs while the acceptance holds the
         // invitation locked.
         signedIn.MapPost("/invitations/accept", async (
             AcceptInvitationRequest request,
@@ -43,7 +43,7 @@ public static class ControlPlaneEndpoints
             IMessageBus bus,
             CancellationToken cancellationToken) =>
         {
-            if (request.Code is null)
+            if (string.IsNullOrWhiteSpace(request.Code))
             {
                 return (Result<TenantSummaryResponse>)InvitationCodeRequired;
             }
