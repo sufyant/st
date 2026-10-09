@@ -39,6 +39,10 @@ internal static class ApiPipeline
             context.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
         builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 
+        // A request an endpoint cannot read answers 400 in every environment. Development would otherwise throw, and the exception
+        // handler would answer 500 (OWASP API8).
+        builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
+
         builder.Services.AddOptions<PipelineOptions>()
             .BindConfiguration(PipelineOptions.Section)
             .Validate(options => options.SlowCommandThreshold > TimeSpan.Zero, "Pipeline:SlowCommandThreshold must be positive.")

@@ -138,6 +138,21 @@ public sealed class TenantOnboardingEndpointTests(Database database) : IAsyncLif
         (await created.Content.ReadFromJsonAsync<HttpValidationProblemDetails>(Cancellation))!.Errors.Keys.ShouldBe([field]);
     }
 
+    // A body the endpoint cannot read at all is a bad request in every environment, never a server error.
+    [Theory]
+    [InlineData("")]
+    [InlineData("null")]
+    [InlineData("{")]
+    public async Task CreateTenant_WithoutAReadableBody_IsABadRequest(string body)
+    {
+        var admin = await AdminAsync();
+
+        var created = await admin.PostAsync("/v1/system/tenants", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        created.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        created.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
+    }
+
     [Fact]
     public async Task CreateTenant_NameOfOneHundredCharacters_IsAccepted()
     {

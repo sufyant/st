@@ -171,6 +171,20 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
         (await CodeOfAsync(accepted)).ShouldBe("invitation.code_required");
     }
 
+    // A body the endpoint cannot read at all is a bad request in every environment, never a server error.
+    [Theory]
+    [InlineData("")]
+    [InlineData("null")]
+    [InlineData("{")]
+    public async Task AcceptInvitation_WithoutAReadableBody_IsABadRequest(string body)
+    {
+        var accepted = await _api.CreateClient($"user_{Guid.NewGuid():N}")
+            .PostAsync("/v1/invitations/accept", new StringContent(body, Encoding.UTF8, "application/json"), Cancellation);
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        accepted.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
+    }
+
     [Fact]
     public async Task Accepting_needs_a_signed_in_user()
     {
