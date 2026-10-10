@@ -75,6 +75,51 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         (await declare.ShouldThrowAsync<InvalidOperationException>()).Message.ShouldContain("a tenant or a user, never both");
     }
 
+    // R4: a transaction declares one tenant only. Its writes so far belong to the first, so declaring another one stops it.
+    [Fact]
+    public async Task DeclareTenant_AnotherTenantInTheSameTransaction_IsRefusedAndWritesNothing()
+    {
+        var first = Tenants.New();
+        var second = Tenants.New();
+
+        var declare = () => _notes.WithoutTenantAsync(async notes =>
+        {
+            await using var transaction = await notes.Database.BeginTransactionAsync(Cancellation);
+            await notes.DeclareTenantAsync(first, Cancellation);
+            notes.Notes.Add(new Note { Text = "first" });
+            await notes.SaveChangesAsync(Cancellation);
+            await notes.DeclareTenantAsync(second, Cancellation);
+            notes.Notes.Add(new Note { Text = "second" });
+            await notes.SaveChangesAsync(Cancellation);
+            await transaction.CommitAsync(Cancellation);
+            return true;
+        });
+
+        (await declare.ShouldThrowAsync<InvalidOperationException>()).Message.ShouldContain("one tenant only");
+        (await _notes.InTenantAsync(first, notes => notes.Notes.CountAsync(Cancellation))).ShouldBe(0);
+        (await _notes.InTenantAsync(second, notes => notes.Notes.CountAsync(Cancellation))).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task DeclareTenant_TheSameTenantAgain_IsAllowed()
+    {
+        var tenant = Tenants.New();
+
+        var declared = await _notes.WithoutTenantAsync(async notes =>
+        {
+            await using var transaction = await notes.Database.BeginTransactionAsync(Cancellation);
+            await notes.DeclareTenantAsync(tenant, Cancellation);
+            await notes.DeclareTenantAsync(tenant, Cancellation);
+            notes.Notes.Add(new Note { Text = "again" });
+            await notes.SaveChangesAsync(Cancellation);
+            await transaction.CommitAsync(Cancellation);
+            return true;
+        });
+
+        declared.ShouldBeTrue();
+        (await _notes.InTenantAsync(tenant, notes => notes.Notes.Select(note => note.Text).ToListAsync(Cancellation))).ShouldBe(["again"]);
+    }
+
     [Fact]
     public async Task ReadNotes_InItsOwnTenant_ReturnsItsRows()
     {
