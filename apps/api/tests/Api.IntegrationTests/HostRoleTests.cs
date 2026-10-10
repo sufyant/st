@@ -1,10 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Audit.Application;
 using ControlPlane.Application.Tenants;
 using ControlPlane.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+using Notifications.Application;
 using Notifications.Contracts;
 using Tenancy;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
 
 namespace Api.IntegrationTests;
 
@@ -15,16 +20,19 @@ public sealed class HostRoleTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    // The messages of every onboarding step after the first, as section 6 lists them.
-    private static readonly Type[] StepsAfterTheFirst =
+    // The handlers of every onboarding message after the first, as section 6 lists them: an event with two handlers runs both.
+    private static readonly HandlerRun[] HandlersAfterTheFirstStep =
     [
-        typeof(RegisterOwnerWithIdentityProvider),
-        typeof(OwnerRegistered),
-        typeof(ActivateTenant),
-        typeof(TenantActivated),
-        typeof(OwnerInvitationReady),
-        typeof(InvitationEmailSent),
+        new(typeof(RegisterOwnerWithIdentityProvider), typeof(RegisterOwnerWithIdentityProviderHandler)),
+        new(typeof(OwnerRegistered), typeof(TenantOnboarding)),
+        new(typeof(ActivateTenant), typeof(ActivateTenantHandler)),
+        new(typeof(TenantActivated), typeof(TenantOnboarding)),
+        new(typeof(TenantActivated), typeof(RecordTenantCreatedHandler)),
+        new(typeof(OwnerInvitationReady), typeof(SendOwnerInvitationHandler)),
+        new(typeof(InvitationEmailSent), typeof(TenantOnboarding)),
     ];
+
+    private static readonly HandlerRun FirstStep = new(typeof(StartTenantOnboarding), typeof(StartTenantOnboardingHandler));
 
     [Fact]
     public async Task OnboardTenant_OnAWebAndAWorkerHost_RunsEveryStepAfterTheFirstInTheWorker()
@@ -41,8 +49,8 @@ public sealed class HostRoleTests(Database database)
         await Waiting.UntilAsync(async () => await OnboardingStateAsync(name, tenantId) == "Completed");
 
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
-        runs.In("web").ShouldBe([typeof(StartTenantOnboarding)]);
-        runs.In("worker").Distinct().ShouldBe(StepsAfterTheFirst, ignoreOrder: true);
+        runs.In("web").ShouldBe([FirstStep]);
+        runs.In("worker").Distinct().ShouldBe(HandlersAfterTheFirstStep, ignoreOrder: true);
         (await OnboardingStateAsync(name, tenantId)).ShouldBe("Completed");
         worker.Email.Sent.ShouldHaveSingleItem().To.ShouldBe("owner@acme.test");
     }
@@ -72,8 +80,56 @@ public sealed class HostRoleTests(Database database)
 
         waiting.ShouldBe("Registering");
         queued.ShouldBe(1L);
-        runs.In("web").ShouldBe([typeof(StartTenantOnboarding)]);
+        runs.In("web").ShouldBe([FirstStep]);
         (await OnboardingStateAsync(name, tenantId)).ShouldBe("Completed");
+    }
+
+    // O3, W4: the Audit handler of the activation runs beside the saga's, in the worker, once.
+    [Fact]
+    public async Task OnboardTenant_OnAWebAndAWorkerHost_WritesOneTenantCreatedAuditEntry()
+    {
+        var name = await database.CreateMigratedDatabaseAsync();
+        await using var web = Host(name, "web", new HandlerRuns());
+        await using var worker = Host(name, "worker", new HandlerRuns());
+        _ = worker.Services;
+        var admin = web.CreateClient(await AddSystemAdminAsync(name), secondFactor: true);
+
+        var tenantId = await IdOfAsync(await admin.CreateTenantAsync(new { name = "Acme Ltd", slug = "acme", ownerEmail = "owner@acme.test" }));
+        await Waiting.UntilAsync(async () => await OnboardingStateAsync(name, tenantId) == "Completed");
+        await Waiting.UntilAsync(async () => await TenantCreatedEntriesAsync(name, tenantId) > 0);
+
+        (await OnboardingStateAsync(name, tenantId)).ShouldBe("Completed");
+        (await TenantCreatedEntriesAsync(name, tenantId)).ShouldBe(1L);
+    }
+
+    // Spike T8 in the production layout (O3, W4): each handler of an event runs in a worker, in its own transaction. The one that
+    // throws goes to the dead letter queue; the other commits its row once.
+    [Fact]
+    public async Task PublishAnEventWithTwoHandlers_OnAWebAndAWorkerHost_OneThrowsTheOtherCommitsOnceInTheWorker()
+    {
+        var name = await database.CreateMigratedDatabaseAsync();
+        await database.CreateProbesAsync(name);
+        var runs = new HandlerRuns();
+        await using var web = ProbeHost(name, "web", runs);
+        await using var worker = ProbeHost(name, "worker", runs);
+        _ = worker.Services;
+        var tenant = Guid.NewGuid();
+        var value = $"ping-{Guid.NewGuid():N}";
+
+        await using (var scope = web.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IMessageBus>()
+                .PublishAsync(new ProbePinged(value), new DeliveryOptions { TenantId = tenant.ToString() });
+        }
+
+        await Waiting.UntilAsync(async () => await DeadLettersOfAsync<ProbePinged>(name) > 0);
+        await Waiting.UntilAsync(async () => await ProbesAsync(name, $"recorded:{value}") > 0);
+
+        (await ProbesAsync(name, $"recorded:{value}")).ShouldBe(1L);
+        (await ProbesAsync(name, $"failed:{value}")).ShouldBe(0L);
+        (await DeadLettersOfAsync<ProbePinged>(name)).ShouldBe(1L);
+        runs.In("worker").ShouldBe([new HandlerRun(typeof(ProbePinged), typeof(RecordPingHandler))]);
+        runs.In("web").ShouldBeEmpty();
     }
 
     // A worker serves no API: only the health endpoints answer.
@@ -94,6 +150,34 @@ public sealed class HostRoleTests(Database database)
         database.ConnectionStringFor(DatabaseRoles.Application, databaseName),
         settings: new Dictionary<string, string?> { ["Host:Role"] = role },
         configureServices: HandlerRunsOfHost.Register(role, runs));
+
+    // A host with the probe module's DbContext and the two handlers of ProbePinged.
+    private ApiFactory ProbeHost(string databaseName, string role, HandlerRuns runs) => new(
+        database.ConnectionStringFor(DatabaseRoles.Application, databaseName),
+        settings: new Dictionary<string, string?> { ["Host:Role"] = role },
+        configureServices: services =>
+        {
+            HandlerRunsOfHost.Register(role, runs)(services);
+            services.AddDbContextWithWolverineIntegration<ProbeDbContext>(
+                (provider, options) => options.UseModuleDatabase(provider, ProbeDbContext.Schema),
+                TenancyServiceCollectionExtensions.MessageSchema);
+            services.ConfigureWolverine(options =>
+            {
+                options.Discovery.IncludeType(typeof(RecordPingHandler));
+                options.Discovery.IncludeType(typeof(FailOnPingHandler));
+            });
+        });
+
+    private Task<long> TenantCreatedEntriesAsync(string databaseName, Guid tenantId) =>
+        database.ScalarAsSuperuserAsync<long>(
+            $"SELECT count(*) FROM audit.entries WHERE tenant_id = '{tenantId}' AND operation = 'tenant.created'", databaseName);
+
+    private Task<long> ProbesAsync(string databaseName, string value) =>
+        database.ScalarAsSuperuserAsync<long>($"SELECT count(*) FROM probes.probes WHERE value = '{value}'", databaseName);
+
+    private Task<long> DeadLettersOfAsync<TMessage>(string databaseName) =>
+        database.ScalarAsSuperuserAsync<long>(
+            $"SELECT count(*) FROM wolverine.wolverine_dead_letters WHERE message_type = '{typeof(TMessage).FullName}'", databaseName);
 
     private async Task<string> AddSystemAdminAsync(string databaseName)
     {
