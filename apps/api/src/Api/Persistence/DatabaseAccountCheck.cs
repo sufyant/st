@@ -5,9 +5,8 @@ namespace Api.Persistence;
 // R10: the application does not start as a role that row level security does not bind: a superuser, a role that bypasses it, or
 // the owner of a table, who can switch it off. A member of such a role, directly or through other roles, has its rights or can
 // become it (PostgreSQL documentation, Privileges), so the role and every role it is a member of are checked. Both of the
-// application's connections are checked: the one requests use, and the
-// one Wolverine keeps its messages over, when it has one of its own. It runs before Wolverine starts. The migration step never starts
-// the host, so it runs as the owner without this check.
+// application's connections are checked: the one requests use, and the one Wolverine keeps its messages over, when it has one of
+// its own. It runs before Wolverine starts. The migration step never starts the host, so it runs as the owner without this check.
 internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHostedService
 {
     // The connection's own role, and every role it is a member of.
