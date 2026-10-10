@@ -32,6 +32,13 @@ public static class AcceptInvitationHandler
 
         var now = time.GetUtcNow();
         var existing = await catalog.FindUserAsync(command.UserId, cancellationToken);
+
+        // T5: provider staff enter through the system door, never as tenant members.
+        if (existing is not null && await catalog.IsSystemAdminAsync(existing.Id, cancellationToken))
+        {
+            return Error.Unprocessable("invitation.staff_cannot_join", "Provider staff cannot join a tenant.");
+        }
+
         if (existing is not null && await catalog.FindMembershipAsync(existing.Id, cancellationToken) is not null)
         {
             return Error.Conflict("membership.exists", "You are already a member of this tenant.");
