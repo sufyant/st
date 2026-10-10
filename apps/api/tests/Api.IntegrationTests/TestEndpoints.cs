@@ -5,7 +5,6 @@ using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Time.Testing;
 using SharedKernel;
 using Wolverine;
 
@@ -41,9 +40,6 @@ internal static class TestEndpoints
 
         v1.MapPost("/explosions", (IMessageBus bus, CancellationToken cancellationToken) =>
             bus.InvokeAsync<Result>(new Explode(), cancellationToken));
-
-        v1.MapPost("/slow-work", (DoSlowWork command, IMessageBus bus, CancellationToken cancellationToken) =>
-            bus.InvokeAsync<Result>(command, cancellationToken));
 
         v1.MapGet("/ping", () => Results.Ok());
     }
@@ -107,15 +103,4 @@ public static class ExplodeHandler
 {
     public static Result Handle(Explode command) =>
         throw new InvalidOperationException("Host=internal-db;Password=hunter2");
-}
-
-public sealed record DoSlowWork(TimeSpan Duration);
-
-public static class DoSlowWorkHandler
-{
-    public static Result Handle(DoSlowWork command, FakeTimeProvider time)
-    {
-        time.Advance(command.Duration);
-        return Result.Success();
-    }
 }

@@ -73,7 +73,6 @@ RateLimiting__PermitLimit=1000
 RateLimiting__Window=00:01:00
 RateLimiting__InvitationAccept__PermitLimit=10
 RateLimiting__InvitationAccept__Window=00:01:00
-Pipeline__SlowCommandThreshold=00:00:00.500
 ControlPlane__FirstSystemAdminEmail=<first system admin's email>
 ControlPlane__ActivationTimeout=00:10:00
 ControlPlane__InvitationEmailTimeout=02:00:00   # longer than the Notifications retry delays together

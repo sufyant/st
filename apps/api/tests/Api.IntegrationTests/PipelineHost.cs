@@ -23,7 +23,6 @@ internal sealed class PipelineHost : IAsyncDisposable
     {
         ["RateLimiting:PermitLimit"] = "1000",
         ["RateLimiting:Window"] = "00:01:00",
-        ["Pipeline:SlowCommandThreshold"] = "00:00:01",
         ["Host:Role"] = "all",
         ["ControlPlane:Invitations:AcceptUrl"] = ApiFactory.AcceptUrl,
         ["ControlPlane:Clerk:SecretKey"] = "sk_test_unused",
