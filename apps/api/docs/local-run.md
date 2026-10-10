@@ -38,7 +38,7 @@ Every process below runs this output. Only the configuration changes.
 
 ## 4. Migrate
 
-The migration step runs as the owner role and needs only its connection (R3). It creates every module's schema and the `wolverine` schema, then exits. It logs one line for each module, with the number of migrations it applied, and one line when it has finished. Running it again is safe.
+The migration step runs as the owner role and needs only its connection (R3). `ConnectionStrings:Migrations` is given only to the `migrate` command, never to a running process. It creates every module's schema and the `wolverine` schema, then exits. It logs one line for each module, with the number of migrations it applied, and one line when it has finished. Running it again is safe.
 
 ```sh
 cd out/api
