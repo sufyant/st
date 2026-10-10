@@ -29,7 +29,7 @@ public sealed class HandlerReachTests : IAsyncLifetime
     public void RouteEveryMessage_FromEachRole_ReachesEveryHandlerInAWorker(string sender)
     {
         var worker = _worker.Services.GetRequiredService<IWolverineRuntime>();
-        var sending = (sender == "web" ? _web : _worker).Services.GetRequiredService<IWolverineRuntime>();
+        var sending = RuntimeOf(sender);
         var listened = worker.Options.Transports.AllEndpoints().Where(endpoint => endpoint.IsListener).Select(endpoint => endpoint.Uri).ToHashSet();
         var graph = _worker.Services.GetRequiredService<HandlerGraph>();
 
@@ -39,6 +39,9 @@ public sealed class HandlerReachTests : IAsyncLifetime
 
         unreached.ShouldBeEmpty();
     }
+
+    private IWolverineRuntime RuntimeOf(string role) =>
+        (role == "web" ? _web : _worker).Services.GetRequiredService<IWolverineRuntime>();
 
     // The handlers of the message type that no route takes to an endpoint a worker listens to, as "message -> handler".
     private static IEnumerable<string> Unreached(HandlerChain chain, HashSet<Uri> routes, HashSet<Uri> listened)

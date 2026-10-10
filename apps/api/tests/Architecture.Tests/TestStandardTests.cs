@@ -75,14 +75,18 @@ public partial class TestStandardTests
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
             .Where(method => method.IsDefined(typeof(FactAttribute), inherit: true));
 
+    // The conditional operator, ?? and ??= choose between two values as an if does.
     private static bool BranchesOrLoops(MethodDeclarationSyntax method) =>
         method.DescendantNodes().Any(node => node is IfStatementSyntax
             or SwitchStatementSyntax
             or SwitchExpressionSyntax
+            or ConditionalExpressionSyntax
             or ForStatementSyntax
             or CommonForEachStatementSyntax
             or WhileStatementSyntax
-            or DoStatementSyntax);
+            or DoStatementSyntax
+            || node.IsKind(SyntaxKind.CoalesceExpression)
+            || node.IsKind(SyntaxKind.CoalesceAssignmentExpression));
 
     private static string NameOf(MethodDeclarationSyntax method) =>
         $"{method.Ancestors().OfType<TypeDeclarationSyntax>().First().Identifier.Text}.{method.Identifier.Text}";
