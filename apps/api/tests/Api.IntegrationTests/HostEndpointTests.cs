@@ -229,6 +229,20 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    // Section 7: the OpenAPI document and Scalar are on only in Development.
+    [Theory]
+    [InlineData("/openapi/v1.json")]
+    [InlineData("/scalar")]
+    [InlineData("/scalar/v1")]
+    public async Task ServeApiDocuments_OutsideDevelopment_IsNotFound(string path)
+    {
+        await using var api = new ApiFactory(database.ApplicationConnectionString, environment: Environments.Production, settings: Resend);
+
+        var response = await api.CreateClient().GetAsync(path, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     private static readonly Dictionary<string, string?> Resend = new()
     {
         ["Notifications:Resend:ApiKey"] = "re_test_key",
