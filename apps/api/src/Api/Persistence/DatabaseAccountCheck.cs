@@ -10,8 +10,9 @@ namespace Api.Persistence;
 // application's connections are checked: the one requests use, and the one Wolverine keeps its messages over, when it has one of
 // its own. It runs before Wolverine starts. The migration step never starts the host, so it runs as the owner without this check.
 // It also stops a start on a database the migration step has not run on: every module's schema and the message storage's must be
-// there.
-internal sealed class DatabaseAccountCheck(IConfiguration configuration, IEnumerable<IModuleMigrator> modules) : IHostedService
+// there, and each module's history table must hold every migration the module has. The message storage has no such table.
+internal sealed class DatabaseAccountCheck(IConfiguration configuration, IEnumerable<IModuleMigrator> modules, IServiceProvider services)
+    : IHostedService
 {
     // The connection's own role, and every role it is a member of.
     private const string RoleQuery =
@@ -81,11 +82,25 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration, IEnumer
         await using var command = dataSource.CreateCommand(MissingSchemasQuery);
         command.Parameters.AddWithValue("schemas", (string[])[.. modules.Select(module => module.Schema), MessageStorage.Schema]);
         var missing = (string)(await command.ExecuteScalarAsync(cancellationToken))!;
+        if (missing.Length > 0)
+        {
+            return [$"the database is not migrated, it has no schema {missing}: run `dotnet Api.dll {MigrationStep.Command}` first"];
+        }
 
-        return missing.Length == 0
+        List<string> behind = [];
+        foreach (var module in modules)
+        {
+            var pending = await module.PendingMigrationsAsync(services, connectionString, cancellationToken);
+            behind.AddRange(pending.Count > 0 ? [$"the module {ModuleOf(module)} misses the migrations {string.Join(", ", pending)}"] : []);
+        }
+
+        return behind.Count == 0
             ? []
-            : [$"the database is not migrated, it has no schema {missing}: run `dotnet Api.dll {MigrationStep.Command}` first"];
+            : [$"the database is not migrated, {string.Join(", ", behind)}: run `dotnet Api.dll {MigrationStep.Command}` first"];
     }
+
+    // A module's projects are named after it (section 2): the DbContext of ControlPlane is in ControlPlane.Infrastructure.
+    private static string ModuleOf(IModuleMigrator module) => module.DbContextType.Assembly.GetName().Name!.Split('.')[0];
 
     private static async Task<string[]> ProblemsAsync(string key, string connectionString, CancellationToken cancellationToken)
     {
