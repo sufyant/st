@@ -39,6 +39,23 @@ public sealed class MigrationStepTests(Database database)
         (await OwnerOfAsync("wolverine", "wolverine_queue_messages_scheduled", empty)).ShouldBe(DatabaseRoles.Owner);
     }
 
+    // The step says what it migrated, one line for each module, and that it finished. Run again, it applies nothing new.
+    [Fact]
+    public async Task Migrate_EmptyDatabaseTwice_LogsEachModuleAndThatItFinished()
+    {
+        var owner = database.ConnectionStringFor(DatabaseRoles.Owner, await database.CreateEmptyDatabaseAsync());
+
+        var first = await MigrateCommand.RunAsync(owner);
+        var again = await MigrateCommand.RunAsync(owner);
+
+        first.ExitCode.ShouldBe(0, first.Output);
+        first.Output.ShouldContain("Migrated the catalog schema:");
+        first.Output.ShouldContain("Migrated the audit schema:");
+        first.Output.ShouldContain("Migration finished: the schemas catalog, audit and the message storage in wolverine are up to date");
+        again.Output.ShouldContain("Migrated the catalog schema: 0 migrations applied");
+        again.Output.ShouldContain("Migrated the audit schema: 0 migrations applied");
+    }
+
     // The application role owns nothing the migration step creates, yet it can use all of it, the message storage included.
     [Fact]
     public async Task StartApplication_OnAMigratedDatabase_IsReady()

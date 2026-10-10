@@ -61,13 +61,17 @@ public static class TenancyServiceCollectionExtensions
     {
         public Type DbContextType => typeof(TContext);
 
-        public async Task MigrateAsync(IServiceProvider services, string connectionString, CancellationToken cancellationToken)
+        public string Schema => schema;
+
+        public async Task<IReadOnlyList<string>> MigrateAsync(IServiceProvider services, string connectionString, CancellationToken cancellationToken)
         {
             await using var scope = services.CreateAsyncScope();
             await using var context = ActivatorUtilities.CreateInstance<TContext>(
                 scope.ServiceProvider, ModuleDbContextOptions<TContext>(schema, connectionString));
 
+            var pending = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
             await context.Database.MigrateAsync(cancellationToken);
+            return pending;
         }
     }
 }

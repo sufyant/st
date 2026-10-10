@@ -221,6 +221,7 @@ public sealed class Database : IAsyncLifetime
     private async Task MigrateAsync(string database)
     {
         await using var services = new ServiceCollection()
+            .AddLogging()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
             .AddControlPlaneInfrastructure()
             .AddNotificationsInfrastructure()
