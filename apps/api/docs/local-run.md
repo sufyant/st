@@ -49,6 +49,12 @@ echo $?   # 0
 
 The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`).
 
+The Notifications module stores no data and has no schema of its own. A database migrated by an earlier version still has an empty `notifications` schema, which nothing uses. The owner role can drop it by hand:
+
+```sh
+psql "postgresql://api_owner:<owner password>@localhost:5432/app" -c "DROP SCHEMA notifications CASCADE"
+```
+
 ## 5. Configure
 
 Configuration comes from environment variables (section 7). Each key of `apps/api/appsettings.Example.json` becomes a variable with `__` in place of `:`, and an array item gets its index (`Host__Cors__AllowedOrigins__0`). For a local run:

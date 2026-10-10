@@ -4,25 +4,18 @@ using Microsoft.Extensions.Options;
 using Notifications.Application;
 using Notifications.Application.Ports;
 using Notifications.Infrastructure.Email;
-using Tenancy;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 
 namespace Notifications.Infrastructure;
 
 /// <summary>
-/// The module's infrastructure entry point: the host calls it to register the module's DbContext, adapters and contract
-/// implementations.
+/// The module's infrastructure entry point: the host calls it to register the module's adapters. The module stores no data, so it
+/// has no DbContext and no migrations.
 /// </summary>
 public static class NotificationsInfrastructure
 {
     public static IServiceCollection AddNotificationsInfrastructure(this IServiceCollection services)
     {
-        services.AddDbContextWithWolverineIntegration<NotificationsDbContext>(
-            (provider, options) => options.UseModuleDatabase(provider, NotificationsDbContext.Schema),
-            TenancyServiceCollectionExtensions.MessageSchema);
-        services.AddModuleMigrations<NotificationsDbContext>(NotificationsDbContext.Schema);
-
         // Outside Development email goes only through Resend. Without its settings no email could leave, invitations included, so the
         // application does not start.
         services.AddOptions<ResendOptions>()
