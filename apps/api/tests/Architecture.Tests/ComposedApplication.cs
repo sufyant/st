@@ -12,8 +12,8 @@ namespace Architecture.Tests;
 // The application as Program composes it, in the given role (by default the one that handles every message), without the start-up
 // checks that need a database and its settings. The roles web and worker configure the PostgreSQL transport, which needs a
 // connection setting; it is never used: Wolverine's message storage and external transports are switched off, and its endpoints and
-// routing stay as configured.
-internal sealed class ComposedApplication(string role = "all") : WebApplicationFactory<Program>
+// routing stay as configured. A test may configure the host further.
+internal sealed class ComposedApplication(string role = "all", Action<IWebHostBuilder>? configure = null) : WebApplicationFactory<Program>
 {
     private const string UnusedConnection = "Host=localhost;Database=unused;Username=unused;Password=unused";
 
@@ -39,5 +39,7 @@ internal sealed class ComposedApplication(string role = "all") : WebApplicationF
                 services.DisableAllWolverineMessagePersistence();
             }
         });
+
+        configure?.Invoke(builder);
     }
 }

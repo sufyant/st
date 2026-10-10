@@ -63,7 +63,7 @@ psql "postgresql://api_owner:<owner password>@localhost:5432/app" -c "DROP SCHEM
 
 ## 5. Configure
 
-Configuration comes from environment variables (section 7). Each key of `apps/api/appsettings.Example.json` becomes a variable with `__` in place of `:`, and an array item gets its index (`Host__Cors__AllowedOrigins__0`). For a local run:
+Configuration comes from environment variables (section 7). `apps/api/docs/configuration.md` lists every key: whether it is required, its default and what Development relaxes. Each key of `apps/api/appsettings.Example.json` becomes a variable with `__` in place of `:`, and an array item gets its index (`Host__Cors__AllowedOrigins__0`). For a local run:
 
 ```sh
 ASPNETCORE_ENVIRONMENT=Development
