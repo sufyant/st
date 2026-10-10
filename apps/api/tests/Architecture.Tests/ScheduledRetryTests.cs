@@ -1,14 +1,12 @@
-using ControlPlane.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Wolverine.Runtime.Handlers;
 
 namespace Architecture.Tests;
 
-// W5: a worker hands an event with several handlers on to durable local queues, one for each handler (W4), and a handler that
-// shares its event with a saga runs from a PostgreSQL queue of its own. A retry that Wolverine schedules for such a handler waits
-// among the shared store's scheduled inbox rows, which every node polls, a web host included, so the handler could run in a web
-// host. A retry inline, where the handler runs, stays in the worker. Read from Wolverine's own handler graph of the application
-// composed as a worker, with the failure policies every chain has and the ones it has of its own.
+// W5: a worker hands an event with several handlers on to durable local queues, one for each handler (W4). A retry that Wolverine
+// schedules for such a handler waits among the shared store's scheduled inbox rows, which every node polls, a web host included, so
+// the handler could run in a web host. A retry inline, where the handler runs, stays in the worker. Read from Wolverine's own handler
+// graph of the application composed as a worker, with the failure policies every chain has and the ones it has of its own.
 public sealed class ScheduledRetryTests : IAsyncLifetime
 {
     private const string WhyNot =
@@ -33,7 +31,6 @@ public sealed class ScheduledRetryTests : IAsyncLifetime
 
         var scheduling = severalHandlers.SelectMany(message => message).Where(chain => SchedulesARetry(chain, graph)).Select(Describe);
 
-        severalHandlers.Select(message => message.Key).ShouldContain(typeof(TenantActivated));
         scheduling.ShouldBeEmpty(WhyNot);
     }
 

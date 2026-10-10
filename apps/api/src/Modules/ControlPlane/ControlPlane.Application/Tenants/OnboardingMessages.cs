@@ -9,6 +9,9 @@ namespace ControlPlane.Application.Tenants;
 /// <summary>Step 2, the pivot: makes the tenant active and announces it, with the link the owner is invited by.</summary>
 public sealed record ActivateTenant(Guid TenantId, Guid InvitationId, Uri Link);
 
+/// <summary>The reply to the saga: the tenant is active (S13).</summary>
+public sealed record TenantActivationCompleted(Guid TenantId);
+
 /// <summary>Compensation before the pivot: cancels the tenant, with a fixed reason code, and its owner's invitation.</summary>
 public sealed record CancelTenant(Guid TenantId, Guid InvitationId, string Reason);
 

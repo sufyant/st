@@ -20,11 +20,11 @@ public sealed class HostRoleTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    // The handlers of every onboarding message after the first, as section 6 lists them: an event with two handlers runs both.
+    // The handlers of every onboarding message after the first, as section 6 lists them.
     private static readonly HandlerRun[] HandlersAfterTheFirstStep =
     [
         new(typeof(ActivateTenant), typeof(ActivateTenantHandler)),
-        new(typeof(TenantActivated), typeof(TenantOnboarding)),
+        new(typeof(TenantActivationCompleted), typeof(TenantOnboarding)),
         new(typeof(TenantActivated), typeof(RecordTenantCreatedHandler)),
         new(typeof(OwnerInvitationReady), typeof(SendOwnerInvitationHandler)),
         new(typeof(InvitationEmailSent), typeof(TenantOnboarding)),

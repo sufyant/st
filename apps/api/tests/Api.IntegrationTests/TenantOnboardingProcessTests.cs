@@ -175,7 +175,7 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
             """);
         var now = DateTimeOffset.UtcNow;
         var emailSent = new Notifications.Contracts.InvitationEmailSent(Guid.CreateVersion7(), now, tenantId, invitationId);
-        var activated = new TenantActivated(Guid.CreateVersion7(), now, tenantId, "Acme Ltd", Guid.CreateVersion7());
+        var activated = new TenantActivationCompleted(tenantId);
         await using var hold = await HoldOnboardingAsync(tenantId);
 
         var messages = await _api.TrackMessagesAsync(async () =>

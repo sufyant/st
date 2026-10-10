@@ -16,8 +16,8 @@ public static class ActivateTenantHandler
     public static void Configure(HandlerChain chain) => chain.OnAnyException().RetryTimes(3);
 
     // The pivot. The tenant is locked, so a repeated activation finds it active and announces nothing again. The tenant was created
-    // by the system admin who invited its first owner.
-    public static async Task<(TenantActivated?, OwnerInvitationReady?)> HandleAsync(
+    // by the system admin who invited its first owner. The saga hears of it through a reply of its own (S13).
+    public static async Task<(TenantActivationCompleted?, TenantActivated?, OwnerInvitationReady?)> HandleAsync(
         ActivateTenant step,
         ITenantCatalog catalog,
         TimeProvider time,
@@ -26,7 +26,7 @@ public static class ActivateTenantHandler
         var tenant = await catalog.FindTenantForUpdateAsync(cancellationToken);
         if (!tenant.Activate())
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         var invitation = await catalog.FindInvitationForUpdateAsync(step.InvitationId, cancellationToken)
@@ -35,6 +35,7 @@ public static class ActivateTenantHandler
         await catalog.SaveChangesAsync(cancellationToken);
 
         return (
+            new TenantActivationCompleted(tenant.Id),
             new TenantActivated(Guid.CreateVersion7(now), now, tenant.Id, tenant.Name, invitation.InvitedBy),
             new OwnerInvitationReady(Guid.CreateVersion7(now), now, tenant.Id, invitation.Id, invitation.Email, tenant.Name, step.Link));
     }

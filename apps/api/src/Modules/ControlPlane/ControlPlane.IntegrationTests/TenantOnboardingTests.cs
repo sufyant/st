@@ -116,9 +116,10 @@ public sealed class TenantOnboardingTests(Database database)
         var invitationId = started.Activate.ShouldNotBeNull().Message.InvitationId;
         var link = AcceptLink();
 
-        var (activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, link));
+        var (completed, activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, link));
 
         (await StatusOfAsync(tenantId)).ShouldBe("Active");
+        completed.ShouldBe(new TenantActivationCompleted(tenantId));
         activated.ShouldNotBeNull().ShouldSatisfyAllConditions(
             announced => announced.TenantId.ShouldBe(tenantId),
             announced => announced.Name.ShouldBe("Acme Ltd"),
@@ -140,8 +141,9 @@ public sealed class TenantOnboardingTests(Database database)
         var activate = new ActivateTenant(tenantId, invitationId, AcceptLink());
         await Handlers.ActivateAsync(database.Services, tenantId, activate);
 
-        var (activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, activate);
+        var (completed, activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, activate);
 
+        completed.ShouldBeNull();
         activated.ShouldBeNull();
         ready.ShouldBeNull();
     }
@@ -193,8 +195,9 @@ public sealed class TenantOnboardingTests(Database database)
         var (tenantId, invitationId) = await StartAsync();
         await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
 
-        var (activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, AcceptLink()));
+        var (completed, activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, AcceptLink()));
 
+        completed.ShouldBeNull();
         activated.ShouldBeNull();
         ready.ShouldBeNull();
         (await StatusOfAsync(tenantId)).ShouldBe("Cancelled");

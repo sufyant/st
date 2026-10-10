@@ -19,6 +19,7 @@ public sealed class TraceIdTests(Database database)
     [
         typeof(StartTenantOnboarding).FullName!,
         typeof(ActivateTenant).FullName!,
+        typeof(TenantActivationCompleted).FullName!,
         typeof(TenantActivated).FullName!,
         typeof(OwnerInvitationReady).FullName!,
         typeof(InvitationEmailSent).FullName!,

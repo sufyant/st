@@ -41,7 +41,7 @@ internal static class Handlers
             return new StartedOnboarding(result, onboarding, activate, timeout);
         });
 
-    public static Task<(TenantActivated? Activated, OwnerInvitationReady? Ready)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
+    public static Task<(TenantActivationCompleted? Completed, TenantActivated? Activated, OwnerInvitationReady? Ready)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
         InTenant.RunAsync(services, tenantId, scope => ActivateTenantHandler.HandleAsync(
             step,
             scope.GetRequiredService<ITenantCatalog>(),
@@ -66,7 +66,7 @@ internal static class Handlers
         var tenantId = Guid.CreateVersion7();
         var slug = Unique.Slug();
         var started = await StartOnboardingAsync(services, tenantId, admin.ExternalId, slug, ownerEmail);
-        var (_, ready) = await ActivateAsync(services, tenantId, started.Activate.ShouldNotBeNull().Message);
+        var (_, _, ready) = await ActivateAsync(services, tenantId, started.Activate.ShouldNotBeNull().Message);
 
         return (tenantId, slug, ready.ShouldNotBeNull());
     }

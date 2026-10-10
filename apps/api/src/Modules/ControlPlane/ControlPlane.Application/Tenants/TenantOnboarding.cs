@@ -69,7 +69,7 @@ public sealed class TenantOnboarding : Saga, ITenantEntity
             new ActivateTenant(tenantId, invitationId, acceptLink),
             new ActivationTimedOut(tenantId, timeouts.Activation));
 
-    public OutgoingMessages Handle([SagaIdentityFrom(nameof(TenantActivated.TenantId))] TenantActivated activated) =>
+    public OutgoingMessages Handle([SagaIdentityFrom(nameof(TenantActivationCompleted.TenantId))] TenantActivationCompleted activated) =>
         State == TenantOnboardingState.Activating
             ? MoveTo(TenantOnboardingState.SendingInvitation, new InvitationEmailTimedOut(Id, InvitationEmailTimeout))
             : [];

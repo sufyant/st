@@ -11,7 +11,6 @@ public class TenantOnboardingTests
 {
     private static readonly Guid TenantId = new("0199a8f0-0000-7000-8000-000000000201");
     private static readonly Guid InvitationId = new("0199a8f0-0000-7000-8000-000000000401");
-    private static readonly Guid AdminId = new("0199a8f0-0000-7000-8000-000000000301");
     private static readonly Guid EventId = new("0199a8f0-0000-7000-8000-000000000501");
     private static readonly DateTimeOffset Now = new(2026, 10, 9, 9, 0, 0, TimeSpan.Zero);
     private static readonly Uri AcceptLink = new("https://app.test/invitations/accept?code=0199a8f0-0000-7000-8000-000000000201.secret");
@@ -30,7 +29,7 @@ public class TenantOnboardingTests
         timeout.ShouldBe(new ActivationTimedOut(TenantId, TimeSpan.FromMinutes(10)));
     }
 
-    // Activating | TenantActivated | SendingInvitation | InvitationEmailTimedOut
+    // Activating | TenantActivationCompleted | SendingInvitation | InvitationEmailTimedOut
     [Fact]
     public void ActivateTenant_TenantActivated_SchedulesTheInvitationEmailTimeout()
     {
@@ -310,7 +309,7 @@ public class TenantOnboardingTests
         return onboarding;
     }
 
-    private static TenantActivated Activated() => new(EventId, Now, TenantId, "Acme Ltd", AdminId);
+    private static TenantActivationCompleted Activated() => new(TenantId);
 
     private static OwnerInvitationReady InvitationReady() => new(EventId, Now, TenantId, InvitationId, OwnerEmail, "Acme Ltd", AcceptLink);
 
