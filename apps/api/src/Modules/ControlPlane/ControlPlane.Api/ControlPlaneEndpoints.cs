@@ -18,6 +18,12 @@ namespace ControlPlane.Api;
 /// </summary>
 public static class ControlPlaneEndpoints
 {
+    /// <summary>
+    /// The rate limit policy of accepting an invitation, which the host defines: a guessed code costs a call to the identity provider
+    /// before it is looked up, so the endpoint has a stricter limit than the others (API4).
+    /// </summary>
+    public const string InvitationAcceptRateLimit = "invitation-accept";
+
     private static readonly Error InvitationNotFound = Error.NotFound("invitation.not_found", "The invitation was not found.");
 
     private static readonly Error InvitationCodeRequired = Error.Validation("invitation.code_required", "The request has no invitation code.");
@@ -57,7 +63,7 @@ public static class ControlPlaneEndpoints
             var accepted = await bus.InvokeForTenantAsync<Result<TenantSummary>>(
                 code.TenantId.ToString(), new AcceptInvitation(code.Secret, user.Id(), verifiedEmails), cancellationToken);
             return accepted.Map(tenant => new TenantSummaryResponse(tenant.Id, tenant.Name, tenant.Slug));
-        });
+        }).RequireRateLimiting(InvitationAcceptRateLimit);
 
         // T4: the user's own tenants, read without a tenant.
         signedIn.MapGet("/me/tenants", async (int? page, int? pageSize, ClaimsPrincipal user, IMessageBus bus, CancellationToken cancellationToken) =>
