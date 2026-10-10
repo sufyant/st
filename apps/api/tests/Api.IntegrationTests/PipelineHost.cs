@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Api.SystemAdmins;
 using Api.Tenants;
+using ControlPlane.Application.Ports;
 using ControlPlane.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Notifications.Infrastructure;
 using Tenancy;
@@ -64,6 +66,10 @@ internal sealed class PipelineHost : IAsyncDisposable
             TenancyServiceCollectionExtensions.MessageSchema);
         builder.Services.AddModuleMigrations<ProbeDbContext>(ProbeDbContext.Schema);
         builder.Services.TrustTestKey();
+
+        // The identity provider is a system we do not own. The system door asks it for a user's verified emails while the staff list
+        // is empty, which depends on the order the tests run in.
+        builder.Services.Replace(ServiceDescriptor.Singleton<IIdentityProvider>(new FakeIdentityProvider()));
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
