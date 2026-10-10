@@ -49,7 +49,11 @@ ConnectionStrings__Migrations="Host=localhost;Port=5432;Database=app;Username=ap
 # ... Migration finished: the schemas catalog, audit and the message storage in wolverine are up to date
 ```
 
-The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`).
+The application does not start on a database that was not migrated. It stops at once and says so:
+
+```text
+The application does not start: the database is not migrated, it has no schema audit, catalog, wolverine: run `dotnet Api.dll migrate` first.
+```
 
 The Notifications module stores no data and has no schema of its own. A database migrated by an earlier version still has an empty `notifications` schema, which nothing uses. The owner role can drop it by hand:
 

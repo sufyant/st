@@ -10,17 +10,16 @@ public sealed class MigrationStepTests(Database database)
     private const string CatalogExists = "SELECT to_regclass('catalog.tenants') IS NOT NULL";
     private const string MessageStorageExists = "SELECT to_regclass('wolverine.wolverine_incoming_envelopes') IS NOT NULL";
 
-    // Wolverine checks its message storage while it starts, so an application whose database was not migrated does not start,
-    // and it creates nothing on the way.
+    // An application whose database was not migrated stops at once, says to run the migration step, and creates nothing on the way.
     [Fact]
-    public async Task StartApplication_OnADatabaseNotMigrated_FailsAndMigratesNothing()
+    public async Task StartApplication_OnADatabaseNotMigrated_FailsSayingToMigrateAndMigratesNothing()
     {
         var empty = await database.CreateEmptyDatabaseAsync();
         await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, empty));
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<AggregateException>().Message.ShouldContain("message storage");
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("run `dotnet Api.dll migrate`");
         (await database.ScalarAsync<bool>(CatalogExists, database: empty)).ShouldBeFalse();
         (await database.ScalarAsync<bool>(MessageStorageExists, database: empty)).ShouldBeFalse();
     }

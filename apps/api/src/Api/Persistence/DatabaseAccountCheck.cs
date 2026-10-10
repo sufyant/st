@@ -1,4 +1,6 @@
+using Api.Messaging;
 using Npgsql;
+using Tenancy;
 
 namespace Api.Persistence;
 
@@ -7,7 +9,9 @@ namespace Api.Persistence;
 // become it (PostgreSQL documentation, Privileges), so the role and every role it is a member of are checked. Both of the
 // application's connections are checked: the one requests use, and the one Wolverine keeps its messages over, when it has one of
 // its own. It runs before Wolverine starts. The migration step never starts the host, so it runs as the owner without this check.
-internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHostedService
+// It also stops a start on a database the migration step has not run on: every module's schema and the message storage's must be
+// there.
+internal sealed class DatabaseAccountCheck(IConfiguration configuration, IEnumerable<IModuleMigrator> modules) : IHostedService
 {
     // The connection's own role, and every role it is a member of.
     private const string RoleQuery =
@@ -23,14 +27,24 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHost
         ORDER BY role.rolname = current_user DESC, role.rolname
         """;
 
+    // The schemas the migration step creates, of those it is given, that the database does not have.
+    private const string MissingSchemasQuery =
+        """
+        SELECT coalesce(string_agg(required.name, ', ' ORDER BY required.name), '')
+        FROM unnest(@schemas) AS required(name)
+        WHERE NOT EXISTS (SELECT FROM pg_namespace WHERE nspname = required.name)
+        """;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        var database = configuration.GetConnectionString(PersistenceExtensions.DatabaseConnection)!;
         string[] problems =
         [
-            .. await ProblemsAsync(PersistenceExtensions.DatabaseKey, configuration.GetConnectionString(PersistenceExtensions.DatabaseConnection)!, cancellationToken),
+            .. await ProblemsAsync(PersistenceExtensions.DatabaseKey, database, cancellationToken),
             .. PersistenceExtensions.MessagingConnectionOf(configuration) is { Key: var key, ConnectionString: var messaging } && key != PersistenceExtensions.DatabaseKey
                 ? await ProblemsAsync(key, messaging, cancellationToken)
                 : [],
+            .. await MigrationProblemsAsync(database, cancellationToken),
         ];
 
         if (problems.Length > 0)
@@ -59,6 +73,18 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHost
         }
 
         return [.. problems];
+    }
+
+    private async Task<string[]> MigrationProblemsAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await using var command = dataSource.CreateCommand(MissingSchemasQuery);
+        command.Parameters.AddWithValue("schemas", (string[])[.. modules.Select(module => module.Schema), MessageStorage.Schema]);
+        var missing = (string)(await command.ExecuteScalarAsync(cancellationToken))!;
+
+        return missing.Length == 0
+            ? []
+            : [$"the database is not migrated, it has no schema {missing}: run `dotnet Api.dll {MigrationStep.Command}` first"];
     }
 
     private static async Task<string[]> ProblemsAsync(string key, string connectionString, CancellationToken cancellationToken)
