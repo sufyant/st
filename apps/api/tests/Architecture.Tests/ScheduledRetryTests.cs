@@ -4,17 +4,18 @@ using Wolverine.Runtime.Handlers;
 
 namespace Architecture.Tests;
 
-// W5: a worker hands an event with several handlers on to durable local queues, one for each handler (W4). A retry that Wolverine
-// schedules for such a handler waits among the shared store's scheduled inbox rows, which every node polls, a web host included, so
-// the handler could run in a web host. A retry inline, where the handler runs, stays in the worker. Read from Wolverine's own handler
-// graph of the composed application, with the failure policies every chain has and the ones it has of its own.
+// W5: a worker hands an event with several handlers on to durable local queues, one for each handler (W4), and a handler that
+// shares its event with a saga runs from a PostgreSQL queue of its own. A retry that Wolverine schedules for such a handler waits
+// among the shared store's scheduled inbox rows, which every node polls, a web host included, so the handler could run in a web
+// host. A retry inline, where the handler runs, stays in the worker. Read from Wolverine's own handler graph of the application
+// composed as a worker, with the failure policies every chain has and the ones it has of its own.
 public sealed class ScheduledRetryTests : IAsyncLifetime
 {
     private const string WhyNot =
         "A scheduled retry of a message with several handlers waits among the scheduled inbox rows every node polls, so the handler "
         + "could run in a web host (W5). Retry it inline, or give the message one handler.";
 
-    private readonly ComposedApplication _application = new();
+    private readonly ComposedApplication _application = new("worker");
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 

@@ -1,4 +1,6 @@
+using System.Reflection;
 using Api.Hosting;
+using Audit.Api;
 using JasperFx;
 using Npgsql;
 using Tenancy;
@@ -18,6 +20,11 @@ namespace Api.Messaging;
 // through the outbox, to a PostgreSQL queue in the same schema; the web host listens to nothing and runs no durability agent. A worker
 // sends every message to that queue too and listens to it, so whatever a handler sends on is handled by some worker. A host in the
 // role all hands its messages to its own durable local queues.
+//
+// Each handler of a message runs in its own transaction (W4). A worker hands a message with several handlers on to a durable local
+// queue for each, but Wolverine runs a saga at the endpoint its message arrives on and then hands the message on to no other handler.
+// So a handler that shares its message with a saga has a PostgreSQL queue of its own in the roles web and worker: every host sends
+// the message there too, and only a worker listens to it, running that handler alone.
 internal static class MessageStorage
 {
     public const string Schema = TenancyServiceCollectionExtensions.MessageSchema;
@@ -26,6 +33,11 @@ internal static class MessageStorage
 
     // How long an idle worker waits before it looks for new messages in the queue again.
     private static readonly TimeSpan QueuePollingInterval = TimeSpan.FromSeconds(1);
+
+    private static readonly string[] HandlerMethodNames = ["Handle", "HandleAsync", "Consume", "ConsumeAsync"];
+
+    // The handlers that share their message with a saga (W5).
+    private static readonly Type[] HandlersBesideASaga = [.. AuditModule.HandlersBesideASaga];
 
     public static void Configure(WolverineOptions options, NpgsqlDataSource dataSource, HostRole? role)
     {
@@ -37,11 +49,19 @@ internal static class MessageStorage
         {
             storage.EnableMessageTransport(transport => transport.TransportSchemaName(Schema));
             options.PublishAllMessages().ToPostgresqlQueue(Queue);
+            foreach (var handler in HandlersBesideASaga)
+            {
+                options.PublishMessage(MessageOf(handler)).ToPostgresqlQueue(QueueOf(handler));
+            }
         }
 
         if (role is HostRole.Worker)
         {
             options.ListenToPostgresqlQueue(Queue).PollingInterval(QueuePollingInterval);
+            foreach (var handler in HandlersBesideASaga)
+            {
+                options.ListenToPostgresqlQueue(QueueOf(handler)).PollingInterval(QueuePollingInterval).AddStickyHandler(handler);
+            }
         }
 
         if (role is HostRole.Web)
@@ -54,6 +74,14 @@ internal static class MessageStorage
             options.Services.AddSingleton<IAgentFamily>(services => services.GetRequiredService<IWolverineRuntime>().Stores);
         }
     }
+
+    private static string QueueOf(Type handler) => handler.Name.ToLowerInvariant();
+
+    // The message a handler class handles: the first parameter of its handler method, by Wolverine's naming.
+    private static Type MessageOf(Type handler) =>
+        handler.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Single(method => HandlerMethodNames.Contains(method.Name))
+            .GetParameters()[0].ParameterType;
 
     // Wolverine builds its store only inside a host. This one is never started: it creates or updates the schema as the owner, with the
     // configuration a worker uses, and lets the application role use the tables. The PostgreSQL transport adds its queue tables to the
