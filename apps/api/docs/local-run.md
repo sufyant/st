@@ -8,7 +8,8 @@ These steps take an empty machine to a created tenant and an accepted invitation
 - PostgreSQL 18 and `psql`.
 - An identity provider instance for development. It must serve OpenID Connect discovery (`/.well-known/openid-configuration` and its key set) over HTTPS with a certificate the machine trusts, and its Backend API. You need:
   - its issuer URL (`Authentication:Clerk:Issuer`), its Backend API URL and its secret key (`ControlPlane:Clerk:*`);
-  - a way to get a session token for a user. The token carries `sub`, `iss`, `exp` and `nbf`. A token for the system door also carries `fva` with a verified second factor (for example `[0,0]`).
+  - a way to get a session token for a user. The token carries `sub`, `sid`, `iss`, `exp` and `nbf`; a token without `sid`, such as a JWT template's token, is refused. A token for the system door also carries `fva` with a verified second factor (for example `[0,0]`).
+  - open sign-up with email verification at sign-up: the Owner signs up like any other user. The application calls the Backend API only to read a user's verified email addresses when they accept an invitation.
   - a user whose verified email address is the one you put in `ControlPlane:FirstSystemAdminEmail`. That user becomes the first system admin on their first request to `/v1/system/...` (section 6).
 
 ## 2. Database
@@ -46,7 +47,7 @@ ConnectionStrings__Migrations="Host=localhost;Port=5432;Database=app;Username=ap
 echo $?   # 0
 ```
 
-The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`).
+The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`). Run the step again after pulling a new version: it also creates the PostgreSQL queues the workers listen to, one shared queue and one for each handler that shares its event with a saga (W5).
 
 ## 5. Configure
 
@@ -64,13 +65,13 @@ ForwardedHeaders__KnownProxies__0=10.0.0.1
 ForwardedHeaders__KnownNetworks__0=10.0.0.0/8
 RateLimiting__PermitLimit=1000
 RateLimiting__Window=00:01:00
+RateLimiting__InvitationAccept__PermitLimit=10
+RateLimiting__InvitationAccept__Window=00:01:00
 Pipeline__SlowCommandThreshold=00:00:00.500
 ControlPlane__FirstSystemAdminEmail=<first system admin's email>
-ControlPlane__RegistrationTimeout=00:10:00
-ControlPlane__InvitationEmailTimeout=02:00:00
-ControlPlane__IdentityProviderRetryDelays__0=00:00:01
-ControlPlane__IdentityProviderRetryDelays__1=00:00:05
-ControlPlane__IdentityProviderRetryDelays__2=00:00:30
+ControlPlane__ActivationTimeout=00:10:00
+ControlPlane__InvitationEmailTimeout=02:00:00   # longer than the Notifications retry delays together
+ControlPlane__CancellationTimeout=00:10:00
 ControlPlane__Clerk__SecretKey=<Backend API secret key>
 ControlPlane__Clerk__BackendApiUrl=<Backend API URL, ending in />
 ControlPlane__Clerk__Timeout=00:00:10
@@ -136,7 +137,7 @@ Email to owner@acme.test is not sent in Development: You are invited to Acme
 https://app.localhost/invitations/accept?code=<tenantId>.<secret>
 ```
 
-If the owner has no account at the identity provider, the link is the provider's invitation link. It signs the owner up and then redirects to the accept URL with the same `code`.
+The link is always our accept link. The onboarding creates nothing at the identity provider: an owner without an account signs up there like any other user, with the invited email address verified, and then accepts.
 
 ## 8. Accept the invitation
 
