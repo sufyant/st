@@ -46,6 +46,29 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
             """)).ShouldBe(1);
     }
 
+    // T5: provider staff are not tenant members, even with the code and the invited email address verified.
+    [Fact]
+    public async Task AcceptInvitation_ASystemAdmin_IsRefusedAndJoinsNothing()
+    {
+        var staff = await _catalog.AddSystemAdminAsync();
+        var email = $"{Guid.NewGuid():N}@example.com";
+        _api.Identity.AddAccount(staff, email);
+        var slug = await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
+
+        var accepted = await AcceptAsync(staff, _api.Email.CodeSentTo(email));
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await CodeOfAsync(accepted)).ShouldBe("invitation.staff_cannot_join");
+        (await database.ScalarAsSuperuserAsync<long>(
+            $"""
+            SELECT count(*) FROM catalog.memberships JOIN catalog.tenants ON tenants.id = memberships.tenant_id
+            WHERE tenants.slug = '{slug}'
+            """)).ShouldBe(0);
+        (await database.ScalarAsSuperuserAsync<string>(
+            $"SELECT invitations.status FROM catalog.invitations JOIN catalog.tenants ON tenants.id = invitations.tenant_id WHERE tenants.slug = '{slug}'"))
+            .ShouldBe("Pending");
+    }
+
     // The secret travels in the accept link, inside the onboarding's messages (see the deviations list); the catalog keeps only its
     // hash.
     [Fact]
