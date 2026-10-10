@@ -74,7 +74,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
     [Fact]
     public async Task AcceptInvitation_EmailNotVerified_ChangesNoRowAndSendsNoMessage()
     {
-        var (tenantId, secret) = await InviteAsync(Email());
+        var (tenantId, secret) = await InviteOwnerAsync(Email());
         var user = $"user_{Guid.NewGuid():N}";
 
         var (result, session) = await InvokeForTenantAsync<Result<TenantSummary>>(
@@ -90,7 +90,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
     public async Task AcceptInvitation_AlreadyAMember_ChangesNoRowAndSendsNoMessage()
     {
         var email = Email();
-        var (tenantId, secret) = await InviteAsync(email);
+        var (tenantId, secret) = await InviteOwnerAsync(email);
         var member = await _catalog.AddMemberAsync(tenantId);
 
         var (result, session) = await InvokeForTenantAsync<Result<TenantSummary>>(
@@ -143,7 +143,7 @@ public sealed class RejectionTests(Database database) : IAsyncLifetime
     }
 
     // A tenant onboarded the way a system admin does it, with its first owner's invitation delivered; returns the invitation's secret.
-    private async Task<(Guid TenantId, string Secret)> InviteAsync(string ownerEmail)
+    private async Task<(Guid TenantId, string Secret)> InviteOwnerAsync(string ownerEmail)
     {
         _api.Identity.AddAccount($"user_{Guid.NewGuid():N}", ownerEmail);
         var slug = Slug();

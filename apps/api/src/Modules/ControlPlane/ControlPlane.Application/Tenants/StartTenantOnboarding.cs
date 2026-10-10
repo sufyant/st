@@ -37,11 +37,11 @@ public sealed class StartTenantOnboardingValidator : AbstractValidator<StartTena
 
 // Step 1 of the onboarding saga, in one transaction: the tenant as provisioning, its first owner's invitation, the saga's record
 // (section 6) and the request under its idempotency key (section 8). The invitation's secret is born here; only its hash is stored,
-// and the accept link that carries it goes on in the first step's message. Every rejection returns before the handler changes
+// and the accept link that carries it goes on in the activation's message. Every rejection returns before the handler changes
 // anything, because Wolverine commits a failed Result too (W7); a taken slug is found by the insert itself, which writes nothing then.
 public static class StartTenantOnboardingHandler
 {
-    public static async Task<(Result<TenantDetails>, Insert<TenantOnboarding>?, DeliveryMessage<RegisterOwnerWithIdentityProvider>?, RegistrationTimedOut?)> HandleAsync(
+    public static async Task<(Result<TenantDetails>, Insert<TenantOnboarding>?, DeliveryMessage<ActivateTenant>?, ActivationTimedOut?)> HandleAsync(
         StartTenantOnboarding command,
         ITenantCatalog catalog,
         InvitationSettings invitations,
@@ -78,10 +78,9 @@ public static class StartTenantOnboardingHandler
             Guid.CreateVersion7(now), tenant.Value.Id, command.OwnerEmail, BuiltInRoles.Owner, admin.Id, now, invitations.Lifetime, secret);
         catalog.Add(invitation);
 
-        var (saga, register, timeout) = TenantOnboarding.Begin(
+        var (saga, activate, timeout) = TenantOnboarding.Begin(
             tenant.Value.Id,
             invitation.Id,
-            invitation.Email,
             invitations.AcceptLink(new InvitationCode(tenant.Value.Id, secret)),
             onboarding.Timeouts);
 
@@ -90,7 +89,7 @@ public static class StartTenantOnboardingHandler
         return (
             Details(tenant.Value),
             Storage.Insert(saga),
-            register.WithDeliveryOptions(new DeliveryOptions { SagaId = saga.Id.ToString() }),
+            activate.WithDeliveryOptions(new DeliveryOptions { SagaId = saga.Id.ToString() }),
             timeout);
     }
 

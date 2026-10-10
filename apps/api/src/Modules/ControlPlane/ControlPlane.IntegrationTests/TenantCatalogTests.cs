@@ -62,8 +62,8 @@ public sealed class TenantCatalogTests(Database database)
     public async Task FindInvitationByHash_OfAnotherTenant_FindsNothing()
     {
         var email = Unique.Email();
-        await Handlers.OnboardAsync(database.Services, email);
-        var tokenHash = InvitationToken.Hash(Handlers.SecretOf(Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink)));
+        var (_, _, ready) = await Handlers.OnboardAsync(database.Services, email);
+        var tokenHash = InvitationToken.Hash(Handlers.SecretOf(Handlers.CodeOf(ready.Link)));
         var tenant = await Catalog.AddTenantAsync(database.Services);
 
         var found = await InTenant.ReadAsync(database.Services, tenant.Id, scope =>

@@ -183,7 +183,7 @@ public sealed class TenantOnboardingTests(Database database)
 
         cancelled.ShouldBeNull();
         (await StatusOfAsync(tenantId)).ShouldBe("Active");
-        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBeNull();
+        (await ScalarAsync<bool>($"SELECT cancellation_reason IS NULL FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBeTrue();
         (await ScalarAsync<string>($"SELECT status FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe("Pending");
     }
 

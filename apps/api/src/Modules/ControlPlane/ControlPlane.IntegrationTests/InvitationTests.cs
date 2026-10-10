@@ -12,7 +12,7 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task AcceptInvitation_NewUser_CreatesTheUserAndTheMembershipWithTheInvitedRole()
     {
-        var (tenantId, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteOwnerAsync();
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
 
@@ -34,7 +34,7 @@ public sealed class InvitationTests(Database database)
         var other = await Catalog.AddTenantAsync(database.Services);
         var invitee = await Catalog.AddUserAsync(database.Services);
         await Catalog.AddMemberAsync(database.Services, other, invitee);
-        var (tenantId, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteOwnerAsync();
         database.Identity.AddAccount(invitee.ExternalId, email);
 
         await Handlers.AcceptAsync(database.Services, code, invitee.ExternalId);
@@ -46,7 +46,7 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task AcceptInvitation_Rejected_LeavesNoUserBehind()
     {
-        var (_, _, code) = await InviteAsync();
+        var (_, _, code) = await InviteOwnerAsync();
         var stranger = Unique.ExternalId();
         database.Identity.AddAccount(stranger, Unique.Email());
 
@@ -59,7 +59,7 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task AcceptInvitation_CodeUsedTwice_IsRejected()
     {
-        var (tenantId, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteOwnerAsync();
         var first = Unique.ExternalId();
         var second = Unique.ExternalId();
         database.Identity.AddAccount(first, email);
@@ -77,7 +77,7 @@ public sealed class InvitationTests(Database database)
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero));
         await using var services = database.BuildServices(services => services.Replace(ServiceDescriptor.Singleton<TimeProvider>(time)));
-        var (tenantId, email, code) = await InviteAsync(services);
+        var (tenantId, email, code) = await InviteOwnerAsync(services);
         var invitee = Unique.ExternalId();
         database.Identity.AddAccount(invitee, email);
         time.Advance(TimeSpan.FromDays(7));
@@ -92,7 +92,7 @@ public sealed class InvitationTests(Database database)
     [Fact]
     public async Task AcceptInvitation_Cancelled_IsNotFound()
     {
-        var (tenantId, email, code) = await InviteAsync();
+        var (tenantId, email, code) = await InviteOwnerAsync();
         var invitationId = await ScalarAsync<Guid>($"SELECT id FROM catalog.invitations WHERE tenant_id = '{tenantId}'");
         await Handlers.CancelInvitationAsync(database.Services, tenantId, new CancelInvitation(tenantId, invitationId));
         var invitee = Unique.ExternalId();
@@ -105,7 +105,7 @@ public sealed class InvitationTests(Database database)
     }
 
     // The first owner is invited the way onboarding does it: the email carries our accept link.
-    private async Task<(Guid TenantId, string Email, string Code)> InviteAsync(IServiceProvider? services = null)
+    private async Task<(Guid TenantId, string Email, string Code)> InviteOwnerAsync(IServiceProvider? services = null)
     {
         var email = Unique.Email();
         var (tenantId, _, ready) = await Handlers.OnboardAsync(services ?? database.Services, email);

@@ -25,7 +25,7 @@ public sealed class InvitationDeliveryTests(Database database)
         await using var api = Api(Environments.Development);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
+        var response = await api.WaitingForMessagesAsync(() => InviteOwnerAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record => record.Message.Contains(email, StringComparison.Ordinal));
@@ -38,7 +38,7 @@ public sealed class InvitationDeliveryTests(Database database)
         await using var api = Api(Environments.Production, resend, Resend);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
+        var response = await api.WaitingForMessagesAsync(() => InviteOwnerAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var invitationId = await database.ScalarAsSuperuserAsync<Guid>($"SELECT id FROM catalog.invitations WHERE email = '{email}'");
@@ -76,7 +76,7 @@ public sealed class InvitationDeliveryTests(Database database)
         api.Email.FailNext(2);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var messages = await api.TrackMessagesAsync(() => InviteAsync(api, email));
+        var messages = await api.TrackMessagesAsync(() => InviteOwnerAsync(api, email));
 
         var attempts = messages.ExecutionStarted.RecordsInOrder()
             .Where(record => record.Message is OwnerInvitationReady)
@@ -109,8 +109,8 @@ public sealed class InvitationDeliveryTests(Database database)
         var messages = await api.TrackMessagesAsync(
             async () =>
             {
-                await InviteAsync(api, refused);
-                await InviteAsync(api, next);
+                await InviteOwnerAsync(api, refused);
+                await InviteOwnerAsync(api, next);
             },
             until: new SentAndRescheduled(sent: next, rescheduled: refused));
 
@@ -160,7 +160,7 @@ public sealed class InvitationDeliveryTests(Database database)
         });
 
     // Onboarding a tenant invites its first owner.
-    private async Task<HttpResponseMessage> InviteAsync(ApiFactory api, string email)
+    private async Task<HttpResponseMessage> InviteOwnerAsync(ApiFactory api, string email)
     {
         var admin = await _catalog.AddSystemAdminAsync();
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];
