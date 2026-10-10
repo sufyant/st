@@ -31,9 +31,11 @@ internal static partial class Solution
     // The project files themselves, as the solution file lists them.
     private static Dictionary<string, string> ProjectFiles { get; } = ReadProjectFilesFromSolution();
 
+    // The modules of the projects the host ships and of the solution file: a module project that nothing references is still
+    // checked, and fails the rules it cannot meet.
     public static IReadOnlyList<string> Modules { get; } =
     [
-        .. ProjectNames
+        .. ProjectNames.Concat(ProjectFiles.Keys)
             .Select(name => ModuleProjectName().Match(name))
             .Where(match => match.Success)
             .Select(match => match.Groups["module"].Value)

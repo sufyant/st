@@ -17,6 +17,17 @@ public class ModuleStructureTests
         templateModules.ShouldBeSubsetOf(Solution.Modules);
     }
 
+    // A module project that nothing references is still a module, so the rules check it too (section 2).
+    [Fact]
+    public void FindModules_InTheSolutionFile_IncludesEveryModuleItLists()
+    {
+        var listed = Solution.SolutionProjects
+            .Where(project => Solution.Layers.Any(layer => project.EndsWith($".{layer}", StringComparison.Ordinal)))
+            .Select(project => project[..project.IndexOf('.', StringComparison.Ordinal)]);
+
+        listed.ShouldBeSubsetOf(Solution.Modules);
+    }
+
     [Theory]
     [MemberData(nameof(Modules))]
     public void ShipModule_AnyModule_HasAllFiveProjects(string module)
