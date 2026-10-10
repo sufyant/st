@@ -62,6 +62,25 @@ public sealed class MigrationStepTests(Database database)
         await migrate.ShouldThrowAsync<InvalidOperationException>();
     }
 
+    // Section 1: each module owns its schema, so no foreign key points from one schema to another.
+    [Fact]
+    public async Task Migrate_EmptyDatabase_AddsNoForeignKeyAcrossSchemas()
+    {
+        var migrated = await database.CreateMigratedDatabaseAsync();
+
+        var crossing = await database.ScalarAsSuperuserAsync<string>(
+            """
+            SELECT coalesce(string_agg(format('%s: %s -> %s', key.conname, key.conrelid::regclass, key.confrelid::regclass), ', '), '')
+            FROM pg_constraint AS key
+            JOIN pg_class AS source ON source.oid = key.conrelid
+            JOIN pg_class AS target ON target.oid = key.confrelid
+            WHERE key.contype = 'f' AND source.relnamespace <> target.relnamespace
+            """,
+            migrated);
+
+        crossing.ShouldBeEmpty();
+    }
+
     private Task<string?> OwnerOfAsync(string schema, string table, string databaseName) =>
         database.ScalarAsync<string>(
             $"SELECT tableowner FROM pg_tables WHERE schemaname = '{schema}' AND tablename = '{table}'", database: databaseName);
