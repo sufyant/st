@@ -288,6 +288,8 @@ Only email goes into the first template. Hangfire, SignalR and cache code do not
 
 Three helper tools are in scope. The OpenAPI document and Scalar are on only in the development environment. OpenTelemetry sends logs, metrics and traces over OTLP. The target address comes from configuration. If there is no address, no data is sent. A test checks the trace id rule: the id on the request is the same in the handler of the event that the request caused.
 
+The build writes the OpenAPI document to openapi/v1.json, and the file is committed. A change to the API then shows in the pull request. A frontend client can be generated from it later.
+
 ### Configuration
 
 1. Each module has its own configuration section. A module does not read another module's configuration.
