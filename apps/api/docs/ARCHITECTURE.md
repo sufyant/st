@@ -17,8 +17,10 @@ The purpose is a multi-tenant SaaS starter template. Every future product is bui
 3. There is no billing.
 4. There are no commercially licensed packages: MediatR, AutoMapper, MassTransit v9+, FluentAssertions.
 5. The architecture controls the tool. The tool does not control the architecture. If a tool does not fit the structure, the tool goes or the deviation is approved openly.
-6. The template is platform independent. Provider detail (example: Neon) does not go into the architecture. It goes into the setup notes.
+6. The template is platform independent. Provider detail (example: the database provider) does not go into the architecture. It goes into the setup notes.
 7. Infrastructure without a use does not go in. A part is added only if it catches a failure that no other control catches.
+
+Setup notes for providers are in docs/setup.md.
 
 ### Scope of the first template
 
@@ -182,7 +184,7 @@ The tenant id is in the API path. The id in the path does not give access. Verif
 | T3 | If there is no membership, the response is 404 | OWASP API Top 10, API1 |
 | T4 | `GET /v1/me/tenants` runs without a tenant | Industry practice |
 | T5 | Provider staff are not tenant members. Their door is the `/v1/system/...` path | Golding, Chapter 2 |
-| T6 | The token carries only the user identity. No tenant, role or permission comes from Clerk | Fixed requirement: Clerk is authentication only |
+| T6 | The token carries only the user identity. No tenant, role or permission comes from the identity provider | Fixed requirement: the identity provider is authentication only |
 | T7 | Membership is verified on each request in one place. No tenant endpoint can go around this filter | OWASP API Top 10, API1 |
 
 A tenant has two descriptive fields. `name` is free text, cannot be empty, has a maximum of 100 characters and does not have to be unique. `slug` is unique and is given when the tenant is created. `GET /v1/me/tenants` returns both. The path, authorization and isolation use only the id.
@@ -219,7 +221,7 @@ The code checks permissions, not roles. Provider staff enter through a separate 
 | A5 | Each endpoint carries one of three explicit states: public, signed-in only, requires a permission. An endpoint without a state breaks the architecture test. Each endpoint on the tenant path requires a permission | OWASP API Top 10, API5 |
 | A6 | The system door requires a second factor. The rule is in ControlPlane. The host only translates the identity provider's field into a neutral value. Tenant users are not affected | OWASP ASVS, item 4.3.1 |
 
-Tenant users and staff sign in with the same Clerk instance. Our tables decide which door a person can use. Terms: "system admin" (Golding), "built-in roles" and "custom roles".
+Tenant users and staff sign in with the same identity provider instance. Our tables decide which door a person can use. Terms: "system admin" (Golding), "built-in roles" and "custom roles".
 
 ## 6. Modules and onboarding
 
@@ -355,7 +357,7 @@ These deviations were discussed openly and approved.
 
 | Deviation | The way in the books | Reason |
 | --- | --- | --- |
-| The tenant is in the API path, not in the token | Golding, Chapter 6: the tenant comes in the token | Clerk stays authentication only. A cancelled membership takes effect immediately. The Azure guidance accepts this way |
+| The tenant is in the API path, not in the token | Golding, Chapter 6: the tenant comes in the token | The identity provider stays authentication only. A cancelled membership takes effect immediately. The Azure guidance accepts this way |
 | The isolation unit is a schema, not a database | Richardson: a database for each service | The rule is for microservices. It is adapted to a monolith. The change back is cheap |
 | There is one shared outbox | Richardson, Chapter 3: the outbox is in the service's own database | An outbox row is a delivery record, not business data |
 | Each module is five projects | Khononov, Chapter 10 and Fowler, PoEAA Chapter 2: a simple structure for a simple module | One pattern was requested. The cost is some nearly empty projects |
@@ -380,7 +382,6 @@ These parts are not in the first template. Each one comes in when its written co
 | Slug in addresses | The frontend wants the tenant name in the address. The slug field is ready. The API path continues to use the id |
 | Read model | A report appears that needs a join across modules |
 | Pre-generated handler code | Startup time becomes a problem or the RuntimeCompilation package is not wanted in production. Try it first |
-| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. `ConnectionStrings:Messaging` is needed when `ConnectionStrings:Database` goes through a pooler in transaction mode (example: Neon's pooled endpoint), because Wolverine's message store holds session-level advisory locks; it then names a direct or session-mode connection. In Clerk, sign-up is open and email verification at sign-up is required; the Owner signs up like any user. ControlPlane:InvitationEmailTimeout must be longer than the Notifications retry delays together. These go into the setup list, not into the architecture |
 | Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
 ## Open items
