@@ -24,6 +24,22 @@ public sealed class MigrationStepTests(Database database)
         (await database.ScalarAsync<bool>(MessageStorageExists, database: empty)).ShouldBeFalse();
     }
 
+    // After a deploy that brings a new migration, every schema is there but a module misses its migration. The application stops at
+    // once, names the module and says to run the migration step, rather than fail later on the missing change.
+    [Fact]
+    public async Task StartApplication_OnADatabaseMissingAModulesLastMigration_FailsNamingTheModuleAndSayingToMigrate()
+    {
+        var behind = await database.CreateDatabaseWithoutTheLastCatalogMigrationAsync();
+        await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, behind));
+
+        var start = () => api.CreateClient();
+
+        var message = start.ShouldThrow<InvalidOperationException>().Message;
+        message.ShouldContain("ControlPlane");
+        message.ShouldNotContain("Audit");
+        message.ShouldContain("run `dotnet Api.dll migrate`");
+    }
+
     [Fact]
     public async Task Migrate_EmptyDatabase_CreatesEveryModuleAndTheMessageStorageAsTheOwner()
     {
