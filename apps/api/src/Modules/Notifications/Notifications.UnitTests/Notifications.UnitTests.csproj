@@ -18,7 +18,7 @@
   <ItemGroup>
     <AssemblyAttribute Include="Xunit.TraitAttribute">
       <_Parameter1>TestClassification</_Parameter1>
-      <_Parameter2>Integration</_Parameter2>
+      <_Parameter2>Unit</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 

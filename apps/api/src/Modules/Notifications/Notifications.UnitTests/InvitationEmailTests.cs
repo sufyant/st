@@ -4,7 +4,7 @@ using ControlPlane.Contracts;
 using Notifications.Contracts;
 using Microsoft.Extensions.Time.Testing;
 
-namespace Notifications.IntegrationTests;
+namespace Notifications.UnitTests;
 
 // The Notifications module sends the invitation email when ControlPlane announces that a tenant's first owner can be invited.
 public sealed class InvitationEmailTests

@@ -26,7 +26,7 @@
     <Project Path="src/Modules/Notifications/Notifications.Contracts/Notifications.Contracts.csproj" />
     <Project Path="src/Modules/Notifications/Notifications.Domain/Notifications.Domain.csproj" />
     <Project Path="src/Modules/Notifications/Notifications.Infrastructure/Notifications.Infrastructure.csproj" />
-    <Project Path="src/Modules/Notifications/Notifications.IntegrationTests/Notifications.IntegrationTests.csproj" />
+    <Project Path="src/Modules/Notifications/Notifications.UnitTests/Notifications.UnitTests.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/SharedKernel/SharedKernel.csproj" />

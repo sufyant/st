@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Notifications.IntegrationTests" />
+    <InternalsVisibleTo Include="Notifications.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

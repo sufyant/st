@@ -8,7 +8,7 @@ using Notifications.Application;
 using Notifications.Application.Ports;
 using Notifications.Infrastructure;
 
-namespace Notifications.IntegrationTests;
+namespace Notifications.UnitTests;
 
 // Resend is a system we do not own; these tests pin down the requests the email channel makes.
 public sealed class ResendEmailChannelTests : IDisposable
