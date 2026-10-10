@@ -7,7 +7,9 @@ using Microsoft.IdentityModel.Tokens;
 namespace Api.Authentication;
 
 // Clerk only authenticates. Its session tokens are JWTs signed with keys published by the instance's Frontend API, which
-// is also their issuer. They carry no audience; the authorized party (azp) is checked instead, as Clerk recommends.
+// is also their issuer. They carry no audience; the authorized party (azp) is checked instead, as Clerk recommends. A JWT template
+// token is signed with the same keys and issuer, but it cannot carry the session's id (sid), which every session token carries, so
+// a token without one is refused (API2).
 internal static class ClerkAuthentication
 {
     public const string Section = "Authentication:Clerk";
@@ -32,6 +34,9 @@ internal static class ClerkAuthentication
             .Configure<IOptions<ClerkAuthenticationOptions>>((options, clerk) =>
             {
                 options.Authority = clerk.Value.Issuer;
+
+                // API8: a 401 does not say why the token failed.
+                options.IncludeErrorDetails = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = clerk.Value.Issuer,
@@ -53,7 +58,7 @@ internal static class ClerkAuthentication
 
     private static Task CheckClerkClaimsAsync(TokenValidatedContext context)
     {
-        if (context.SecurityToken is not JsonWebToken token)
+        if (context.SecurityToken is not JsonWebToken token || !token.TryGetPayloadValue<string>("sid", out var session) || string.IsNullOrEmpty(session))
         {
             context.Fail("Not a Clerk session token.");
             return Task.CompletedTask;
