@@ -129,7 +129,7 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 | W2 | The module's DbContext reads the tenant from the message context. An EF Core transaction interceptor runs `set_config('app.tenant_id', ..., true)` when the transaction starts | R4, R5 | T1, T2, T5, T6 |
 | W3 | A tenant endpoint uses `InvokeForTenantAsync`. The tenant goes to the following messages automatically. A message without a tenant carries the value `*DEFAULT*`. The interceptor does not treat this value as a tenant | Requirement 7, R5 | T3, T6 |
 | W4 | `MultipleHandlerBehavior.Separated` is on | O3 | T8 |
-| W5 | Messages wait in durable queues, and the message store is in the shared `wolverine` schema. In the role `all`, a message goes to a durable local queue (`UseDurableLocalQueues`). In the roles `web` and `worker`, every message goes through the outbox to one PostgreSQL queue in the same schema (Wolverine's PostgreSQL transport). Only a worker listens to that queue, and it hands an event with several handlers on to durable local queues, one for each handler (W4). Wolverine runs a saga at the queue its event arrives on and hands that event on to no other handler, so a handler that shares its event with a saga has a PostgreSQL queue of its own in the same schema: every host sends the event there too, and only a worker listens to it. A web host runs no durability agent (`DurabilityAgentEnabled = false`): outbox and inbox recovery run in a worker | O1, O5, Requirement 5, section 1 | T3, `HostRoleTests` |
+| W5 | Messages wait in durable queues, and the message store is in the shared `wolverine` schema. In the role `all`, a message goes to a durable local queue (`UseDurableLocalQueues`). In the roles `web` and `worker`, every message goes through the outbox to one PostgreSQL queue in the same schema (Wolverine's PostgreSQL transport). Only a worker listens to that queue, and it hands an event with several handlers on to durable local queues, one for each handler (W4). A web host runs no durability agent (`DurabilityAgentEnabled = false`): outbox and inbox recovery run in a worker | O1, O5, Requirement 5, section 1 | T3, `HostRoleTests` |
 | W6 | A saga derives from Wolverine's `Saga` class. Its record is stored with EF Core in the module's own schema. The `Version` property is mapped as a concurrency token. There is a retry policy for `SagaConcurrencyException` | S3, S8 | T7, T9 |
 | W7 | A business rule rejection returns before any data changes: in a `Validate` or `Before` method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
 | W8 | The transaction middleware is first in the Wolverine chain. Validation runs inside the transaction. Authorization runs before, in ASP.NET Core | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
@@ -152,6 +152,7 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 | S10 | Each wait has a timeout | Nygard, Chapter 5 (Timeouts) |
 | S11 | Until the pivot, the tenant shows the "provisioning" state | Richardson, Chapter 4 (semantic lock) |
 | S12 | The saga class is unit tested without a host. The saga does not call external services. It only decides and returns messages | Khorikov, Chapter 7 |
+| S13 | A saga shares no message with another handler. It hears its steps through replies and faults sent to it, not through events meant for other modules. A test enforces it | Richardson, Chapter 4 (command and reply). Wolverine runs a saga alone at the endpoint its message arrives on |
 
 "Tenant is provisioning" and "tenant is active" are the tenant's own business state and stay in its status. Step tracking and retry counts are not put in the status. They stay in the saga record.
 
@@ -249,7 +250,8 @@ Onboarding messages:
 | `StartTenantOnboarding` | `POST /v1/system/tenants` | ControlPlane, `StartTenantOnboardingHandler` (step 1, starts the saga) | Yes |
 | `ActivateTenant` | Step 1 | ControlPlane, `ActivateTenantHandler` (step 2, pivot) | Yes |
 | `ActivationTimedOut` | Step 1, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
-| `TenantActivated` | Step 2 | Audit, `RecordTenantCreatedHandler`; ControlPlane, `TenantOnboarding` saga | Yes, each its own |
+| `TenantActivated` | Step 2 | Audit, `RecordTenantCreatedHandler` | Yes |
+| `TenantActivationCompleted` | Step 2 | ControlPlane, `TenantOnboarding` saga | Yes |
 | `OwnerInvitationReady` | Step 2 | Notifications, `SendOwnerInvitationHandler` (step 3, calls the email service) | No |
 | `InvitationEmailTimedOut` | Saga, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
 | `InvitationEmailSent` | Step 3 | ControlPlane, `TenantOnboarding` saga | Yes |

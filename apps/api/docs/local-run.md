@@ -47,7 +47,7 @@ ConnectionStrings__Migrations="Host=localhost;Port=5432;Database=app;Username=ap
 echo $?   # 0
 ```
 
-The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`). Run the step again after pulling a new version: it also creates the PostgreSQL queues the workers listen to, one shared queue and one for each handler that shares its event with a saga (W5).
+The application does not start on a database that was not migrated (`relation "wolverine.wolverine_nodes" does not exist`).
 
 ## 5. Configure
 
