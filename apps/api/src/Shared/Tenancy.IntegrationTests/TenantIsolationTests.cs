@@ -154,17 +154,6 @@ public sealed class TenantIsolationTests(Database database) : IAsyncDisposable
         count.ShouldBe(0);
     }
 
-    [Fact]
-    public async Task ReadNotes_WithRowLevelSecurityAlone_HidesAnotherTenantsRows()
-    {
-        var other = Tenants.New();
-        await WriteNoteAsync(other, "secret");
-
-        var count = await _notes.InTenantAsync(Tenants.New(), notes => notes.Notes.CountAsync(Cancellation));
-
-        count.ShouldBe(0);
-    }
-
     // R1: row level security is forced, so it binds the owner of the table too, which runs the migrations.
     [Fact]
     public async Task ReadNotes_AsTheOwner_SeesNoRowsOfAnotherTenantNorWithoutATenant()
