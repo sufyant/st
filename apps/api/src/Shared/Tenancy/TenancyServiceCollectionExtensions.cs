@@ -10,6 +10,8 @@ public static class TenancyServiceCollectionExtensions
     /// <summary>The shared schema of Wolverine's message store (W5), whose envelope tables a module DbContext writes its messages to.</summary>
     public const string MessageSchema = "wolverine";
 
+    private const string MigrationsHistoryTable = "__ef_migrations_history";
+
     /// <summary>The host's part: the data source every module DbContext uses.</summary>
     public static IServiceCollection AddTenancy(this IServiceCollection services, Func<IServiceProvider, string> pooledConnectionString) =>
         services.AddSingleton(provider => NpgsqlDataSource.Create(pooledConnectionString(provider)));
@@ -54,20 +56,38 @@ public static class TenancyServiceCollectionExtensions
             .ReplaceService<IMigrationsSqlGenerator, TenantMigrationsSqlGenerator>();
 
     private static Action<Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.NpgsqlDbContextOptionsBuilder> Configure(string schema) =>
-        npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", schema);
+        npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, schema);
 
     private sealed class ModuleMigrator<TContext>(string schema) : IModuleMigrator
         where TContext : DbContext
     {
         public Type DbContextType => typeof(TContext);
 
-        public async Task MigrateAsync(IServiceProvider services, string connectionString, CancellationToken cancellationToken)
+        public string Schema => schema;
+
+        public async Task<IReadOnlyList<string>> MigrateAsync(IServiceProvider services, string connectionString, CancellationToken cancellationToken)
         {
             await using var scope = services.CreateAsyncScope();
             await using var context = ActivatorUtilities.CreateInstance<TContext>(
                 scope.ServiceProvider, ModuleDbContextOptions<TContext>(schema, connectionString));
 
+            var pending = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
             await context.Database.MigrateAsync(cancellationToken);
+
+            // EF Core creates the history table before the first migration runs, so no privilege a migration grants reaches it. The
+            // application role reads it on start, to stop when a migration is missing. The names are the module's own constants.
+            var grant = $"GRANT SELECT ON {schema}.{MigrationsHistoryTable} TO {DatabaseRoles.Application}";
+            await context.Database.ExecuteSqlRawAsync(grant, cancellationToken);
+            return pending;
+        }
+
+        public async Task<IReadOnlyList<string>> PendingMigrationsAsync(IServiceProvider services, string connectionString, CancellationToken cancellationToken)
+        {
+            await using var scope = services.CreateAsyncScope();
+            await using var context = ActivatorUtilities.CreateInstance<TContext>(
+                scope.ServiceProvider, ModuleDbContextOptions<TContext>(schema, connectionString));
+
+            return [.. await context.Database.GetPendingMigrationsAsync(cancellationToken)];
         }
     }
 }

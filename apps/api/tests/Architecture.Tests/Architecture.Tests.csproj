@@ -21,7 +21,7 @@
     <ProjectReference Include="..\..\src\Modules\Audit\Audit.IntegrationTests\Audit.IntegrationTests.csproj" />
     <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.IntegrationTests\ControlPlane.IntegrationTests.csproj" />
     <ProjectReference Include="..\..\src\Modules\ControlPlane\ControlPlane.UnitTests\ControlPlane.UnitTests.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Notifications\Notifications.IntegrationTests\Notifications.IntegrationTests.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Notifications.UnitTests\Notifications.UnitTests.csproj" />
     <ProjectReference Include="..\..\src\Shared\SharedKernel.UnitTests\SharedKernel.UnitTests.csproj" />
     <ProjectReference Include="..\..\src\Shared\Tenancy.IntegrationTests\Tenancy.IntegrationTests.csproj" />
     <ProjectReference Include="..\Api.IntegrationTests\Api.IntegrationTests.csproj" />

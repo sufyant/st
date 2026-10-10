@@ -17,6 +17,9 @@ public sealed class InvitationDeliveryTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
+    // Milliseconds: the resolution of the timer Wolverine waits a retry's pause with.
+    private const long TimerResolution = 1;
+
     private readonly Catalog _catalog = new(database);
 
     [Fact]
@@ -61,7 +64,8 @@ public sealed class InvitationDeliveryTests(Database database)
         start.ShouldThrow<Exception>().Message.ShouldContain("Notifications:Resend:ApiKey");
     }
 
-    // The email service may be down for a while: a failed email is tried again, each time after a longer pause.
+    // The email service may be down for a while: a failed email is tried again, each time after a longer pause. Wolverine waits each
+    // pause with a timer that counts whole milliseconds, so a pause can end up to one millisecond early on the test's stopwatch.
     [Fact]
     public async Task SendInvitation_TheEmailServiceRecovers_IsTriedAgainAfterGrowingPauses()
     {
@@ -83,8 +87,8 @@ public sealed class InvitationDeliveryTests(Database database)
             .Select(record => record.SessionTime)
             .ToArray();
         attempts.Length.ShouldBe(3);
-        (attempts[1] - attempts[0]).ShouldBeGreaterThanOrEqualTo(100);
-        (attempts[2] - attempts[1]).ShouldBeGreaterThanOrEqualTo(200);
+        (attempts[1] - attempts[0]).ShouldBeGreaterThanOrEqualTo(100 - TimerResolution);
+        (attempts[2] - attempts[1]).ShouldBeGreaterThanOrEqualTo(200 - TimerResolution);
         api.Email.Sent.ShouldHaveSingleItem().To.ShouldBe(email);
     }
 

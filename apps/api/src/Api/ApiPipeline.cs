@@ -64,10 +64,6 @@ internal static class ApiPipeline
         // handler would answer 500 (OWASP API8).
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 
-        builder.Services.AddOptions<PipelineOptions>()
-            .BindConfiguration(PipelineOptions.Section)
-            .Validate(options => options.SlowCommandThreshold > TimeSpan.Zero, "Pipeline:SlowCommandThreshold must be positive.")
-            .ValidateOnStart();
         builder.Services.AddWolverine(options =>
         {
             foreach (var assembly in handlerAssemblies)
@@ -100,7 +96,9 @@ internal static class ApiPipeline
             options.MultipleHandlerBehavior = MultipleHandlerBehavior.Separated;
 
             options.UseFluentValidation();
-            options.Policies.AddMiddleware(typeof(CommandDurationMiddleware));
+
+            // Each process logs every message it handled, at Information (Wolverine's default is Debug).
+            options.Policies.MessageSuccessLogLevel(LogLevel.Information);
         });
 
         // API8: only the configured browser origins may call, with the methods and headers the API uses, and without credentials

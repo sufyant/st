@@ -3,6 +3,7 @@ using Audit.Infrastructure;
 using ControlPlane.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +62,20 @@ public sealed class Database : IAsyncLifetime
     {
         var name = await CreateEmptyDatabaseAsync();
         await MigrateAsync(name);
+        return name;
+    }
+
+    // A database set up the way a deployment is, then with the catalog's last migration undone: the state after a deploy that brings
+    // a new migration, before its migration step has run.
+    public async Task<string> CreateDatabaseWithoutTheLastCatalogMigrationAsync()
+    {
+        var name = await CreateMigratedDatabaseAsync();
+        await using var catalog = new CatalogDbContext(
+            TenancyServiceCollectionExtensions.ModuleDbContextOptions<CatalogDbContext>(
+                CatalogDbContext.Schema, ConnectionStringFor(DatabaseRoles.Owner, name)));
+        var migrations = catalog.Database.GetMigrations().ToList();
+        await catalog.GetService<IMigrator>().MigrateAsync(migrations[^2]);
+
         return name;
     }
 
@@ -221,6 +236,7 @@ public sealed class Database : IAsyncLifetime
     private async Task MigrateAsync(string database)
     {
         await using var services = new ServiceCollection()
+            .AddLogging()
             .AddTenancy(_ => ConnectionStringFor(DatabaseRoles.Application, database))
             .AddControlPlaneInfrastructure()
             .AddNotificationsInfrastructure()

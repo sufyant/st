@@ -10,19 +10,34 @@ public sealed class MigrationStepTests(Database database)
     private const string CatalogExists = "SELECT to_regclass('catalog.tenants') IS NOT NULL";
     private const string MessageStorageExists = "SELECT to_regclass('wolverine.wolverine_incoming_envelopes') IS NOT NULL";
 
-    // Wolverine checks its message storage while it starts, so an application whose database was not migrated does not start,
-    // and it creates nothing on the way.
+    // An application whose database was not migrated stops at once, says to run the migration step, and creates nothing on the way.
     [Fact]
-    public async Task StartApplication_OnADatabaseNotMigrated_FailsAndMigratesNothing()
+    public async Task StartApplication_OnADatabaseNotMigrated_FailsSayingToMigrateAndMigratesNothing()
     {
         var empty = await database.CreateEmptyDatabaseAsync();
         await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, empty));
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<AggregateException>().Message.ShouldContain("message storage");
+        start.ShouldThrow<InvalidOperationException>().Message.ShouldContain("run `dotnet Api.dll migrate`");
         (await database.ScalarAsync<bool>(CatalogExists, database: empty)).ShouldBeFalse();
         (await database.ScalarAsync<bool>(MessageStorageExists, database: empty)).ShouldBeFalse();
+    }
+
+    // After a deploy that brings a new migration, every schema is there but a module misses its migration. The application stops at
+    // once, names the module and says to run the migration step, rather than fail later on the missing change.
+    [Fact]
+    public async Task StartApplication_OnADatabaseMissingAModulesLastMigration_FailsNamingTheModuleAndSayingToMigrate()
+    {
+        var behind = await database.CreateDatabaseWithoutTheLastCatalogMigrationAsync();
+        await using var api = new ApiFactory(database.ConnectionStringFor(DatabaseRoles.Application, behind));
+
+        var start = () => api.CreateClient();
+
+        var message = start.ShouldThrow<InvalidOperationException>().Message;
+        message.ShouldContain("ControlPlane");
+        message.ShouldNotContain("Audit");
+        message.ShouldContain("run `dotnet Api.dll migrate`");
     }
 
     [Fact]
@@ -37,6 +52,23 @@ public sealed class MigrationStepTests(Database database)
         (await OwnerOfAsync("wolverine", "wolverine_incoming_envelopes", empty)).ShouldBe(DatabaseRoles.Owner);
         (await OwnerOfAsync("wolverine", "wolverine_queue_messages", empty)).ShouldBe(DatabaseRoles.Owner);
         (await OwnerOfAsync("wolverine", "wolverine_queue_messages_scheduled", empty)).ShouldBe(DatabaseRoles.Owner);
+    }
+
+    // The step says what it migrated, one line for each module, and that it finished. Run again, it applies nothing new.
+    [Fact]
+    public async Task Migrate_EmptyDatabaseTwice_LogsEachModuleAndThatItFinished()
+    {
+        var owner = database.ConnectionStringFor(DatabaseRoles.Owner, await database.CreateEmptyDatabaseAsync());
+
+        var first = await MigrateCommand.RunAsync(owner);
+        var again = await MigrateCommand.RunAsync(owner);
+
+        first.ExitCode.ShouldBe(0, first.Output);
+        first.Output.ShouldContain("Migrated the catalog schema:");
+        first.Output.ShouldContain("Migrated the audit schema:");
+        first.Output.ShouldContain("Migration finished: the schemas catalog, audit and the message storage in wolverine are up to date");
+        again.Output.ShouldContain("Migrated the catalog schema: 0 migrations applied");
+        again.Output.ShouldContain("Migrated the audit schema: 0 migrations applied");
     }
 
     // The application role owns nothing the migration step creates, yet it can use all of it, the message storage included.
@@ -60,6 +92,25 @@ public sealed class MigrationStepTests(Database database)
         var migrate = () => MigrationStep.RunAsync(api.Services, TestContext.Current.CancellationToken);
 
         await migrate.ShouldThrowAsync<InvalidOperationException>();
+    }
+
+    // Section 1: each module owns its schema, so no foreign key points from one schema to another.
+    [Fact]
+    public async Task Migrate_EmptyDatabase_AddsNoForeignKeyAcrossSchemas()
+    {
+        var migrated = await database.CreateMigratedDatabaseAsync();
+
+        var crossing = await database.ScalarAsSuperuserAsync<string>(
+            """
+            SELECT coalesce(string_agg(format('%s: %s -> %s', key.conname, key.conrelid::regclass, key.confrelid::regclass), ', '), '')
+            FROM pg_constraint AS key
+            JOIN pg_class AS source ON source.oid = key.conrelid
+            JOIN pg_class AS target ON target.oid = key.confrelid
+            WHERE key.contype = 'f' AND source.relnamespace <> target.relnamespace
+            """,
+            migrated);
+
+        crossing.ShouldBeEmpty();
     }
 
     private Task<string?> OwnerOfAsync(string schema, string table, string databaseName) =>

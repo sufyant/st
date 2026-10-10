@@ -28,6 +28,22 @@ public class ContractsShapeTests
         domainTypesShown.ShouldBeEmpty();
     }
 
+    // Section 2: another module reaches a contract only through its interface. The class behind it is internal sealed, in the
+    // Infrastructure project of the module that publishes the contract.
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void ImplementContract_InInfrastructure_IsInternalSealed(string module)
+    {
+        var contracts = Solution.LayerOfEveryModule("Contracts").ToHashSet();
+
+        var exposed = Solution.Load($"{module}.Infrastructure").GetTypes()
+            .Where(type => type.IsClass && type.GetInterfaces().Any(contract => contracts.Contains(contract.Assembly.GetName().Name!)))
+            .Where(type => !(type.IsNotPublic || type.IsNestedAssembly) || !type.IsSealed)
+            .Select(type => type.FullName);
+
+        exposed.ShouldBeEmpty();
+    }
+
     // The compiler gives a record class a clone method no source can name, and a record struct its member printer.
     private static bool IsRecord(Type type) =>
         type.GetMethod("<Clone>$") is not null || (type.IsValueType && type.GetMethod("PrintMembers", Declared) is not null);

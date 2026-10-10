@@ -1,13 +1,13 @@
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
-namespace Notifications.IntegrationTests;
+namespace Notifications.UnitTests;
 
 internal sealed class TestEnvironment(string name) : IHostEnvironment
 {
     public string EnvironmentName { get; set; } = name;
 
-    public string ApplicationName { get; set; } = "Notifications.IntegrationTests";
+    public string ApplicationName { get; set; } = "Notifications.UnitTests";
 
     public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
 

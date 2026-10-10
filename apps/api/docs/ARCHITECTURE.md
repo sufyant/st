@@ -1,6 +1,6 @@
 # Architecture: multi-tenant SaaS starter template (API)
 
-Last updated: 2026-10-07
+Last updated: 2026-10-10
 
 This document is the single source of truth for the API in `apps/api/`. If the code does not agree with this document, the code changes. No other file overrides it.
 
@@ -17,8 +17,10 @@ The purpose is a multi-tenant SaaS starter template. Every future product is bui
 3. There is no billing.
 4. There are no commercially licensed packages: MediatR, AutoMapper, MassTransit v9+, FluentAssertions.
 5. The architecture controls the tool. The tool does not control the architecture. If a tool does not fit the structure, the tool goes or the deviation is approved openly.
-6. The template is platform independent. Provider detail (example: Neon) does not go into the architecture. It goes into the setup notes.
+6. The template is platform independent. Provider detail (example: the database provider) does not go into the architecture. It goes into the setup notes.
 7. Infrastructure without a use does not go in. A part is added only if it catches a failure that no other control catches.
+
+Setup notes for providers are in docs/setup.md.
 
 ### Scope of the first template
 
@@ -28,8 +30,8 @@ The first template runs one flow from start to end: tenant creation.
 | --- | --- |
 | `POST /v1/system/tenants` | The work itself |
 | The first system admin comes from configuration | The first person who creates a tenant cannot get on the staff list in another way |
-| Tenant onboarding process (saga, four steps) | The approved flow |
-| One handler that sends the invitation email (Notifications) | Step four of the process |
+| Tenant onboarding process (saga, three steps) | The approved flow |
+| One handler that sends the invitation email (Notifications) | Step three of the process |
 | One handler that writes the "tenant created" record (Audit) | The only use of the Audit module |
 | The endpoint that accepts an invitation | Without it, the first Owner cannot exist |
 | `GET /v1/me/tenants` | The user sees their tenants after sign-in |
@@ -39,14 +41,14 @@ Out of scope: member invitation by an Owner, custom roles and role assignment, m
 
 ## 1. The big picture
 
-The system is one code base and one build output. This output runs as two process types: web and worker.
+The system is one code base and one build output. This output runs as two process types: web and worker. A third role, all, runs both in one process, for local development and tests.
 
 | Decision | Source |
 | --- | --- |
 | The system is one deployment unit. The code is divided by business area | Richards and Ford, FSA 2nd ed., Chapter 11 |
 | Each module is a bounded context | Evans, Chapter 14. Khononov, Chapter 3 |
 | One artifact, two process types. Web serves HTTP requests. Worker runs background work. A setting selects the role | Twelve-Factor, Factor VIII. Nygard, Chapter 5 (Bulkheads) |
-| One PostgreSQL schema for each module. No foreign keys and no joins across modules | Evans, Chapter 14. Richardson, "Database per Service" (adapted to a monolith) |
+| Each module that stores data has its own PostgreSQL schema. No foreign keys and no joins across modules | Evans, Chapter 14. Richardson, "Database per Service" (adapted to a monolith) |
 | The host contains no business rule. It only connects the modules | Industry practice (composition root) |
 
 In Kubernetes this is two Deployments and one image. The requirement is a separate process, not a separate machine.
@@ -57,17 +59,19 @@ Each module is five projects. Another module sees only the `Contracts` project.
 
 | Project | Content | Depends on |
 | --- | --- | --- |
-| `X.Contracts` | Interfaces, DTOs, event types. No domain types | Nothing |
-| `X.Api` | HTTP endpoints | Application, Contracts |
-| `X.Application` | Use case handlers, contract implementations, sagas | Domain, Contracts |
-| `X.Domain` | Business rules | Nothing |
-| `X.Infrastructure` | EF Core, adapters for external services | Application, Domain |
+| `X.Contracts` | Interfaces, DTOs, event types. No domain types | `SharedKernel` |
+| `X.Api` | HTTP endpoints | Application, Contracts, `SharedKernel` |
+| `X.Application` | Use case handlers, sagas | Domain, Contracts, other modules' Contracts, `SharedKernel` |
+| `X.Domain` | Business rules | `SharedKernel` |
+| `X.Infrastructure` | EF Core, adapters for external services, contract implementations | Application, Domain, Contracts, `SharedKernel`, `Tenancy` |
+
+`SharedKernel` holds the result and error types, paging and the marker of a tenant entity; `Tenancy` holds the base of a module DbContext, the tenant declaration at the start of each transaction, row level security in migrations and the names of the database roles.
 
 - Two controls enforce the boundary: project references (compilation) and architecture tests. Source: Ford, Parsons, Kua, Chapter 2.
 - The `Api` project cannot reach the `DbContext`. Source: Evans, Chapter 4.
 - A read across modules is a plain method call. The interface is in `A.Contracts`. Its implementation is an `internal sealed` class inside A. Source: Gamma et al., Chapter 4 (Facade). Evans, Chapter 14 (Open Host Service).
 - The shared kernel stays small and carries no business concept. Source: Evans, Chapter 14.
-- Test projects are next to their module. System-wide tests (architecture, end to end) stay in the top `tests` folder.
+- Test projects are next to their module. Tests of the host and system-wide tests (architecture, end to end) stay in the top tests folder.
 
 ## 3. Messaging
 
@@ -105,7 +109,7 @@ Wolverine is the dispatcher. An endpoint sends a command or a query through `IMe
 
 | Order | Command chain | Query chain |
 | --- | --- | --- |
-| 1 | HTTP: authentication, tenant membership, rate limit, authorization (ASP.NET Core) | HTTP: authentication, tenant membership, rate limit, authorization (ASP.NET Core) |
+| 1 | HTTP: authentication, rate limit, tenant membership, authorization (ASP.NET Core) | HTTP: authentication, rate limit, tenant membership, authorization (ASP.NET Core) |
 | 2 | Logging and tracing | Logging and tracing |
 | 3 | The transaction opens, the tenant is declared | The transaction opens, the tenant is declared |
 | 4 | Input validation | Input validation |
@@ -115,7 +119,7 @@ Wolverine is the dispatcher. An endpoint sends a command or a query through `IMe
 Authorization runs once, in ASP.NET Core, before the endpoint sends the message. A refused request opens no transaction. A message from a queue has no caller and is not authorized again.
 
 - Wolverine opens and closes the transaction. We set the rule: each handler runs in its own transaction.
-- A handler that calls an external service uses no DbContext, so no transaction is open during the call. It returns its result as a message. Source: Nygard, Chapter 5 (Integration Points).
+- A handler that calls an external service uses no DbContext, so no transaction is open during the call. It returns its result as a message, or nothing. A step that returns nothing is heard by the saga only when it fails, through its fault. Source: Nygard, Chapter 5 (Integration Points).
 - A domain event is handled inside the module and in the same transaction. An integration event leaves the module through the outbox. Source: Vernon, Chapter 8.
 - HTTP endpoints are plain ASP.NET minimal APIs. The tool's own endpoint model (Wolverine.Http) is not used.
 
@@ -125,13 +129,13 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 
 | # | Rule | Reason | Evidence |
 | --- | --- | --- | --- |
-| W1 | Wolverine's EF Core middleware opens and closes the transaction. There is no hand-written transaction code | The saga record, the business data and the outgoing message go into one transaction (O1, S6) | T3, T4 |
+| W1 | Wolverine's EF Core middleware opens and closes the transaction. There is no hand-written transaction code. One exception: TenantDirectory opens a short transaction of its own in the HTTP pipeline, before any message is sent, to read the membership. | The saga record, the business data and the outgoing message go into one transaction (O1, S6) | T3, T4 |
 | W2 | The module's DbContext reads the tenant from the message context. An EF Core transaction interceptor runs `set_config('app.tenant_id', ..., true)` when the transaction starts | R4, R5 | T1, T2, T5, T6 |
-| W3 | A tenant endpoint uses `InvokeForTenantAsync`. The tenant goes to the following messages automatically. A message without a tenant carries the value `*DEFAULT*`. The interceptor does not treat this value as a tenant | Requirement 7, R5 | T3, T6 |
+| W3 | An endpoint on the tenant path relies on the tenant middleware, which sets the tenant on the message bus, and uses `InvokeAsync`. An endpoint that chooses the tenant itself uses `InvokeForTenantAsync`: accepting an invitation takes the tenant from the code, and creating a tenant uses the id the server chose. The tenant goes to the following messages automatically. A message without a tenant carries the value `*DEFAULT*`. The interceptor does not treat this value as a tenant | Requirement 7, R5 | T3, T6 |
 | W4 | `MultipleHandlerBehavior.Separated` is on | O3 | T8 |
 | W5 | Messages wait in durable queues, and the message store is in the shared `wolverine` schema. In the role `all`, a message goes to a durable local queue (`UseDurableLocalQueues`). In the roles `web` and `worker`, every message goes through the outbox to one PostgreSQL queue in the same schema (Wolverine's PostgreSQL transport). Only a worker listens to that queue, and it hands an event with several handlers on to durable local queues, one for each handler (W4). A web host runs no durability agent (`DurabilityAgentEnabled = false`): outbox and inbox recovery run in a worker | O1, O5, Requirement 5, section 1 | T3, `HostRoleTests` |
 | W6 | A saga derives from Wolverine's `Saga` class. Its record is stored with EF Core in the module's own schema. The `Version` property is mapped as a concurrency token. There is a retry policy for `SagaConcurrencyException` | S3, S8 | T7, T9 |
-| W7 | A business rule rejection returns before any data changes: in a `Validate` or `Before` method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
+| W7 | A business rule rejection returns before any data changes, at the start of the handler or in a Validate or Before method. A failure after a change is an exception | Wolverine also commits a handler that returns a failed `Result` | T10a, T10b |
 | W8 | The transaction middleware is first in the Wolverine chain. Validation runs inside the transaction. Authorization runs before, in ASP.NET Core | This is Wolverine's behaviour. A rejected request opens an empty transaction and writes no data | Generated handler code |
 | W9 | Handler, saga, message and DbContext types are `public` | Wolverine compiles handler code in a separate assembly | Compile errors CS0051 and CS0122 |
 | W10 | The `WolverineFx.RuntimeCompilation` package is necessary | Handler code is generated at startup. Pre-generated code was not tried | The host did not start without the package |
@@ -178,11 +182,11 @@ The tenant id is in the API path. The id in the path does not give access. Verif
 | # | Rule | Source |
 | --- | --- | --- |
 | T1 | The path is `/v1/tenants/{tenantId}/...`. The value is the id, not the slug. The slug is not used in the path | Azure Architecture Center, "Map requests to tenants". Google AIP-122 |
-| T2 | The tenant id is not read from the body, the query string or a header. Commands have no tenant field. A handler gets the tenant from the tenant context | Golding, Chapter 7 |
+| T2 | The tenant id is not read from the body, the query string or a header. A handler gets the tenant from the message envelope. A saga's messages may carry the tenant id to find the saga; data access still uses the envelope's tenant | Golding, Chapter 7 |
 | T3 | If there is no membership, the response is 404 | OWASP API Top 10, API1 |
 | T4 | `GET /v1/me/tenants` runs without a tenant | Industry practice |
 | T5 | Provider staff are not tenant members. Their door is the `/v1/system/...` path | Golding, Chapter 2 |
-| T6 | The token carries only the user identity. No tenant, role or permission comes from Clerk | Fixed requirement: Clerk is authentication only |
+| T6 | The token carries only the user identity. No tenant, role or permission comes from the identity provider | Fixed requirement: the identity provider is authentication only |
 | T7 | Membership is verified on each request in one place. No tenant endpoint can go around this filter | OWASP API Top 10, API1 |
 
 A tenant has two descriptive fields. `name` is free text, cannot be empty, has a maximum of 100 characters and does not have to be unique. `slug` is unique and is given when the tenant is created. `GET /v1/me/tenants` returns both. The path, authorization and isolation use only the id.
@@ -193,10 +197,10 @@ A tenant has two descriptive fields. `name` is free text, cannot be empty, has a
 | --- | --- | --- |
 | R1 | Each table that belongs to a tenant has `tenant_id`. RLS is enabled and forced | Golding, Chapters 8 and 9 |
 | R2 | The application account is not the table owner and cannot bypass RLS | Golding, Chapter 9. OWASP (least privilege) |
-| R3 | Migrations run with a separate account. That account is not used at run time | Twelve-Factor, Factor XII |
+| R3 | Migrations run with a separate account. That account is not used at run time. The application does not start while a module misses a migration, and to check it the application account may read each module's migration history table | Twelve-Factor, Factor XII |
 | R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted. A transaction declares a tenant or a user, never both. A transaction declares one tenant only. | PostgreSQL connection pool behaviour |
 | R5 | If the tenant is not declared, a query returns no data | Nygard, Chapter 5 (Fail Fast) |
-| R6 | Tables without a tenant are on an explicit list. A test checks every table | Ford, Parsons, Kua, Chapter 2 |
+| R6 | Tables without a tenant are on an explicit list. A test checks every table. The wolverine schema and the migration history tables are exempt by pattern. The wolverine tables hold message bodies, invitation links included, and are not under RLS (see Deviations). | Ford, Parsons, Kua, Chapter 2 |
 | R7 | There are only two database accounts: migration and application. Running code has no path that bypasses RLS | Golding, Chapter 9 |
 | R8 | A background handler gets the tenant from the message and declares it in the same way | Requirement 7 |
 | R9 | Each tenant table is tested with real PostgreSQL: read, update, insert for another tenant | Khorikov, Chapter 10 |
@@ -219,7 +223,7 @@ The code checks permissions, not roles. Provider staff enter through a separate 
 | A5 | Each endpoint carries one of three explicit states: public, signed-in only, requires a permission. An endpoint without a state breaks the architecture test. Each endpoint on the tenant path requires a permission | OWASP API Top 10, API5 |
 | A6 | The system door requires a second factor. The rule is in ControlPlane. The host only translates the identity provider's field into a neutral value. Tenant users are not affected | OWASP ASVS, item 4.3.1 |
 
-Tenant users and staff sign in with the same Clerk instance. Our tables decide which door a person can use. Terms: "system admin" (Golding), "built-in roles" and "custom roles".
+Tenant users and staff sign in with the same identity provider instance. Our tables decide which door a person can use. Terms: "system admin" (Golding), "built-in roles" and "custom roles".
 
 ## 6. Modules and onboarding
 
@@ -265,7 +269,7 @@ Onboarding messages:
 - If step 2 fails for good, the tenant is cancelled. A reason code is stored on the tenant and logged. No endpoint shows it yet: the tenant list for the system admin is deferred.
 - If step 3 fails for good, or a wait after step 1 times out, the process goes to "needs attention" and the invitation is cancelled. The alarm is raised once.
 - The invitation link travels to Notifications inside the message. See the deviations list.
-- The invitation link carries one invitation code: the tenant id and a secret, `<tenantId>.<secret>`. Only the hash of the secret is stored. Accepting declares the tenant from the code, then finds the invitation by the hash in that tenant. A wrong tenant, a wrong secret and a malformed code all answer 404. This is the only place where a request names its tenant outside the path. The secret gives the right, not the tenant id.
+- The invitation link carries one invitation code: the tenant id and a secret, `<tenantId>.<secret>`. Only the hash of the secret is stored. Accepting declares the tenant from the code, then finds the invitation by the hash in that tenant. A missing or empty code answers 400. A wrong tenant, a wrong secret and a malformed code all answer 404. This is the only place where a request names its tenant outside the path. The secret gives the right, not the tenant id.
 - Accepting an invitation needs two things: the secret in the code, and a verified email address of the signed-in user that is the same as the invited address. The verified addresses come from the identity provider's server, not from the request.
 - The email handler is in `Notifications.Application`. The event type is in `ControlPlane.Contracts`. ControlPlane does not know how to send email.
 - Invitation expiry is checked when the invitation is read. There is no nightly job.
@@ -283,6 +287,8 @@ Only email goes into the first template. Hangfire, SignalR and cache code do not
 - The messaging tool's own dispatcher runs the outbox. A scheduler is not used for this.
 
 Three helper tools are in scope. The OpenAPI document and Scalar are on only in the development environment. OpenTelemetry sends logs, metrics and traces over OTLP. The target address comes from configuration. If there is no address, no data is sent. A test checks the trace id rule: the id on the request is the same in the handler of the event that the request caused.
+
+The build writes the OpenAPI document to openapi/v1.json, and the file is committed. A change to the API then shows in the pull request. A frontend client can be generated from it later.
 
 ### Configuration
 
@@ -334,18 +340,20 @@ The test is written first. Tests run with real PostgreSQL. We do not fake our ow
 1. The end-to-end test is written first. Source: Freeman and Pryce, GOOS Chapters 4 and 5.
 2. Real PostgreSQL runs in a container. An in-memory fake database is not used. Source: Khorikov, Chapter 10.
 3. Tests connect with the application account. Migrations run with the separate account. If not, RLS tests have no meaning.
-4. Only external services are faked: the identity service and email. A fake is a hand-written implementation of our interface. Source: Khorikov, Chapter 9.
+4. Only external services are faked: the identity service and email. A fake is a hand-written implementation of our interface. Source: Khorikov, Chapter 9. Time is faked with FakeTimeProvider. Tokens in tests are signed with a test key the host is given.
 5. Each test creates its own tenant.
 
 Unit test standard:
 
-- Each test kind is in its own project (`.UnitTests`, `.IntegrationTests`).
+- Each test kind is in its own project: .UnitTests, .IntegrationTests, .EndToEndTests, and .Tests for architecture tests.
 - Each project carries a `TestClassification` trait.
 - The structure is Arrange, Act, Assert.
 - A test has no `if` and no loop.
 - The name pattern is `Operation_Scenario_ExpectedOutcome`. `Operation` is the name of the work, not the method name. Example: `ActivateTenant_WhenCancelled_IsRejected`.
 
-An architecture test enforces the trait, the name pattern and the rule against branches and loops.
+An architecture test enforces the trait, the name pattern and the rule against branches and loops. The branch check does not see loops written with LINQ. Use a theory for several cases.
+
+Module integration tests call a handler with the module's DbContext on real PostgreSQL, inside a transaction the test opens. The Wolverine pipeline is tested in Api.IntegrationTests. The spike in apps/api/spikes is outside the test standard.
 
 The order for a fix is: first a red test that checks the rule, then the fix.
 
@@ -355,9 +363,9 @@ These deviations were discussed openly and approved.
 
 | Deviation | The way in the books | Reason |
 | --- | --- | --- |
-| The tenant is in the API path, not in the token | Golding, Chapter 6: the tenant comes in the token | Clerk stays authentication only. A cancelled membership takes effect immediately. The Azure guidance accepts this way |
+| The tenant is in the API path, not in the token | Golding, Chapter 6: the tenant comes in the token | The identity provider stays authentication only. A cancelled membership takes effect immediately. The Azure guidance accepts this way |
 | The isolation unit is a schema, not a database | Richardson: a database for each service | The rule is for microservices. It is adapted to a monolith. The change back is cheap |
-| There is one shared outbox | Richardson, Chapter 3: the outbox is in the service's own database | An outbox row is a delivery record, not business data |
+| There is one shared outbox | Richardson, Chapter 3: the outbox is in the service's own database | An outbox row is a delivery record, not business data. The wolverine tables are not under RLS. They hold message bodies, invitation links included, until Wolverine removes handled messages. |
 | Each module is five projects | Khononov, Chapter 10 and Fowler, PoEAA Chapter 2: a simple structure for a simple module | One pattern was requested. The cost is some nearly empty projects |
 | The test name pattern is `Operation_Scenario_ExpectedOutcome` | Khorikov, Chapter 3: a plain sentence | Common in .NET. `Operation` is the name of the work |
 | The `Api` and `Application` projects see Wolverine types | Khononov, Chapter 8 (Ports and Adapters): business logic does not see the infrastructure tool, a port is between them | The only reason for our own interface was "what if the tool changes". There is no concrete limitation. `Domain` and `Contracts` stay clean |
@@ -380,7 +388,8 @@ These parts are not in the first template. Each one comes in when its written co
 | Slug in addresses | The frontend wants the tenant name in the address. The slug field is ready. The API path continues to use the id |
 | Read model | A report appears that needs a join across modules |
 | Pre-generated handler code | Startup time becomes a problem or the RuntimeCompilation package is not wanted in production. Try it first |
-| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. `ConnectionStrings:Messaging` is needed when `ConnectionStrings:Database` goes through a pooler in transaction mode (example: Neon's pooled endpoint), because Wolverine's message store holds session-level advisory locks; it then names a direct or session-mode connection. In Clerk, sign-up is open and email verification at sign-up is required; the Owner signs up like any user. ControlPlane:InvitationEmailTimeout must be longer than the Notifications retry delays together. These go into the setup list, not into the architecture |
 | Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
 ## Open items
+
+None.

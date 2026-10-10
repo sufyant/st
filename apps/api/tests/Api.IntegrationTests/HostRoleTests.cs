@@ -130,6 +130,36 @@ public sealed class HostRoleTests(Database database)
         runs.In("web").ShouldBeEmpty();
     }
 
+    // Requirement 6 in the production layout: a message that always fails is moved aside to the dead letter queue, and the queue does
+    // not block. The messages sent after it are still handled.
+    [Fact]
+    public async Task SendMessages_FirstAlwaysFailsOnAWebAndAWorkerHost_IsDeadLetteredAndTheNextAreHandled()
+    {
+        var name = await database.CreateMigratedDatabaseAsync();
+        await database.CreateProbesAsync(name);
+        await using var web = ProbeHost(name, "web", new HandlerRuns());
+        await using var worker = ProbeHost(name, "worker", new HandlerRuns());
+        _ = worker.Services;
+        var tenant = new DeliveryOptions { TenantId = Guid.NewGuid().ToString() };
+        var first = $"first-{Guid.NewGuid():N}";
+        var second = $"second-{Guid.NewGuid():N}";
+
+        await using (var scope = web.Services.CreateAsyncScope())
+        {
+            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
+            await bus.SendAsync(new FailProbe(), tenant);
+            await bus.SendAsync(new ProbeAnnounced(first), tenant);
+            await bus.SendAsync(new ProbeAnnounced(second), tenant);
+        }
+
+        await Waiting.UntilAsync(async () => await DeadLettersOfAsync<FailProbe>(name) > 0);
+        await Waiting.UntilAsync(async () => await ProbesAsync(name, $"announced:{first}") + await ProbesAsync(name, $"announced:{second}") == 2);
+
+        (await DeadLettersOfAsync<FailProbe>(name)).ShouldBe(1L);
+        (await ProbesAsync(name, $"announced:{first}")).ShouldBe(1L);
+        (await ProbesAsync(name, $"announced:{second}")).ShouldBe(1L);
+    }
+
     // A worker serves no API: only the health endpoints answer.
     [Theory]
     [InlineData("/v1/me/tenants", HttpStatusCode.NotFound)]
@@ -149,7 +179,7 @@ public sealed class HostRoleTests(Database database)
         settings: new Dictionary<string, string?> { ["Host:Role"] = role },
         configureServices: HandlerRunsOfHost.Register(role, runs));
 
-    // A host with the probe module's DbContext and the two handlers of ProbePinged.
+    // A host with the probe module's DbContext, the two handlers of ProbePinged, and a handler that writes and one that always fails.
     private ApiFactory ProbeHost(string databaseName, string role, HandlerRuns runs) => new(
         database.ConnectionStringFor(DatabaseRoles.Application, databaseName),
         settings: new Dictionary<string, string?> { ["Host:Role"] = role },
@@ -163,6 +193,8 @@ public sealed class HostRoleTests(Database database)
             {
                 options.Discovery.IncludeType(typeof(RecordPingHandler));
                 options.Discovery.IncludeType(typeof(FailOnPingHandler));
+                options.Discovery.IncludeType(typeof(ProbeAnnouncedHandler));
+                options.Discovery.IncludeType(typeof(FailProbeHandler));
             });
         });
 

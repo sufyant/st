@@ -6,6 +6,14 @@ public class ModuleStructureTests
 {
     public static TheoryData<string> Modules => [.. Solution.Modules];
 
+    // A test project belongs to the module its name starts with.
+    public static TheoryData<string, string> ModuleTestProjects =>
+    [
+        .. Solution.TestProjects
+            .Select(project => (project, module: project[..project.IndexOf('.', StringComparison.Ordinal)]))
+            .Where(pair => Solution.Modules.Contains(pair.module)),
+    ];
+
     // The host is left out: no project can reference it without a cycle, and its top-level Program has no namespace.
     public static TheoryData<string> NamespacedProjects => [Solution.SharedKernel, Solution.Tenancy, .. Solution.ModuleProjects];
 
@@ -17,6 +25,17 @@ public class ModuleStructureTests
         templateModules.ShouldBeSubsetOf(Solution.Modules);
     }
 
+    // A module project that nothing references is still a module, so the rules check it too (section 2).
+    [Fact]
+    public void FindModules_InTheSolutionFile_IncludesEveryModuleItLists()
+    {
+        var listed = Solution.SolutionProjects
+            .Where(project => Solution.Layers.Any(layer => project.EndsWith($".{layer}", StringComparison.Ordinal)))
+            .Select(project => project[..project.IndexOf('.', StringComparison.Ordinal)]);
+
+        listed.ShouldBeSubsetOf(Solution.Modules);
+    }
+
     [Theory]
     [MemberData(nameof(Modules))]
     public void ShipModule_AnyModule_HasAllFiveProjects(string module)
@@ -24,6 +43,16 @@ public class ModuleStructureTests
         var missing = Solution.ProjectsOf(module).Where(project => !Solution.IsShipped(project));
 
         missing.ShouldBeEmpty();
+    }
+
+    // Section 2: a module's test projects sit in the module's folder, beside its five projects.
+    [Theory]
+    [MemberData(nameof(ModuleTestProjects))]
+    public void PlaceTestProject_OfAModule_SitsInTheModulesFolder(string project, string module)
+    {
+        var folder = Path.GetDirectoryName(Solution.FolderOf(project));
+
+        folder.ShouldBe(Path.GetDirectoryName(Solution.FolderOf($"{module}.Api")));
     }
 
     // Dependency rules match on namespaces, so a type outside its project's namespace would escape them.

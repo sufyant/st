@@ -1,5 +1,5 @@
 -- Creates the database roles. Runs before the migrations, as a role allowed to create roles: a superuser
--- locally, a member of neon_superuser on Neon. Safe to run again; a rerun sets the passwords given.
+-- locally; for a hosted database see docs/setup.md. Safe to run again; a rerun sets the passwords given.
 --
 --   psql "$DATABASE_URL" -v owner_password=... -v application_password=... -f bootstrap.sql
 

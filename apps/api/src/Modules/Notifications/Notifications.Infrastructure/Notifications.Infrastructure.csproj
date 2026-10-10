@@ -1,20 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Notifications.IntegrationTests" />
+    <InternalsVisibleTo Include="Notifications.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
-    <!-- The module's DbContext is registered with Wolverine's EF Core integration (W1). -->
     <PackageReference Include="WolverineFx" />
-    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +16,6 @@
     <ProjectReference Include="..\Notifications.Domain\Notifications.Domain.csproj" />
     <ProjectReference Include="..\Notifications.Contracts\Notifications.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\SharedKernel\SharedKernel.csproj" />
-    <ProjectReference Include="..\..\..\Shared\Tenancy\Tenancy.csproj" />
   </ItemGroup>
 
 </Project>
