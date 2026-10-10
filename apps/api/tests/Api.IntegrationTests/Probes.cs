@@ -172,6 +172,14 @@ public static class FailOnPingHandler
     }
 }
 
+// A command whose handler always fails, so it ends in the dead letter queue (requirement 6).
+public sealed record FailProbe;
+
+public static class FailProbeHandler
+{
+    public static void Handle(FailProbe command) => throw new InvalidOperationException("The handler always fails.");
+}
+
 internal static class TenantSetting
 {
     public static Task<string?> ReadAsync(ProbeDbContext probes, CancellationToken cancellationToken) =>
