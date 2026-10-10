@@ -197,7 +197,7 @@ A tenant has two descriptive fields. `name` is free text, cannot be empty, has a
 | --- | --- | --- |
 | R1 | Each table that belongs to a tenant has `tenant_id`. RLS is enabled and forced | Golding, Chapters 8 and 9 |
 | R2 | The application account is not the table owner and cannot bypass RLS | Golding, Chapter 9. OWASP (least privilege) |
-| R3 | Migrations run with a separate account. That account is not used at run time | Twelve-Factor, Factor XII |
+| R3 | Migrations run with a separate account. That account is not used at run time. The application does not start while a module misses a migration, and to check it the application account may read each module's migration history table | Twelve-Factor, Factor XII |
 | R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted. A transaction declares a tenant or a user, never both. A transaction declares one tenant only. | PostgreSQL connection pool behaviour |
 | R5 | If the tenant is not declared, a query returns no data | Nygard, Chapter 5 (Fail Fast) |
 | R6 | Tables without a tenant are on an explicit list. A test checks every table. The wolverine schema and the migration history tables are exempt by pattern. The wolverine tables hold message bodies, invitation links included, and are not under RLS (see Deviations). | Ford, Parsons, Kua, Chapter 2 |
