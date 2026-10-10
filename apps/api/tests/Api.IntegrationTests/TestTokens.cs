@@ -42,14 +42,22 @@ internal static class TestTokens
         string? authorizedParty = AuthorizedParty,
         TimeSpan? expiresIn = null,
         bool trusted = true,
-        IReadOnlyDictionary<string, object>? extraClaims = null)
+        IReadOnlyDictionary<string, object>? extraClaims = null,
+        bool sessionToken = true)
     {
         var now = DateTime.UtcNow;
         var expires = now + (expiresIn ?? TimeSpan.FromMinutes(5));
-        Dictionary<string, object> claims = new() { ["sid"] = "sess_test", ["v"] = 2, ["fva"] = new[] { 0, secondFactor ? 0 : -1 } };
+        Dictionary<string, object> claims = new() { ["fva"] = new[] { 0, secondFactor ? 0 : -1 } };
         if (authorizedParty is not null)
         {
             claims["azp"] = authorizedParty;
+        }
+
+        // The claims tied to a session, which Clerk puts only in session tokens, never in a JWT template's token.
+        if (sessionToken)
+        {
+            claims["sid"] = "sess_test";
+            claims["v"] = 2;
         }
 
         foreach (var (type, value) in extraClaims ?? new Dictionary<string, object>())
