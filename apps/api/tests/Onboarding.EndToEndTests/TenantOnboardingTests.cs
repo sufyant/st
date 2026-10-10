@@ -4,38 +4,48 @@ using System.Text.Json;
 
 namespace Onboarding.EndToEndTests;
 
-// The tracer bullet: the whole onboarding flow through HTTP against the composed application. The first system admin, named by
-// configuration, creates a tenant; its first owner gets the email, signs up with the identity provider like any other user, accepts
-// the invitation with the code from the email's link and sees the tenant; another user does not find it.
+// The tracer bullet: the whole onboarding flow through HTTP against the composed application, as it is deployed: one build output
+// running as a web host and a worker host on one database (section 1). The first system admin, named by configuration, creates a
+// tenant; its first owner gets the email, signs up with the identity provider like any other user, accepts the invitation with the
+// code from the email's link and sees the tenant; another user does not find it.
 public sealed class TenantOnboardingTests(Database database) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
-    private OnboardingApp _app = null!;
+    private readonly FakeIdentityProvider _identity = new();
+    private readonly FakeEmailChannel _email = new();
+    private OnboardingApp _web = null!;
+    private OnboardingApp _worker = null!;
 
     public ValueTask InitializeAsync()
     {
-        _app = new OnboardingApp(database);
+        _web = new OnboardingApp(database, "web", _identity, _email);
+        _worker = new OnboardingApp(database, "worker", _identity, _email);
+        _ = _worker.Services;
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync() => await _app.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _worker.DisposeAsync();
+        await _web.DisposeAsync();
+    }
 
     [Fact]
     public async Task OnboardTenant_FirstOwnerAccepts_OwnerSeesTheTenantAndAStrangerGetsNotFound()
     {
-        var admin = _app.ClientFor(Database.SystemAdmin, secondFactor: true);
-        var owner = _app.ClientFor("user_e2e_owner");
-        var stranger = _app.ClientFor("user_e2e_stranger");
+        var admin = _web.ClientFor(Database.SystemAdmin, secondFactor: true);
+        var owner = _web.ClientFor("user_e2e_owner");
+        var stranger = _web.ClientFor("user_e2e_stranger");
         const string slug = "acme";
         const string ownerEmail = "owner@acme.test";
-        _app.Identity.SignUp(Database.SystemAdmin, OnboardingApp.FirstSystemAdminEmail);
+        _identity.SignUp(Database.SystemAdmin, OnboardingApp.FirstSystemAdminEmail);
 
-        var created = await _app.WaitingForMessagesAsync(() =>
-            admin.SendAsync(CreateTenant(new { name = "Acme Ltd", slug, ownerEmail }), Cancellation));
+        var created = await admin.SendAsync(CreateTenant(new { name = "Acme Ltd", slug, ownerEmail }), Cancellation);
         var tenantId = (await created.Content.ReadFromJsonAsync<JsonElement>(Cancellation)).GetProperty("id").GetGuid();
-        var acceptLink = LinkIn(_app.Email.Sent.Single(sent => sent.To == ownerEmail).Text);
-        _app.Identity.SignUp("user_e2e_owner", ownerEmail);
+        await Waiting.UntilAsync(() => _email.Sent.Any(sent => sent.To == ownerEmail));
+        var acceptLink = LinkIn(_email.Sent.Single(sent => sent.To == ownerEmail).Text);
+        _identity.SignUp("user_e2e_owner", ownerEmail);
         var accepted = await owner.PostAsJsonAsync("/v1/invitations/accept", new { code = CodeOf(acceptLink) }, Cancellation);
         var myTenants = await owner.GetFromJsonAsync<JsonElement>("/v1/me/tenants", Cancellation);
         var members = await owner.GetFromJsonAsync<JsonElement>($"/v1/tenants/{tenantId}/members", Cancellation);
