@@ -41,13 +41,13 @@ public sealed class InvitationDeliveryTests(Database database)
         var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var invitationId = api.Identity.Invitations.Single(invitation => invitation.Email == email).InvitationId;
+        var invitationId = await database.ScalarAsSuperuserAsync<Guid>($"SELECT id FROM catalog.invitations WHERE email = '{email}'");
         var sent = resend.Requests.ShouldHaveSingleItem();
         sent.Uri.ShouldBe(new Uri("https://api.resend.test/emails"));
         sent.IdempotencyKey.ShouldBe($"invite/{invitationId}");
         var body = JsonDocument.Parse(sent.Body).RootElement;
         body.GetProperty("to").EnumerateArray().Single().GetString().ShouldBe(email);
-        body.GetProperty("text").GetString()!.ShouldContain($"https://clerk.test/invitations/{invitationId}");
+        body.GetProperty("text").GetString()!.ShouldContain($"{ApiFactory.AcceptUrl}?code=");
     }
 
     // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email does not start.

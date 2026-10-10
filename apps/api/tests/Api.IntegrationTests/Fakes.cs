@@ -6,39 +6,12 @@ using Notifications.Application.Ports;
 
 namespace Api.IntegrationTests;
 
-// Clerk, as far as the application uses it. A test can take it down, as a real outage would.
+// Clerk, as far as the application uses it.
 internal sealed class FakeIdentityProvider : IIdentityProvider
 {
     private readonly ConcurrentDictionary<string, string[]> _verifiedEmails = new();
 
-    public ConcurrentBag<(string Email, Guid InvitationId, Uri AcceptLink)> Invitations { get; } = [];
-
-    public ConcurrentBag<string> Revoked { get; } = [];
-
-    // While down, every call that onboarding makes fails.
-    public bool IsDown { get; set; }
-
     public void AddAccount(string externalUserId, params string[] verifiedEmails) => _verifiedEmails[externalUserId] = verifiedEmails;
-
-    public Task<bool> HasAccountAsync(string email, CancellationToken cancellationToken)
-    {
-        ThrowIfDown();
-        return Task.FromResult(_verifiedEmails.Values.Any(emails => emails.Contains(email, StringComparer.OrdinalIgnoreCase)));
-    }
-
-    public Task<IdentityProviderInvitation> InviteAsync(string email, Guid invitationId, Uri acceptLink, CancellationToken cancellationToken)
-    {
-        ThrowIfDown();
-        Invitations.Add((email, invitationId, acceptLink));
-        return Task.FromResult(new IdentityProviderInvitation($"inv_{invitationId:N}", new Uri($"https://clerk.test/invitations/{invitationId}")));
-    }
-
-    public Task RevokeInvitationAsync(string invitationId, CancellationToken cancellationToken)
-    {
-        ThrowIfDown();
-        Revoked.Add(invitationId);
-        return Task.CompletedTask;
-    }
 
     // Lets a test look at the database at the moment the application asks for a user's verified email addresses.
     public Func<Task>? WhileReadingVerifiedEmails { get; set; }
@@ -51,14 +24,6 @@ internal sealed class FakeIdentityProvider : IIdentityProvider
         }
 
         return _verifiedEmails.GetValueOrDefault(externalUserId, []);
-    }
-
-    private void ThrowIfDown()
-    {
-        if (IsDown)
-        {
-            throw new HttpRequestException("Clerk is down.");
-        }
     }
 }
 
@@ -97,7 +62,7 @@ internal sealed partial class FakeEmailChannel : IEmailChannel
 
     public Uri LinkSentTo(string email) => new(Link().Match(Sent.Single(sent => sent.To == email).Text).Value);
 
-    // The invitation code of the accept link sent to someone who already has an account.
+    // The invitation code of the accept link sent to the address.
     public string CodeSentTo(string email)
     {
         var link = LinkSentTo(email);

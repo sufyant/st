@@ -27,7 +27,7 @@ internal static class TenantTables
                 """),
         ["catalog.tenant_onboardings"] = new(
             ApplicationMayUpdate: true,
-            tenant => $"INSERT INTO catalog.tenant_onboardings (id, tenant_id, state, invitation_id, invitation_email_timeout, version) VALUES (gen_random_uuid(), '{tenant}', 'Registering', gen_random_uuid(), interval '2 hours', 0)"),
+            tenant => $"INSERT INTO catalog.tenant_onboardings (id, tenant_id, state, invitation_id, invitation_email_timeout, cancellation_timeout, version) VALUES (gen_random_uuid(), '{tenant}', 'Activating', gen_random_uuid(), interval '2 hours', interval '10 minutes', 0)"),
         ["probes.probes"] = new(
             ApplicationMayUpdate: true,
             tenant => $"INSERT INTO probes.probes (id, value, tenant_id) VALUES (gen_random_uuid(), 'isolation', '{tenant}')"),

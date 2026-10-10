@@ -18,8 +18,6 @@ public sealed class TraceIdTests(Database database)
     private static readonly string[] OnboardingHandlers =
     [
         typeof(StartTenantOnboarding).FullName!,
-        typeof(RegisterOwnerWithIdentityProvider).FullName!,
-        typeof(OwnerRegistered).FullName!,
         typeof(ActivateTenant).FullName!,
         typeof(TenantActivated).FullName!,
         typeof(OwnerInvitationReady).FullName!,

@@ -23,8 +23,6 @@ public sealed class HostRoleTests(Database database)
     // The handlers of every onboarding message after the first, as section 6 lists them: an event with two handlers runs both.
     private static readonly HandlerRun[] HandlersAfterTheFirstStep =
     [
-        new(typeof(RegisterOwnerWithIdentityProvider), typeof(RegisterOwnerWithIdentityProviderHandler)),
-        new(typeof(OwnerRegistered), typeof(TenantOnboarding)),
         new(typeof(ActivateTenant), typeof(ActivateTenantHandler)),
         new(typeof(TenantActivated), typeof(TenantOnboarding)),
         new(typeof(TenantActivated), typeof(RecordTenantCreatedHandler)),
@@ -70,7 +68,7 @@ public sealed class HostRoleTests(Database database)
             SELECT count(*) FROM (
                 SELECT message_type FROM wolverine.wolverine_queue_messages
                 UNION ALL SELECT message_type FROM wolverine.wolverine_outgoing_envelopes) AS waiting
-            WHERE message_type LIKE '%RegisterOwnerWithIdentityProvider'
+            WHERE message_type LIKE '%ActivateTenant'
             """,
             database: name);
 
@@ -78,7 +76,7 @@ public sealed class HostRoleTests(Database database)
         _ = worker.Services;
         await Waiting.UntilAsync(async () => await OnboardingStateAsync(name, tenantId) == "Completed");
 
-        waiting.ShouldBe("Registering");
+        waiting.ShouldBe("Activating");
         queued.ShouldBe(1L);
         runs.In("web").ShouldBe([FirstStep]);
         (await OnboardingStateAsync(name, tenantId)).ShouldBe("Completed");

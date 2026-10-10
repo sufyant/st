@@ -15,7 +15,7 @@ using Wolverine.Tracking;
 
 namespace Api.IntegrationTests;
 
-// The tenant onboarding saga through the system door and the real host: its four steps, its compensations, and what is left
+// The tenant onboarding saga through the system door and the real host: its three steps, its compensations, and what is left
 // for a person when the last step fails for good. Only Clerk and the email service are fakes.
 public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLifetime
 {
@@ -65,52 +65,28 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         (await database.ScalarAsSuperuserAsync<long>($"SELECT count(*) FROM catalog.invitations WHERE email = '{owner}'")).ShouldBe(0);
     }
 
-    [Fact]
-    public async Task OnboardTenant_TheIdentityProviderKeepsFailing_CancelsTheTenantAndItsInvitation()
-    {
-        var admin = await _catalog.AddSystemAdminAsync();
-        var owner = Email();
-        _api.Identity.IsDown = true;
-
-        HttpResponseMessage created = null!;
-        var messages = await _api.TrackMessagesAsync(async () => created = await CreateTenantAsync(admin, Slug(), owner));
-
-        var tenantId = await IdOfAsync(created);
-        messages.MovedToErrorQueue.SingleMessage<RegisterOwnerWithIdentityProvider>().ShouldNotBeNull();
-        (await TenantStatusAsync(tenantId)).ShouldBe("Cancelled");
-        (await database.ScalarAsSuperuserAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'"))
-            .ShouldBe("identity_provider_failed");
-        _api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record =>
-            record.Id.Name == "TenantCancelled"
-            && record.Message.Contains(tenantId.ToString(), StringComparison.Ordinal)
-            && record.Message.Contains("identity_provider_failed", StringComparison.Ordinal));
-        (await InvitationStatusAsync(tenantId)).ShouldBe("Cancelled");
-        (await OnboardingStateAsync(tenantId)).ShouldBe("Cancelled");
-        _api.Email.Attempts.ShouldNotContain(attempt => attempt.Email.To == owner);
-        (await AuditEntriesAsync(tenantId)).ShouldBeNull();
-    }
-
     // Wolverine publishes the fault of a message that went to the dead letter queue with the message's tenant and saga id, so the
     // saga finds its record under row level security.
     [Fact]
     public async Task FailForGood_AStepOfTheOnboarding_TheFaultCarriesItsTenantAndSagaId()
     {
         var admin = await _catalog.AddSystemAdminAsync();
-        _api.Identity.IsDown = true;
+        var slug = Slug();
+        await RefuseAsync("tenants", "UPDATE", $"NEW.slug = '{slug}' AND NEW.status = 'Active'");
 
         HttpResponseMessage created = null!;
-        var messages = await _api.TrackMessagesAsync(async () => created = await CreateTenantAsync(admin, Slug(), Email()));
+        var messages = await _api.TrackMessagesAsync(async () => created = await CreateTenantAsync(admin, slug, Email()));
 
         var tenantId = (await IdOfAsync(created)).ToString();
-        var fault = messages.Executed.SingleEnvelope<Fault<RegisterOwnerWithIdentityProvider>>();
+        var fault = messages.Executed.SingleEnvelope<Fault<ActivateTenant>>();
         fault.TenantId.ShouldBe(tenantId);
         fault.SagaId.ShouldBe(tenantId);
-        ((Fault<RegisterOwnerWithIdentityProvider>)fault.Message!).TenantId.ShouldBe(tenantId);
+        ((Fault<ActivateTenant>)fault.Message!).TenantId.ShouldBe(tenantId);
     }
 
     // The activation is refused by the database, as a real failure would be; the step is retried, then compensated.
     [Fact]
-    public async Task OnboardTenant_TheActivationKeepsFailing_CancelsTheTenantAndRevokesTheOwnersRegistration()
+    public async Task OnboardTenant_TheActivationKeepsFailing_CancelsTheTenantAndItsInvitation()
     {
         var admin = await _catalog.AddSystemAdminAsync();
         var slug = Slug();
@@ -125,8 +101,14 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         (await TenantStatusAsync(tenantId)).ShouldBe("Cancelled");
         (await database.ScalarAsSuperuserAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'"))
             .ShouldBe("activation_failed");
-        _api.Identity.Revoked.ShouldBe([$"inv_{await InvitationIdAsync(tenantId):N}"]);
+        _api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record =>
+            record.Id.Name == "TenantCancelled"
+            && record.Message.Contains(tenantId.ToString(), StringComparison.Ordinal)
+            && record.Message.Contains("activation_failed", StringComparison.Ordinal));
+        (await InvitationStatusAsync(tenantId)).ShouldBe("Cancelled");
+        (await OnboardingStateAsync(tenantId)).ShouldBe("Cancelled");
         _api.Email.Attempts.ShouldNotContain(attempt => attempt.Email.To == owner);
+        (await AuditEntriesAsync(tenantId)).ShouldBeNull();
     }
 
     // After the pivot nothing is undone: the tenant stays active, the invitation nobody received is cancelled, and a person is told.
@@ -188,8 +170,8 @@ public sealed class TenantOnboardingProcessTests(Database database) : IAsyncLife
         await database.ExecuteInTenantAsync(
             tenantId,
             $"""
-            INSERT INTO catalog.tenant_onboardings (id, state, invitation_id, invitation_email_timeout, version)
-            VALUES ('{tenantId}', 'Activating', '{invitationId}', interval '2 hours', 0)
+            INSERT INTO catalog.tenant_onboardings (id, state, invitation_id, invitation_email_timeout, cancellation_timeout, version)
+            VALUES ('{tenantId}', 'Activating', '{invitationId}', interval '2 hours', interval '10 minutes', 0)
             """);
         var now = DateTimeOffset.UtcNow;
         var emailSent = new Notifications.Contracts.InvitationEmailSent(Guid.CreateVersion7(), now, tenantId, invitationId);

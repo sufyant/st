@@ -6,7 +6,7 @@ using Wolverine;
 namespace ControlPlane.UnitTests;
 
 // The onboarding saga without a host (S12): it only decides, from its state and the message, what its next state is and which
-// messages it sends. A message that does not fit the state is ignored (S7).
+// messages it sends. A message that does not fit the state is ignored (S7). One test for each row of the saga's state table.
 public class TenantOnboardingTests
 {
     private static readonly Guid TenantId = new("0199a8f0-0000-7000-8000-000000000201");
@@ -15,33 +15,22 @@ public class TenantOnboardingTests
     private static readonly Guid EventId = new("0199a8f0-0000-7000-8000-000000000501");
     private static readonly DateTimeOffset Now = new(2026, 10, 9, 9, 0, 0, TimeSpan.Zero);
     private static readonly Uri AcceptLink = new("https://app.test/invitations/accept?code=0199a8f0-0000-7000-8000-000000000201.secret");
-    private static readonly Uri SignUpLink = new("https://clerk.test/invitations/inv_1");
-    private static readonly OnboardingTimeouts Timeouts = new(TimeSpan.FromMinutes(10), TimeSpan.FromHours(2));
+    private static readonly OnboardingTimeouts Timeouts = new(TimeSpan.FromMinutes(10), TimeSpan.FromHours(2), TimeSpan.FromMinutes(15));
     private const string OwnerEmail = "owner@acme.test";
-    private const string ProviderInvitationId = "inv_1";
 
+    // (start) | StartTenantOnboarding handled | Activating | ActivateTenant, ActivationTimedOut
     [Fact]
-    public void StartOnboarding_NewTenant_RegistersTheOwnerAndSchedulesTheRegistrationTimeout()
+    public void StartOnboarding_NewTenant_ActivatesTheTenantAndSchedulesTheActivationTimeout()
     {
-        var (onboarding, register, timeout) = TenantOnboarding.Begin(TenantId, InvitationId, OwnerEmail, AcceptLink, Timeouts);
+        var (onboarding, activate, timeout) = TenantOnboarding.Begin(TenantId, InvitationId, AcceptLink, Timeouts);
 
         onboarding.Id.ShouldBe(TenantId);
-        onboarding.State.ShouldBe(TenantOnboardingState.Registering);
-        register.ShouldBe(new RegisterOwnerWithIdentityProvider(TenantId, InvitationId, OwnerEmail, AcceptLink));
-        timeout.ShouldBe(new RegistrationTimedOut(TenantId, TimeSpan.FromMinutes(10)));
-    }
-
-    [Fact]
-    public void RegisterOwner_OwnerRegistered_ActivatesTheTenantWithTheLinkToSend()
-    {
-        var onboarding = Registering();
-
-        var sent = onboarding.Handle(Registered());
-
         onboarding.State.ShouldBe(TenantOnboardingState.Activating);
-        sent.ShouldBe([new ActivateTenant(TenantId, InvitationId, SignUpLink)]);
+        activate.ShouldBe(new ActivateTenant(TenantId, InvitationId, AcceptLink));
+        timeout.ShouldBe(new ActivationTimedOut(TenantId, TimeSpan.FromMinutes(10)));
     }
 
+    // Activating | TenantActivated | SendingInvitation | InvitationEmailTimedOut
     [Fact]
     public void ActivateTenant_TenantActivated_SchedulesTheInvitationEmailTimeout()
     {
@@ -53,6 +42,44 @@ public class TenantOnboardingTests
         sent.ShouldBe([new InvitationEmailTimedOut(TenantId, TimeSpan.FromHours(2))]);
     }
 
+    // Activating | Fault<ActivateTenant> | Cancelling | CancelTenant, CancellationTimedOut
+    [Fact]
+    public void ActivateTenant_FailsForGood_CancelsTheTenantAndSchedulesTheCancellationTimeout()
+    {
+        var onboarding = Activating();
+
+        var sent = onboarding.Handle(FaultOf(new ActivateTenant(TenantId, InvitationId, AcceptLink)));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.Cancelling);
+        sent.ShouldBe([new CancelTenant(TenantId, InvitationId, "activation_failed"), new CancellationTimedOut(TenantId, TimeSpan.FromMinutes(15))]);
+    }
+
+    // Activating | ActivationTimedOut | NeedsAttention | CancelInvitation, RaiseOnboardingAlarm
+    [Fact]
+    public void ActivateTenant_TimesOut_NeedsAttentionAndCancelsTheInvitation()
+    {
+        var onboarding = Activating();
+
+        var sent = onboarding.Handle(new ActivationTimedOut(TenantId, Timeouts.Activation));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBe([new CancelInvitation(TenantId, InvitationId), new RaiseOnboardingAlarm(TenantId)]);
+    }
+
+    // Activating | InvitationEmailSent | Completed | none. The tenant's activation and the invitation email are published together,
+    // so the email may be reported sent before the saga has heard of the activation; the email proves that the activation committed.
+    [Fact]
+    public void SendInvitation_EmailSentBeforeTheActivationArrives_CompletesTheOnboarding()
+    {
+        var onboarding = Activating();
+
+        var sent = onboarding.Handle(EmailSent());
+
+        onboarding.State.ShouldBe(TenantOnboardingState.Completed);
+        sent.ShouldBeEmpty();
+    }
+
+    // SendingInvitation | InvitationEmailSent | Completed | none
     [Fact]
     public void SendInvitation_EmailSent_CompletesTheOnboarding()
     {
@@ -64,28 +91,19 @@ public class TenantOnboardingTests
         sent.ShouldBeEmpty();
     }
 
+    // Activating | Fault<OwnerInvitationReady> | NeedsAttention | CancelInvitation, RaiseOnboardingAlarm
     [Fact]
-    public void RegisterOwner_FailsForGood_CancelsTheTenant()
-    {
-        var onboarding = Registering();
-
-        var sent = onboarding.Handle(FaultOf(new RegisterOwnerWithIdentityProvider(TenantId, InvitationId, OwnerEmail, AcceptLink)));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.Cancelling);
-        sent.ShouldBe([new CancelTenant(TenantId, InvitationId, "identity_provider_failed")]);
-    }
-
-    [Fact]
-    public void ActivateTenant_FailsForGood_CancelsTheTenantAndRevokesTheOwnersRegistration()
+    public void SendInvitation_FailsForGoodBeforeTheActivationArrives_NeedsAttentionAndCancelsTheInvitation()
     {
         var onboarding = Activating();
 
-        var sent = onboarding.Handle(FaultOf(new ActivateTenant(TenantId, InvitationId, SignUpLink)));
+        var sent = onboarding.Handle(FaultOf(InvitationReady()));
 
-        onboarding.State.ShouldBe(TenantOnboardingState.Cancelling);
-        sent.ShouldBe([new CancelTenant(TenantId, InvitationId, "activation_failed"), new RevokeOwnerRegistration(TenantId, ProviderInvitationId)]);
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBe([new CancelInvitation(TenantId, InvitationId), new RaiseOnboardingAlarm(TenantId)]);
     }
 
+    // SendingInvitation | Fault<OwnerInvitationReady> | NeedsAttention | CancelInvitation, RaiseOnboardingAlarm
     [Fact]
     public void SendInvitation_FailsForGood_NeedsAttentionAndCancelsTheInvitation()
     {
@@ -97,39 +115,81 @@ public class TenantOnboardingTests
         sent.ShouldBe([new CancelInvitation(TenantId, InvitationId), new RaiseOnboardingAlarm(TenantId)]);
     }
 
+    // SendingInvitation | InvitationEmailTimedOut | NeedsAttention | CancelInvitation, RaiseOnboardingAlarm
     [Fact]
-    public void RegisterOwner_TimesOut_CancelsTheTenant()
-    {
-        var onboarding = Registering();
-
-        var sent = onboarding.Handle(new RegistrationTimedOut(TenantId, Timeouts.Registration));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.Cancelling);
-        sent.ShouldBe([new CancelTenant(TenantId, InvitationId, "registration_timed_out")]);
-    }
-
-    [Fact]
-    public void RegisterOwner_TimeoutAfterTheOwnerRegistered_IsIgnored()
-    {
-        var onboarding = Activating();
-
-        var sent = onboarding.Handle(new RegistrationTimedOut(TenantId, Timeouts.Registration));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.Activating);
-        sent.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void SendInvitation_TimesOut_NeedsAttention()
+    public void SendInvitation_TimesOut_NeedsAttentionAndCancelsTheInvitation()
     {
         var onboarding = SendingInvitation();
 
         var sent = onboarding.Handle(new InvitationEmailTimedOut(TenantId, Timeouts.InvitationEmail));
 
         onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBe([new CancelInvitation(TenantId, InvitationId), new RaiseOnboardingAlarm(TenantId)]);
+    }
+
+    // Cancelling | TenantCancelled | Cancelled | none
+    [Fact]
+    public void CancelTenant_TenantCancelled_EndsCancelled()
+    {
+        var onboarding = Cancelling();
+
+        var sent = onboarding.Handle(new TenantCancelled(TenantId));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.Cancelled);
+        sent.ShouldBeEmpty();
+    }
+
+    // Cancelling | CancellationTimedOut | NeedsAttention | RaiseOnboardingAlarm
+    [Fact]
+    public void CancelTenant_TimesOut_NeedsAttention()
+    {
+        var onboarding = Cancelling();
+
+        var sent = onboarding.Handle(new CancellationTimedOut(TenantId, Timeouts.Cancellation));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
         sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
     }
 
+    // Cancelling | Fault<CancelTenant> | NeedsAttention | RaiseOnboardingAlarm. S9: a compensation that fails for good leaves the
+    // process to a person.
+    [Fact]
+    public void CancelTenant_FailsForGood_NeedsAttention()
+    {
+        var onboarding = Cancelling();
+
+        var sent = onboarding.Handle(FaultOf(new CancelTenant(TenantId, InvitationId, "activation_failed")));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
+    }
+
+    // Any state except NeedsAttention | Fault<CancelInvitation> | NeedsAttention | RaiseOnboardingAlarm
+    [Fact]
+    public void CancelInvitation_FailsForGoodWhileCancelling_NeedsAttention()
+    {
+        var onboarding = Cancelling();
+
+        var sent = onboarding.Handle(FaultOf(new CancelInvitation(TenantId, InvitationId)));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
+    }
+
+    // NeedsAttention | any message | unchanged | none. M11: the alarm is raised once for each onboarding.
+    [Fact]
+    public void CancelInvitation_FailsForGoodAfterTheAlarm_RaisesNoSecondAlarm()
+    {
+        var onboarding = SendingInvitation();
+        onboarding.Handle(FaultOf(InvitationReady()));
+
+        var sent = onboarding.Handle(FaultOf(new CancelInvitation(TenantId, InvitationId)));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBeEmpty();
+    }
+
+    // Completed | any message | unchanged | none
     [Fact]
     public void SendInvitation_TimeoutAfterCompletion_IsIgnored()
     {
@@ -141,38 +201,55 @@ public class TenantOnboardingTests
         sent.ShouldBeEmpty();
     }
 
+    // Cancelled | any message | unchanged | none
     [Fact]
-    public void RegisterOwner_OwnerRegisteredAgain_SendsNothing()
+    public void CancelTenant_TimeoutAfterTheTenantIsCancelled_IsIgnored()
     {
-        var onboarding = Activating();
+        var onboarding = Cancelling();
+        onboarding.Handle(new TenantCancelled(TenantId));
 
-        var sent = onboarding.Handle(Registered());
+        var sent = onboarding.Handle(new CancellationTimedOut(TenantId, Timeouts.Cancellation));
 
-        onboarding.State.ShouldBe(TenantOnboardingState.Activating);
+        onboarding.State.ShouldBe(TenantOnboardingState.Cancelled);
         sent.ShouldBeEmpty();
     }
 
+    // M2: the invitation was cancelled when the wait timed out, so the late fault has nothing left to do.
     [Fact]
-    public void SendInvitation_EmailSentAgain_SendsNothing()
+    public void SendInvitation_FaultAfterTheTimeout_IsIgnored()
     {
-        var onboarding = Completed();
+        var onboarding = SendingInvitation();
+        onboarding.Handle(new InvitationEmailTimedOut(TenantId, Timeouts.InvitationEmail));
 
-        var sent = onboarding.Handle(EmailSent());
+        var sent = onboarding.Handle(FaultOf(InvitationReady()));
 
-        onboarding.State.ShouldBe(TenantOnboardingState.Completed);
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
         sent.ShouldBeEmpty();
     }
 
-    // The tenant's activation and the invitation email are published together, so the email may be reported sent before the
-    // saga has heard of the activation. The email proves that the activation committed.
+    // A late email carries a link to the cancelled invitation, which answers 404; the alarm already asked for a new invitation.
     [Fact]
-    public void SendInvitation_EmailSentBeforeTheActivationArrives_CompletesTheOnboarding()
+    public void SendInvitation_EmailSentAfterTheTimeout_IsIgnored()
     {
-        var onboarding = Activating();
+        var onboarding = SendingInvitation();
+        onboarding.Handle(new InvitationEmailTimedOut(TenantId, Timeouts.InvitationEmail));
 
         var sent = onboarding.Handle(EmailSent());
 
-        onboarding.State.ShouldBe(TenantOnboardingState.Completed);
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
+        sent.ShouldBeEmpty();
+    }
+
+    // M11: a repeated alarm reaches the saga as a repeated timeout.
+    [Fact]
+    public void ActivateTenant_TimeoutArrivesAgainAfterTheAlarm_RaisesNoSecondAlarm()
+    {
+        var onboarding = Activating();
+        onboarding.Handle(new ActivationTimedOut(TenantId, Timeouts.Activation));
+
+        var sent = onboarding.Handle(new ActivationTimedOut(TenantId, Timeouts.Activation));
+
+        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
         sent.ShouldBeEmpty();
     }
 
@@ -189,87 +266,28 @@ public class TenantOnboardingTests
     }
 
     [Fact]
-    public void SendInvitation_FailsForGoodBeforeTheActivationArrives_NeedsAttentionAndCancelsTheInvitation()
+    public void ActivateTenant_TimeoutAfterTheActivation_IsIgnored()
     {
-        var onboarding = Activating();
+        var onboarding = SendingInvitation();
 
-        var sent = onboarding.Handle(FaultOf(InvitationReady()));
+        var sent = onboarding.Handle(new ActivationTimedOut(TenantId, Timeouts.Activation));
 
-        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
-        sent.ShouldBe([new CancelInvitation(TenantId, InvitationId), new RaiseOnboardingAlarm(TenantId)]);
-    }
-
-    [Fact]
-    public void CancelTenant_TenantCancelled_EndsCancelled()
-    {
-        var onboarding = Registering();
-        onboarding.Handle(new RegistrationTimedOut(TenantId, Timeouts.Registration));
-
-        var sent = onboarding.Handle(new TenantCancelled(TenantId));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.Cancelled);
+        onboarding.State.ShouldBe(TenantOnboardingState.SendingInvitation);
         sent.ShouldBeEmpty();
     }
 
-    // The provider's call may succeed after the registration timed out; what it created is undone.
     [Fact]
-    public void RegisterOwner_OwnerRegisteredAfterTheTimeout_RevokesTheRegistration()
+    public void SendInvitation_EmailSentAgain_SendsNothing()
     {
-        var onboarding = Registering();
-        onboarding.Handle(new RegistrationTimedOut(TenantId, Timeouts.Registration));
+        var onboarding = Completed();
 
-        var sent = onboarding.Handle(Registered());
+        var sent = onboarding.Handle(EmailSent());
 
-        onboarding.State.ShouldBe(TenantOnboardingState.Cancelling);
-        sent.ShouldBe([new RevokeOwnerRegistration(TenantId, ProviderInvitationId)]);
+        onboarding.State.ShouldBe(TenantOnboardingState.Completed);
+        sent.ShouldBeEmpty();
     }
 
-    // S9: a compensation that fails for good leaves the process to a person.
-    [Fact]
-    public void CancelTenant_FailsForGood_NeedsAttention()
-    {
-        var onboarding = Registering();
-        onboarding.Handle(new RegistrationTimedOut(TenantId, Timeouts.Registration));
-
-        var sent = onboarding.Handle(FaultOf(new CancelTenant(TenantId, InvitationId, "registration_timed_out")));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
-        sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
-    }
-
-    [Fact]
-    public void RevokeOwnerRegistration_FailsForGood_NeedsAttention()
-    {
-        var onboarding = Activating();
-        onboarding.Handle(FaultOf(new ActivateTenant(TenantId, InvitationId, SignUpLink)));
-
-        var sent = onboarding.Handle(FaultOf(new RevokeOwnerRegistration(TenantId, ProviderInvitationId)));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
-        sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
-    }
-
-    [Fact]
-    public void CancelInvitation_FailsForGood_RaisesTheAlarmAgain()
-    {
-        var onboarding = SendingInvitation();
-        onboarding.Handle(FaultOf(InvitationReady()));
-
-        var sent = onboarding.Handle(FaultOf(new CancelInvitation(TenantId, InvitationId)));
-
-        onboarding.State.ShouldBe(TenantOnboardingState.NeedsAttention);
-        sent.ShouldBe([new RaiseOnboardingAlarm(TenantId)]);
-    }
-
-    private static TenantOnboarding Registering() =>
-        TenantOnboarding.Begin(TenantId, InvitationId, OwnerEmail, AcceptLink, Timeouts).Onboarding;
-
-    private static TenantOnboarding Activating()
-    {
-        var onboarding = Registering();
-        onboarding.Handle(Registered());
-        return onboarding;
-    }
+    private static TenantOnboarding Activating() => TenantOnboarding.Begin(TenantId, InvitationId, AcceptLink, Timeouts).Onboarding;
 
     private static TenantOnboarding SendingInvitation()
     {
@@ -285,11 +303,16 @@ public class TenantOnboardingTests
         return onboarding;
     }
 
-    private static OwnerRegistered Registered() => new(TenantId, InvitationId, SignUpLink, ProviderInvitationId);
+    private static TenantOnboarding Cancelling()
+    {
+        var onboarding = Activating();
+        onboarding.Handle(FaultOf(new ActivateTenant(TenantId, InvitationId, AcceptLink)));
+        return onboarding;
+    }
 
     private static TenantActivated Activated() => new(EventId, Now, TenantId, "Acme Ltd", AdminId);
 
-    private static OwnerInvitationReady InvitationReady() => new(EventId, Now, TenantId, InvitationId, OwnerEmail, "Acme Ltd", SignUpLink);
+    private static OwnerInvitationReady InvitationReady() => new(EventId, Now, TenantId, InvitationId, OwnerEmail, "Acme Ltd", AcceptLink);
 
     private static InvitationEmailSent EmailSent() => new(EventId, Now, TenantId, InvitationId);
 

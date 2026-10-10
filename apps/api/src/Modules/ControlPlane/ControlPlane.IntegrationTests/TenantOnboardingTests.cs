@@ -12,7 +12,7 @@ using Tenancy;
 namespace ControlPlane.IntegrationTests;
 
 // The steps of the tenant onboarding saga, each run the way Wolverine runs it: a step that writes the catalog in the new tenant's
-// transaction, a step that calls the identity provider without one. Each step and each compensation may run twice (S7).
+// transaction. Each step and each compensation may run twice (S7).
 public sealed class TenantOnboardingTests(Database database)
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -28,18 +28,17 @@ public sealed class TenantOnboardingTests(Database database)
         var started = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, slug, owner);
 
         started.Result.Value.ShouldBe(new TenantDetails(tenantId, "Acme Ltd", slug, "Provisioning"));
-        var register = started.Register.ShouldNotBeNull().Message;
+        var activate = started.Activate.ShouldNotBeNull().Message;
         var invitationId = await ScalarAsync<Guid>($"SELECT id FROM catalog.invitations WHERE tenant_id = '{tenantId}'");
-        register.ShouldSatisfyAllConditions(
+        activate.ShouldSatisfyAllConditions(
             step => step.TenantId.ShouldBe(tenantId),
             step => step.InvitationId.ShouldBe(invitationId),
-            step => step.Email.ShouldBe(owner),
-            step => step.AcceptLink.GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl),
-            step => Handlers.TenantIdOf(Handlers.CodeOf(step.AcceptLink)).ShouldBe(tenantId));
-        started.Timeout.ShouldBe(new RegistrationTimedOut(tenantId, new OnboardingSettings().RegistrationTimeout));
+            step => step.Link.GetLeftPart(UriPartial.Path).ShouldBe(Database.AcceptUrl),
+            step => Handlers.TenantIdOf(Handlers.CodeOf(step.Link)).ShouldBe(tenantId));
+        started.Timeout.ShouldBe(new ActivationTimedOut(tenantId, TimeSpan.FromMinutes(10)));
         (await StatusOfAsync(tenantId)).ShouldBe("Provisioning");
         (await ScalarAsync<string>($"SELECT state FROM catalog.tenant_onboardings WHERE id = '{tenantId}' AND tenant_id = '{tenantId}'"))
-            .ShouldBe("Registering");
+            .ShouldBe("Activating");
         (await ScalarAsync<long>(
             $"""
             SELECT count(*) FROM catalog.invitations JOIN catalog.roles ON roles.id = invitations.role_id
@@ -57,20 +56,20 @@ public sealed class TenantOnboardingTests(Database database)
 
         var started = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, Unique.Slug(), Unique.Email());
 
-        var secret = Handlers.SecretOf(Handlers.CodeOf(started.Register.ShouldNotBeNull().Message.AcceptLink));
+        var secret = Handlers.SecretOf(Handlers.CodeOf(started.Activate.ShouldNotBeNull().Message.Link));
         (await ScalarAsync<string>($"SELECT token_hash FROM catalog.invitations WHERE tenant_id = '{tenantId}'")).ShouldBe(Sha256(secret));
     }
 
     // The steps it starts carry the saga's id on their envelopes, so the fault of one that fails for good finds the saga.
     [Fact]
-    public async Task StartOnboarding_NewTenant_SendsTheRegistrationWithTheSagaId()
+    public async Task StartOnboarding_NewTenant_SendsTheActivationWithTheSagaId()
     {
         var admin = await Catalog.AddUserAsync(database.Services);
         var tenantId = Guid.CreateVersion7();
 
         var started = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, Unique.Slug(), Unique.Email());
 
-        started.Register.ShouldNotBeNull().Options.SagaId.ShouldBe(tenantId.ToString());
+        started.Activate.ShouldNotBeNull().Options.SagaId.ShouldBe(tenantId.ToString());
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class TenantOnboardingTests(Database database)
 
         started.Result.Error.Code.ShouldBe("tenant.slug_taken");
         started.Onboarding.ShouldBeNull();
-        started.Register.ShouldBeNull();
+        started.Activate.ShouldBeNull();
         started.Timeout.ShouldBeNull();
     }
 
@@ -108,41 +107,14 @@ public sealed class TenantOnboardingTests(Database database)
     }
 
     [Fact]
-    public async Task RegisterOwner_WithoutAnAccount_InvitesThroughTheProviderToTheAcceptLink()
-    {
-        var step = new RegisterOwnerWithIdentityProvider(Guid.CreateVersion7(), Guid.CreateVersion7(), Unique.Email(), AcceptLink());
-
-        var registered = await Handlers.RegisterOwnerAsync(database.Services, step);
-
-        registered.ShouldBe(new OwnerRegistered(
-            step.TenantId,
-            step.InvitationId,
-            new Uri($"https://clerk.test/invitations/{step.InvitationId}"),
-            FakeIdentityProvider.ProviderInvitationIdOf(step.InvitationId)));
-        database.Identity.Invitations.ShouldContain((step.Email, step.InvitationId, step.AcceptLink));
-    }
-
-    [Fact]
-    public async Task RegisterOwner_WithAnAccount_SendsTheAcceptLinkAndCreatesNoProviderInvitation()
-    {
-        var step = new RegisterOwnerWithIdentityProvider(Guid.CreateVersion7(), Guid.CreateVersion7(), Unique.Email(), AcceptLink());
-        database.Identity.AddAccount(Unique.ExternalId(), step.Email);
-
-        var registered = await Handlers.RegisterOwnerAsync(database.Services, step);
-
-        registered.ShouldBe(new OwnerRegistered(step.TenantId, step.InvitationId, step.AcceptLink, null));
-        database.Identity.Invitations.ShouldNotContain(invited => invited.Email == step.Email);
-    }
-
-    [Fact]
     public async Task ActivateTenant_Provisioning_ActivatesItAndAnnouncesTheTenantAndTheInvitation()
     {
         var admin = await Catalog.AddUserAsync(database.Services);
         var tenantId = Guid.CreateVersion7();
         var owner = Unique.Email();
         var started = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, Unique.Slug(), owner);
-        var invitationId = started.Register.ShouldNotBeNull().Message.InvitationId;
-        var link = new Uri("https://clerk.test/invitations/the-link");
+        var invitationId = started.Activate.ShouldNotBeNull().Message.InvitationId;
+        var link = AcceptLink();
 
         var (activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, link));
 
@@ -179,11 +151,11 @@ public sealed class TenantOnboardingTests(Database database)
     {
         var (tenantId, invitationId) = await StartAsync();
 
-        var cancelled = await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "identity_provider_failed"));
+        var cancelled = await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
 
         cancelled.ShouldBe(new TenantCancelled(tenantId));
         (await StatusOfAsync(tenantId)).ShouldBe("Cancelled");
-        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe("identity_provider_failed");
+        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe("activation_failed");
         (await ScalarAsync<string>($"SELECT status FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe("Cancelled");
     }
 
@@ -191,32 +163,35 @@ public sealed class TenantOnboardingTests(Database database)
     public async Task CancelTenant_Repeated_KeepsTheFirstReason()
     {
         var (tenantId, invitationId) = await StartAsync();
-        await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "identity_provider_failed"));
+        await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
 
-        var cancelled = await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "registration_timed_out"));
+        var cancelled = await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "another_reason"));
 
         cancelled.ShouldBe(new TenantCancelled(tenantId));
-        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe("identity_provider_failed");
+        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBe("activation_failed");
     }
 
-    // The activation is the pivot: an active tenant is never cancelled, so the compensation fails and the saga needs attention.
+    // The activation is the pivot: an active tenant is never cancelled. The compensation changes nothing and reports nothing, so the
+    // saga's cancellation timeout leaves the onboarding to a person.
     [Fact]
-    public async Task CancelTenant_Active_FailsAndLeavesTheTenantActive()
+    public async Task CancelTenant_Active_ChangesNothingAndReportsNoCancellation()
     {
         var (tenantId, invitationId) = await StartAsync();
         await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, AcceptLink()));
 
-        var cancel = () => Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
+        var cancelled = await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
 
-        await cancel.ShouldThrowAsync<InvalidOperationException>();
+        cancelled.ShouldBeNull();
         (await StatusOfAsync(tenantId)).ShouldBe("Active");
+        (await ScalarAsync<string>($"SELECT cancellation_reason FROM catalog.tenants WHERE id = '{tenantId}'")).ShouldBeNull();
+        (await ScalarAsync<string>($"SELECT status FROM catalog.invitations WHERE id = '{invitationId}'")).ShouldBe("Pending");
     }
 
     [Fact]
     public async Task ActivateTenant_Cancelled_AnnouncesNothing()
     {
         var (tenantId, invitationId) = await StartAsync();
-        await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "registration_timed_out"));
+        await Handlers.CancelTenantAsync(database.Services, tenantId, new CancelTenant(tenantId, invitationId, "activation_failed"));
 
         var (activated, ready) = await Handlers.ActivateAsync(database.Services, tenantId, new ActivateTenant(tenantId, invitationId, AcceptLink()));
 
@@ -238,25 +213,20 @@ public sealed class TenantOnboardingTests(Database database)
         (await StatusOfAsync(tenantId)).ShouldBe("Active");
     }
 
+    // S7: the owner accepted before the cancel arrived, and the acceptance stands.
     [Fact]
-    public async Task RevokeOwnerRegistration_WithAProviderInvitation_RevokesIt()
+    public async Task CancelInvitation_AlreadyAccepted_ChangesNothing()
     {
-        var providerInvitationId = $"inv_{Guid.NewGuid():N}";
+        var owner = Unique.Email();
+        var userId = Unique.ExternalId();
+        database.Identity.AddAccount(userId, owner);
+        var (tenantId, _, ready) = await Handlers.OnboardAsync(database.Services, owner);
+        (await Handlers.AcceptAsync(database.Services, Handlers.CodeOf(ready.Link), userId)).IsSuccess.ShouldBeTrue();
 
-        await Handlers.RevokeOwnerRegistrationAsync(database.Services, new RevokeOwnerRegistration(Guid.CreateVersion7(), providerInvitationId));
+        await Handlers.CancelInvitationAsync(database.Services, tenantId, new CancelInvitation(tenantId, ready.InvitationId));
 
-        database.Identity.Revoked.ShouldContain(providerInvitationId);
-    }
-
-    // The owner had an account, so the provider holds nothing of the onboarding.
-    [Fact]
-    public async Task RevokeOwnerRegistration_WithoutAProviderInvitation_DoesNothing()
-    {
-        var revoked = database.Identity.Revoked.Count;
-
-        await Handlers.RevokeOwnerRegistrationAsync(database.Services, new RevokeOwnerRegistration(Guid.CreateVersion7(), null));
-
-        database.Identity.Revoked.Count.ShouldBe(revoked);
+        (await ScalarAsync<string>($"SELECT status FROM catalog.invitations WHERE id = '{ready.InvitationId}'")).ShouldBe("Accepted");
+        (await ScalarAsync<long>($"SELECT count(*) FROM catalog.memberships WHERE tenant_id = '{tenantId}'")).ShouldBe(1);
     }
 
     private async Task<(Guid TenantId, Guid InvitationId)> StartAsync()
@@ -265,7 +235,7 @@ public sealed class TenantOnboardingTests(Database database)
         var tenantId = Guid.CreateVersion7();
         var started = await Handlers.StartOnboardingAsync(database.Services, tenantId, admin.ExternalId, Unique.Slug(), Unique.Email());
 
-        return (tenantId, started.Register.ShouldNotBeNull().Message.InvitationId);
+        return (tenantId, started.Activate.ShouldNotBeNull().Message.InvitationId);
     }
 
     private static Uri AcceptLink() => new($"{Database.AcceptUrl}?code={Guid.CreateVersion7()}.secret");

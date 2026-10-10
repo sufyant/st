@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using ControlPlane.Application.Ports;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,98 +17,11 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     [Fact]
     public async Task CallClerk_AnyRequest_IsAuthorizedWithTheSecretKey()
     {
-        _clerk.Respond("[]");
+        _clerk.Respond("""{"id":"user_1","email_addresses":[]}""");
 
-        await Identity().HasAccountAsync("ada@example.com", Cancellation);
+        await Identity().FindVerifiedEmailsAsync("user_1", Cancellation);
 
         _clerk.Requests.ShouldHaveSingleItem().Authorization.ShouldBe("Bearer sk_test_secret");
-    }
-
-    [Fact]
-    public async Task HasAccount_UserOwnsTheEmail_IsTrue()
-    {
-        _clerk.Respond("""[{"id":"user_1","email_addresses":[{"email_address":"Ada@Example.com","verification":{"status":"verified"}}]}]""");
-
-        var hasAccount = await Identity().HasAccountAsync("ada@example.com", Cancellation);
-
-        hasAccount.ShouldBeTrue();
-        _clerk.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri("https://api.clerk.test/v1/users?email_address=ada%40example.com"));
-    }
-
-    [Fact]
-    public async Task HasAccount_NoUserOwnsTheEmail_IsFalse()
-    {
-        _clerk.Respond("[]");
-
-        var hasAccount = await Identity().HasAccountAsync("ada@example.com", Cancellation);
-
-        hasAccount.ShouldBeFalse();
-    }
-
-    // Clerk matches some email filters partially; only a user who owns exactly this address counts.
-    [Fact]
-    public async Task HasAccount_UserEmailOnlyResemblesIt_IsFalse()
-    {
-        _clerk.Respond("""[{"id":"user_1","email_addresses":[{"email_address":"bada@example.com","verification":{"status":"verified"}}]}]""");
-
-        var hasAccount = await Identity().HasAccountAsync("ada@example.com", Cancellation);
-
-        hasAccount.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task InviteOwner_ThroughClerk_SendsNoClerkEmailAndCarriesOurInvitationId()
-    {
-        var invitationId = new Guid("0199a8f0-0000-7000-8000-000000000401");
-        _clerk.Respond("""{"object":"invitation","id":"inv_1","url":"https://accounts.clerk.test/sign-up?__clerk_ticket=t"}""");
-
-        var invited = await Identity().InviteAsync(
-            "ada@example.com", invitationId, new Uri("https://app.test/invitations/accept?token=abc"), Cancellation);
-
-        invited.ShouldBe(new IdentityProviderInvitation("inv_1", new Uri("https://accounts.clerk.test/sign-up?__clerk_ticket=t")));
-        var request = _clerk.Requests.ShouldHaveSingleItem();
-        (request.Method, request.Uri).ShouldBe((HttpMethod.Post, new Uri("https://api.clerk.test/v1/invitations")));
-        var body = JsonDocument.Parse(request.Body!).RootElement;
-        body.GetProperty("email_address").GetString().ShouldBe("ada@example.com");
-        body.GetProperty("notify").GetBoolean().ShouldBeFalse();
-        body.GetProperty("ignore_existing").GetBoolean().ShouldBeTrue();
-        body.GetProperty("redirect_url").GetString().ShouldBe("https://app.test/invitations/accept?token=abc");
-        body.GetProperty("public_metadata").GetProperty("invitation_id").GetString().ShouldBe(invitationId.ToString());
-    }
-
-    [Fact]
-    public async Task RevokeInvitation_Pending_IsRevokedAtClerk()
-    {
-        _clerk.Respond("""{"object":"invitation","id":"inv_1","status":"revoked","revoked":true}""");
-
-        await Identity().RevokeInvitationAsync("inv_1", Cancellation);
-
-        var request = _clerk.Requests.ShouldHaveSingleItem();
-        (request.Method, request.Uri).ShouldBe((HttpMethod.Post, new Uri("https://api.clerk.test/v1/invitations/inv_1/revoke")));
-    }
-
-    // Clerk revokes only an active invitation and answers 400 for any other, and 404 for one it does not know: a revocation that
-    // arrives again finds nothing left to revoke.
-    [Theory]
-    [InlineData(HttpStatusCode.BadRequest)]
-    [InlineData(HttpStatusCode.NotFound)]
-    public async Task RevokeInvitation_NoLongerActive_IsDone(HttpStatusCode status)
-    {
-        _clerk.Respond("""{"errors":[{"code":"resource_not_found"}]}""", status);
-
-        var revoke = async () => await Identity().RevokeInvitationAsync("inv_1", Cancellation);
-
-        await revoke.ShouldNotThrowAsync();
-    }
-
-    [Fact]
-    public async Task RevokeInvitation_ClerkFails_IsAnError()
-    {
-        _clerk.Respond("""{"errors":[{"code":"internal"}]}""", HttpStatusCode.InternalServerError);
-
-        var revoke = async () => await Identity().RevokeInvitationAsync("inv_1", Cancellation);
-
-        await revoke.ShouldThrowAsync<HttpRequestException>();
     }
 
     [Fact]
@@ -133,9 +45,9 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     {
         _clerk.Respond("""{"errors":[{"code":"internal"}]}""", HttpStatusCode.InternalServerError);
 
-        var hasAccount = async () => await Identity().HasAccountAsync("ada@example.com", Cancellation);
+        var find = async () => await Identity().FindVerifiedEmailsAsync("user_1", Cancellation);
 
-        await hasAccount.ShouldThrowAsync<HttpRequestException>();
+        await find.ShouldThrowAsync<HttpRequestException>();
     }
 
     // Every call to Clerk has a time limit, set from configuration.
@@ -144,9 +56,9 @@ public sealed class ClerkIdentityProviderTests(Database database) : IDisposable
     {
         _clerk.Delay = TimeSpan.FromSeconds(30);
 
-        var hasAccount = async () => await Identity(timeout: "00:00:00.100").HasAccountAsync("ada@example.com", Cancellation);
+        var find = async () => await Identity(timeout: "00:00:00.100").FindVerifiedEmailsAsync("user_1", Cancellation);
 
-        await hasAccount.ShouldThrowAsync<TaskCanceledException>();
+        await find.ShouldThrowAsync<TaskCanceledException>();
     }
 
     // The module's real adapter, as the host registers it, with Clerk replaced at the HTTP boundary.

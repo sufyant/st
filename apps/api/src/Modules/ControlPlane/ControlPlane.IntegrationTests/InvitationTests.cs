@@ -104,14 +104,13 @@ public sealed class InvitationTests(Database database)
         (await FindMembershipAsync(tenantId, invitee)).ShouldBeNull();
     }
 
-    // The first owner, who has no account yet, is invited the way onboarding does it: the provider's invitation carries our accept
-    // link.
+    // The first owner is invited the way onboarding does it: the email carries our accept link.
     private async Task<(Guid TenantId, string Email, string Code)> InviteAsync(IServiceProvider? services = null)
     {
         var email = Unique.Email();
-        var (tenantId, _, _) = await Handlers.OnboardAsync(services ?? database.Services, email);
+        var (tenantId, _, ready) = await Handlers.OnboardAsync(services ?? database.Services, email);
 
-        return (tenantId, email, Handlers.CodeOf(database.Identity.Invitations.Single(invited => invited.Email == email).AcceptLink));
+        return (tenantId, email, Handlers.CodeOf(ready.Link));
     }
 
     private async Task<TenantMembership?> FindMembershipAsync(Guid tenantId, string externalUserId)

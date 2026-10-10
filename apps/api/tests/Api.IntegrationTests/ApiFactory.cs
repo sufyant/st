@@ -38,8 +38,6 @@ internal sealed class ApiFactory(
 
     public static readonly IReadOnlyDictionary<string, string?> ShortRetries = new Dictionary<string, string?>
     {
-        ["ControlPlane:IdentityProviderRetryDelays:0"] = "00:00:00.010",
-        ["ControlPlane:IdentityProviderRetryDelays:1"] = "00:00:00.020",
         ["Notifications:InvitationEmailRetryDelays:0"] = "00:00:00.010",
         ["Notifications:InvitationEmailRetryDelays:1"] = "00:00:00.020",
         ["Notifications:InvitationEmailRetryDelays:2"] = "00:00:00.040",

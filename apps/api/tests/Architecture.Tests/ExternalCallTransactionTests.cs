@@ -34,9 +34,7 @@ public sealed class ExternalCallTransactionTests : IAsyncLifetime
         var calling = chains.Where(chain => ServicesOf(chain).Any(service => Reaches(service, container, []))).ToList();
         var withTransaction = calling.Where(chain => chain.Tags.ContainsKey(EfCoreTransaction)).Select(Describe);
 
-        calling.Select(chain => chain.MessageType).ShouldBe(
-            [typeof(RegisterOwnerWithIdentityProvider), typeof(RevokeOwnerRegistration), typeof(OwnerInvitationReady)],
-            ignoreOrder: true);
+        calling.Select(chain => chain.MessageType).ShouldBe([typeof(OwnerInvitationReady)]);
         withTransaction.ShouldBeEmpty();
     }
 
