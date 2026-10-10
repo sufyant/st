@@ -63,6 +63,26 @@ public sealed class AuthenticationTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    // API8: a refused token is not told why, in any environment.
+    [Fact]
+    public async Task Authenticate_TokenSignedWithAnUntrustedKey_DoesNotSayWhy()
+    {
+        var response = await WhoAmIAsync(TestTokens.For("user_ada", trusted: false));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        response.Headers.WwwAuthenticate.ShouldNotBeEmpty();
+        response.Headers.WwwAuthenticate.ToString().ShouldNotContain("error_description");
+    }
+
+    // API2: Clerk signs JWT template tokens with the same keys and issuer, but only a session token carries the session's id.
+    [Fact]
+    public async Task Authenticate_TokenWithoutASession_IsUnauthorized()
+    {
+        var response = await WhoAmIAsync(TestTokens.For("user_ada", sessionToken: false));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
     [Fact]
     public async Task Authenticate_TokenIssuedToAnUnknownParty_IsUnauthorized()
     {

@@ -11,31 +11,35 @@ namespace Api.IntegrationTests;
 // staff list is empty, so the first system admin's setting is required there too.
 public sealed class HostConfigurationTests(Database database)
 {
-    public static TheoryData<string, string> RequiredSettings => new()
+    // The first key of each row is the one the error names; the others are missing too.
+    public static TheoryData<string, string[]> RequiredSettings => new()
     {
-        { Environments.Development, "Host:Role" },
-        { Environments.Development, "ConnectionStrings:Database" },
-        { Environments.Development, "Authentication:Clerk:Issuer" },
-        { Environments.Development, "ControlPlane:Clerk:SecretKey" },
-        { Environments.Development, "ControlPlane:Invitations:AcceptUrl" },
-        { Environments.Development, "ControlPlane:FirstSystemAdminEmail" },
-        { Environments.Production, "Authentication:Clerk:AuthorizedParties:0" },
-        { Environments.Production, "Notifications:Resend:ApiKey" },
-        { Environments.Production, "Notifications:Resend:From" },
+        { Environments.Development, ["Host:Role"] },
+        { Environments.Development, ["ConnectionStrings:Database"] },
+        { Environments.Development, ["Authentication:Clerk:Issuer"] },
+        { Environments.Development, ["ControlPlane:Clerk:SecretKey"] },
+        { Environments.Development, ["ControlPlane:Invitations:AcceptUrl"] },
+        { Environments.Development, ["ControlPlane:FirstSystemAdminEmail"] },
+        { Environments.Production, ["Authentication:Clerk:AuthorizedParties:0"] },
+        { Environments.Production, ["Notifications:Resend:ApiKey"] },
+        { Environments.Production, ["Notifications:Resend:From"] },
+
+        // S1: without a connection, the first system admin's check cannot read the staff list; the start names the connection.
+        { Environments.Development, ["ConnectionStrings:Database", "ControlPlane:FirstSystemAdminEmail"] },
     };
 
     [Theory]
     [MemberData(nameof(RequiredSettings))]
-    public async Task StartApplication_WithoutARequiredSetting_FailsNamingTheKey(string environment, string key)
+    public async Task StartApplication_WithoutARequiredSetting_FailsNamingTheKey(string environment, string[] missing)
     {
         await using var api = new ApiFactory(
             database.ConnectionStringFor(DatabaseRoles.Application, await database.CreateMigratedDatabaseAsync()),
             environment: environment,
-            settings: new Dictionary<string, string?>(Complete) { [key] = null });
+            settings: Without(missing));
 
         var start = () => api.CreateClient();
 
-        start.ShouldThrow<Exception>().Message.ShouldContain(key.TrimEnd(':', '0'));
+        start.ShouldThrow<Exception>().Message.ShouldContain(missing[0].TrimEnd(':', '0'));
     }
 
     [Theory]
@@ -56,6 +60,11 @@ public sealed class HostConfigurationTests(Database database)
         { "ControlPlane:FirstSystemAdminEmail", "not an email" },
         { "ControlPlane:Invitations:AcceptUrl", "/invitations/accept" },
         { "ControlPlane:Clerk:Timeout", "00:00:00" },
+        { "ControlPlane:ActivationTimeout", "00:00:00" },
+        { "ControlPlane:InvitationEmailTimeout", "-00:00:01" },
+        { "ControlPlane:CancellationTimeout", "00:00:00" },
+        { "RateLimiting:InvitationAccept:PermitLimit", "0" },
+        { "RateLimiting:InvitationAccept:Window", "00:00:00" },
         { "Notifications:Resend:Timeout", "-00:00:01" },
         { "Host:ShutdownTimeout", "00:00:00" },
         { "Host:Cors:AllowedOrigins:0", "*" },
@@ -107,6 +116,10 @@ public sealed class HostConfigurationTests(Database database)
     }
 
     // Everything a production start needs, so that leaving out one setting is the only thing wrong.
+    // The complete settings without the given keys; a setting given as null is left out.
+    private static Dictionary<string, string?> Without(string[] keys) =>
+        Complete.Where(setting => !keys.Contains(setting.Key)).Concat(keys.Select(key => KeyValuePair.Create(key, (string?)null))).ToDictionary();
+
     private static readonly Dictionary<string, string?> Complete = new()
     {
         ["Notifications:Resend:ApiKey"] = "re_test_key",

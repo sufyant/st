@@ -46,6 +46,48 @@ public sealed class InvitationEndpointTests(Database database) : IAsyncLifetime
             """)).ShouldBe(1);
     }
 
+    // API4: accepting an invitation has a stricter limit of its own, ten in a minute by default, on top of the general one; the
+    // user's other requests still have the general limit left.
+    [Fact]
+    public async Task AcceptInvitation_OverItsOwnLimit_IsRejectedButTheUsersOtherRequestsAnswer()
+    {
+        var user = $"user_{Guid.NewGuid():N}";
+        var code = $"{Guid.NewGuid()}.unknown-secret";
+        var client = _api.CreateClient(user);
+        HttpResponseMessage[] allowed = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => client.PostAsJsonAsync("/v1/invitations/accept", new { code }, Cancellation)));
+
+        var rejected = await client.PostAsJsonAsync("/v1/invitations/accept", new { code }, Cancellation);
+        var other = await client.GetAsync("/v1/me/tenants", Cancellation);
+
+        allowed.Select(response => response.StatusCode).Distinct().ShouldBe([HttpStatusCode.NotFound]);
+        rejected.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        rejected.Headers.RetryAfter.ShouldNotBeNull();
+        other.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    // T5: provider staff are not tenant members, even with the code and the invited email address verified.
+    [Fact]
+    public async Task AcceptInvitation_ASystemAdmin_IsRefusedAndJoinsNothing()
+    {
+        var staff = await _catalog.AddSystemAdminAsync();
+        var email = $"{Guid.NewGuid():N}@example.com";
+        _api.Identity.AddAccount(staff, email);
+        var slug = await _api.WaitingForMessagesAsync(() => OnboardAsync(email));
+
+        var accepted = await AcceptAsync(staff, _api.Email.CodeSentTo(email));
+
+        accepted.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await CodeOfAsync(accepted)).ShouldBe("invitation.staff_cannot_join");
+        (await database.ScalarAsSuperuserAsync<long>(
+            $"""
+            SELECT count(*) FROM catalog.memberships JOIN catalog.tenants ON tenants.id = memberships.tenant_id
+            WHERE tenants.slug = '{slug}'
+            """)).ShouldBe(0);
+        (await database.ScalarAsSuperuserAsync<string>(
+            $"SELECT invitations.status FROM catalog.invitations JOIN catalog.tenants ON tenants.id = invitations.tenant_id WHERE tenants.slug = '{slug}'"))
+            .ShouldBe("Pending");
+    }
+
     // The secret travels in the accept link, inside the onboarding's messages (see the deviations list); the catalog keeps only its
     // hash.
     [Fact]

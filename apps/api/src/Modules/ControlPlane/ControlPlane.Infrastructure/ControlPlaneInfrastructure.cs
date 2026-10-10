@@ -42,10 +42,11 @@ public static class ControlPlaneInfrastructure
 
         services.AddOptions<OnboardingSettings>()
             .BindConfiguration(OnboardingSettings.Section)
-            .Validate(settings => !settings.Problems().Any(), $"{OnboardingSettings.Section}:RegistrationTimeout, InvitationEmailTimeout and IdentityProviderRetryDelays must be positive, and the timeouts longer than the retry delays together.")
+            .Validate(settings => settings.ActivationTimeout > TimeSpan.Zero, $"{OnboardingSettings.Section}:ActivationTimeout must be positive.")
+            .Validate(settings => settings.InvitationEmailTimeout > TimeSpan.Zero, $"{OnboardingSettings.Section}:InvitationEmailTimeout must be positive.")
+            .Validate(settings => settings.CancellationTimeout > TimeSpan.Zero, $"{OnboardingSettings.Section}:CancellationTimeout must be positive.")
             .ValidateOnStart();
         services.AddSingleton(provider => provider.GetRequiredService<IOptions<OnboardingSettings>>().Value);
-        services.AddSingleton<IWolverineExtension, IdentityProviderRetries>();
         services.AddSingleton<OnboardingAlarm>();
 
         // Wolverine's generated code cannot build the identity provider, a typed HTTP client that only the container builds, so it

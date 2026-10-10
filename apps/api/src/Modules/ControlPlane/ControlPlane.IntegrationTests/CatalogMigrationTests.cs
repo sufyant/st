@@ -16,6 +16,8 @@ public sealed class CatalogMigrationTests(Database database)
 
     private const string BeforeOnboardingWasASaga = "20261009103109_AddOwnMembershipsPolicy";
 
+    private const string BeforeTheOwnerSignedUpLikeAnyUser = "20261009155044_AddTenantCreationRequests";
+
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     // The Expired status is gone: expiry is checked when an invitation is read, so an old expired invitation becomes pending and
@@ -85,6 +87,33 @@ public sealed class CatalogMigrationTests(Database database)
         (await database.ScalarAsSuperuserAsync<string>($"SELECT status FROM catalog.tenants WHERE id = '{tenantId}'", name)).ShouldBe("Cancelled");
         (await database.ScalarAsSuperuserAsync<bool>($"SELECT cancellation_reason IS NULL FROM catalog.tenants WHERE id = '{tenantId}'", name))
             .ShouldBeTrue();
+    }
+
+    // The onboarding creates nothing in the identity provider any more, and waits for a cancellation no longer than its timeout. An
+    // onboarding that was cancelling gets the default timeout.
+    [Fact]
+    public async Task MigrateCatalog_AnOnboardingFromBeforeTheCancellationTimeout_KeepsItsStateAndWaitsTenMinutes()
+    {
+        var name = await database.CreateEmptyDatabaseAsync();
+        await MigrateCatalogAsync(name, BeforeTheOwnerSignedUpLikeAnyUser);
+        var tenantId = Guid.CreateVersion7();
+        await database.ExecuteAsSuperuserAsync(
+            $"""
+            INSERT INTO catalog.tenant_onboardings (id, tenant_id, state, invitation_id, identity_provider_invitation_id, invitation_email_timeout, version)
+            VALUES ('{tenantId}', '{tenantId}', 'Cancelling', '{Guid.CreateVersion7()}', 'inv_1', interval '2 hours', 3)
+            """,
+            name);
+
+        await using var services = database.BuildServices(database: name);
+        await services.GetServices<IModuleMigrator>().Single()
+            .MigrateAsync(services, database.ConnectionStringFor(DatabaseRoles.Owner, name), Cancellation);
+
+        (await database.ScalarAsSuperuserAsync<string>(
+            $"SELECT state || ' ' || cancellation_timeout FROM catalog.tenant_onboardings WHERE id = '{tenantId}'", name))
+            .ShouldBe("Cancelling 00:10:00");
+        (await database.ScalarAsSuperuserAsync<long>(
+            "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'catalog' AND table_name = 'tenant_onboardings' AND column_name = 'identity_provider_invitation_id'",
+            name)).ShouldBe(0);
     }
 
     private async Task MigrateCatalogAsync(string databaseName, string targetMigration)

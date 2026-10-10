@@ -43,7 +43,7 @@ public sealed class Database : IAsyncLifetime
         await RunBootstrapScriptAsync(MainDatabase);
 
         await MigrateAsync(MainDatabase);
-        await CreateProbesAsOwnerAsync();
+        await CreateProbesAsync(MainDatabase);
     }
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
@@ -252,15 +252,17 @@ public sealed class Database : IAsyncLifetime
         }
     }
 
-    private async Task CreateProbesAsOwnerAsync()
+    // The probe tables, created as the owner, as a module's migration would.
+    public async Task CreateProbesAsync(string database)
     {
+        var owner = ConnectionStringFor(DatabaseRoles.Owner, database);
         await using (var probes = new ProbeDbContext(
-            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, OwnerConnectionString)))
+            TenancyServiceCollectionExtensions.ModuleDbContextOptions<ProbeDbContext>(ProbeDbContext.Schema, owner)))
         {
             await probes.GetService<IRelationalDatabaseCreator>().CreateTablesAsync();
         }
 
-        await using var connection = new NpgsqlConnection(OwnerConnectionString);
+        await using var connection = new NpgsqlConnection(owner);
         await connection.OpenAsync();
         await using var grant = new NpgsqlCommand(
             $"""

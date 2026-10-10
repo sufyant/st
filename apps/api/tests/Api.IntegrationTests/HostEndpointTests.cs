@@ -89,6 +89,36 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
             .ShouldContain("ConnectionStrings:Database connection's role bypasses row level security");
     }
 
+    // R10: a member of a role has that role's rights and can become it, so a member of the owner can switch row level security off
+    // (PostgreSQL documentation, Privileges, and Row Security Policies).
+    [Fact]
+    public async Task StartApplication_AsAMemberOfTheMigrationAccount_FailsNamingTheOwnerRole()
+    {
+        var member = await database.CreateLoginRoleAsync("");
+        await database.ScalarAsSuperuserAsync<object>($"GRANT {DatabaseRoles.Owner} TO {UsernameOf(member)}");
+        await using var api = new ApiFactory(member, messagingConnectionString: database.ApplicationConnectionString);
+
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<InvalidOperationException>().Message
+            .ShouldContain($"ConnectionStrings:Database connection's role is a member of {DatabaseRoles.Owner}, which owns tables");
+    }
+
+    [Fact]
+    public async Task StartApplication_AsAMemberOfARoleThatBypassesRowLevelSecurity_FailsNamingThatRole()
+    {
+        var bypassing = $"bypassing_{Guid.NewGuid():N}";
+        await database.ScalarAsSuperuserAsync<object>($"CREATE ROLE {bypassing} NOLOGIN BYPASSRLS");
+        var member = await database.CreateLoginRoleAsync("");
+        await database.ScalarAsSuperuserAsync<object>($"GRANT {bypassing} TO {UsernameOf(member)}");
+        await using var api = new ApiFactory(member, messagingConnectionString: database.ApplicationConnectionString);
+
+        var start = () => api.CreateClient();
+
+        start.ShouldThrow<InvalidOperationException>().Message
+            .ShouldContain($"ConnectionStrings:Database connection's role is a member of {bypassing}, which bypasses row level security");
+    }
+
     [Fact]
     public async Task StartApplication_AsTheMigrationAccountOverTheMessagingConnection_FailsNamingTheProblem()
     {
@@ -133,6 +163,22 @@ public sealed class HostEndpointTests(Database database) : IAsyncLifetime
 
         ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
     }
+
+    // A role the application runs as, not the shared application role itself, gains the owner's role: the other tests keep theirs.
+    [Fact]
+    public async Task CheckReadiness_TheRoleBecomesAMemberOfTheMigrationAccountWhileRunning_IsNotReady()
+    {
+        var role = await database.CreateLoginRoleAsync("");
+        await using var api = new ApiFactory(role);
+        var client = api.CreateClient();
+        await database.ScalarAsSuperuserAsync<object>($"GRANT {DatabaseRoles.Owner} TO {UsernameOf(role)}");
+
+        var ready = await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        ready.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+    }
+
+    private static string UsernameOf(string connectionString) => new NpgsqlConnectionStringBuilder(connectionString).Username!;
 
     // Outside Development the API must know which clients may use it; without the list any origin's token would be accepted.
     [Fact]

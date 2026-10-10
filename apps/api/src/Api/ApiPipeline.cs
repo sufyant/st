@@ -164,7 +164,7 @@ internal static class ApiPipeline
         endpoints.MapGroup("/v1")
             .AddEndpointFilter<ResultEndpointFilter>()
             .DescribeResults()
-            .RequireRateLimiting(UserRateLimiting.Policy);
+            .RequireUserRateLimit();
 
     // The endpoints of the version group that any signed-in user may call, without a permission (A5).
     public static RouteGroupBuilder MapSignedIn(this RouteGroupBuilder v1) => v1.MapGroup("").RequireSignedIn();

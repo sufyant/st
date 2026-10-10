@@ -4,7 +4,7 @@ using Notifications.Contracts;
 
 namespace Notifications.Application;
 
-// Step 4 of the tenant onboarding: the invitation email to a new tenant's first owner. The handler takes no DbContext, so Wolverine
+// Step 3 of the tenant onboarding: the invitation email to a new tenant's first owner. The handler takes no DbContext, so Wolverine
 // opens no transaction around the call to the email service; its retries are configured from the module's settings, and once
 // they are spent the event goes to the dead letter queue.
 public static class SendOwnerInvitationHandler

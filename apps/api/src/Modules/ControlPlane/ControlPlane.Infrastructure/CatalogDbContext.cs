@@ -95,7 +95,6 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
         {
             onboarding.Property(o => o.Id).ValueGeneratedNever();
             onboarding.Property(o => o.State).HasConversion<string>().HasMaxLength(20);
-            onboarding.Property(o => o.IdentityProviderInvitationId).HasMaxLength(255);
             onboarding.Property(o => o.Version).IsConcurrencyToken();
         });
 

@@ -25,7 +25,7 @@ public sealed class InvitationDeliveryTests(Database database)
         await using var api = Api(Environments.Development);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
+        var response = await api.WaitingForMessagesAsync(() => InviteOwnerAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         api.Services.GetFakeLogCollector().GetSnapshot().ShouldContain(record => record.Message.Contains(email, StringComparison.Ordinal));
@@ -38,16 +38,16 @@ public sealed class InvitationDeliveryTests(Database database)
         await using var api = Api(Environments.Production, resend, Resend);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var response = await api.WaitingForMessagesAsync(() => InviteAsync(api, email));
+        var response = await api.WaitingForMessagesAsync(() => InviteOwnerAsync(api, email));
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var invitationId = api.Identity.Invitations.Single(invitation => invitation.Email == email).InvitationId;
+        var invitationId = await database.ScalarAsSuperuserAsync<Guid>($"SELECT id FROM catalog.invitations WHERE email = '{email}'");
         var sent = resend.Requests.ShouldHaveSingleItem();
         sent.Uri.ShouldBe(new Uri("https://api.resend.test/emails"));
         sent.IdempotencyKey.ShouldBe($"invite/{invitationId}");
         var body = JsonDocument.Parse(sent.Body).RootElement;
         body.GetProperty("to").EnumerateArray().Single().GetString().ShouldBe(email);
-        body.GetProperty("text").GetString()!.ShouldContain($"https://clerk.test/invitations/{invitationId}");
+        body.GetProperty("text").GetString()!.ShouldContain($"{ApiFactory.AcceptUrl}?code=");
     }
 
     // An invitation nobody can receive must not look sent: outside Development a pod that cannot send email does not start.
@@ -76,7 +76,7 @@ public sealed class InvitationDeliveryTests(Database database)
         api.Email.FailNext(2);
         var email = $"{Guid.NewGuid():N}@example.com";
 
-        var messages = await api.TrackMessagesAsync(() => InviteAsync(api, email));
+        var messages = await api.TrackMessagesAsync(() => InviteOwnerAsync(api, email));
 
         var attempts = messages.ExecutionStarted.RecordsInOrder()
             .Where(record => record.Message is OwnerInvitationReady)
@@ -109,8 +109,8 @@ public sealed class InvitationDeliveryTests(Database database)
         var messages = await api.TrackMessagesAsync(
             async () =>
             {
-                await InviteAsync(api, refused);
-                await InviteAsync(api, next);
+                await InviteOwnerAsync(api, refused);
+                await InviteOwnerAsync(api, next);
             },
             until: new SentAndRescheduled(sent: next, rescheduled: refused));
 
@@ -160,7 +160,7 @@ public sealed class InvitationDeliveryTests(Database database)
         });
 
     // Onboarding a tenant invites its first owner.
-    private async Task<HttpResponseMessage> InviteAsync(ApiFactory api, string email)
+    private async Task<HttpResponseMessage> InviteOwnerAsync(ApiFactory api, string email)
     {
         var admin = await _catalog.AddSystemAdminAsync();
         var slug = $"tenant-{Guid.NewGuid():N}"[..20];

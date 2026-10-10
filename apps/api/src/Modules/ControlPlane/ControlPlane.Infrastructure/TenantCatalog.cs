@@ -101,6 +101,9 @@ public sealed class TenantCatalog(CatalogDbContext catalog) : ITenantCatalog
     Task<User?> ITenantCatalog.FindUserAsync(string externalUserId, CancellationToken cancellationToken) =>
         catalog.Users.SingleOrDefaultAsync(user => user.ExternalId == externalUserId, cancellationToken);
 
+    Task<bool> ITenantCatalog.IsSystemAdminAsync(Guid userId, CancellationToken cancellationToken) =>
+        catalog.SystemAdmins.AnyAsync(admin => admin.UserId == userId, cancellationToken);
+
     public void AddMember(Guid userId, Guid roleId) => catalog.Memberships.Add(new Membership(ActiveTenant, userId, roleId));
 
     // An insert of a slug that another onboarding has inserted but not yet committed waits for it, and is skipped if it commits.

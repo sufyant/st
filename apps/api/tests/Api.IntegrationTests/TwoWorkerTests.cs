@@ -1,5 +1,6 @@
 using System.Net;
 using ControlPlane.Contracts;
+using Notifications.Application;
 
 namespace Api.IntegrationTests;
 
@@ -67,7 +68,7 @@ public sealed class TwoWorkerTests(Database database)
         created.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await workers.OnboardingStateAsync(tenantId)).ShouldBe("Completed");
         workers.Email.Sent.ShouldHaveSingleItem().To.ShouldBe("owner@acme.test");
-        workers.Runs.In(workers.Survivor(dead)).ShouldContain(typeof(OwnerInvitationReady));
-        workers.Runs.In(dead).ShouldNotContain(typeof(OwnerInvitationReady));
+        workers.Runs.In(workers.Survivor(dead)).ShouldContain(new HandlerRun(typeof(OwnerInvitationReady), typeof(SendOwnerInvitationHandler)));
+        workers.Runs.In(dead).ShouldNotContain(new HandlerRun(typeof(OwnerInvitationReady), typeof(SendOwnerInvitationHandler)));
     }
 }

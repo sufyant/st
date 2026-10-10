@@ -46,6 +46,9 @@ public interface ITenantCatalog
 
     internal Task<User?> FindUserAsync(string externalUserId, CancellationToken cancellationToken);
 
+    /// <summary>Whether the user is on the staff list. The staff list belongs to no tenant.</summary>
+    internal Task<bool> IsSystemAdminAsync(Guid userId, CancellationToken cancellationToken);
+
     internal void AddMember(Guid userId, Guid roleId);
 
     /// <summary>

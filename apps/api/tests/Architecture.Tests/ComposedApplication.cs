@@ -5,17 +5,27 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Wolverine;
 
 namespace Architecture.Tests;
 
-// The application as Program composes it, in the role that handles every message, without the start-up checks that need a
-// database and its settings.
-internal sealed class ComposedApplication : WebApplicationFactory<Program>
+// The application as Program composes it, in the given role (by default the one that handles every message), without the start-up
+// checks that need a database and its settings. The roles web and worker configure the PostgreSQL transport, which needs a
+// connection setting; it is never used: Wolverine's message storage and external transports are switched off, and its endpoints and
+// routing stay as configured.
+internal sealed class ComposedApplication(string role = "all") : WebApplicationFactory<Program>
 {
+    private const string UnusedConnection = "Host=localhost;Database=unused;Username=unused;Password=unused";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Development);
-        builder.UseSetting("Host:Role", "all");
+        builder.UseSetting("Host:Role", role);
+        if (role != "all")
+        {
+            builder.UseSetting("ConnectionStrings:Database", UnusedConnection);
+        }
+
         builder.ConfigureTestServices(services =>
         {
             services
@@ -23,6 +33,11 @@ internal sealed class ComposedApplication : WebApplicationFactory<Program>
                 .ToList()
                 .ForEach(check => services.Remove(check));
             services.RemoveAll<IStartupValidator>();
+            if (role != "all")
+            {
+                services.DisableAllExternalWolverineTransports();
+                services.DisableAllWolverineMessagePersistence();
+            }
         });
     }
 }

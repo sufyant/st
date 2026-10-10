@@ -150,8 +150,9 @@ These ten rules come from a spike. The spike is in `apps/api/spikes/WolverineRls
 | S8 | Only one message is handled for the same saga at a time. The version number on the record protects this | Fowler, PoEAA Chapter 16 |
 | S9 | A transient failure is tried a limited number of times. Then compensation starts. If compensation also fails, the saga goes to the "needs attention" state and raises an alert | Nygard, Chapter 5 |
 | S10 | Each wait has a timeout | Nygard, Chapter 5 (Timeouts) |
-| S11 | Until the process ends, the related record shows the "provisioning" state | Richardson, Chapter 4 (semantic lock) |
+| S11 | Until the pivot, the tenant shows the "provisioning" state | Richardson, Chapter 4 (semantic lock) |
 | S12 | The saga class is unit tested without a host. The saga does not call external services. It only decides and returns messages | Khorikov, Chapter 7 |
+| S13 | A saga shares no message with another handler. It hears its steps through replies and faults sent to it, not through events meant for other modules. A test enforces it | Richardson, Chapter 4 (command and reply). Wolverine runs a saga alone at the endpoint its message arrives on |
 
 "Tenant is provisioning" and "tenant is active" are the tenant's own business state and stay in its status. Step tracking and retry counts are not put in the status. They stay in the saga record.
 
@@ -193,15 +194,15 @@ A tenant has two descriptive fields. `name` is free text, cannot be empty, has a
 | R1 | Each table that belongs to a tenant has `tenant_id`. RLS is enabled and forced | Golding, Chapters 8 and 9 |
 | R2 | The application account is not the table owner and cannot bypass RLS | Golding, Chapter 9. OWASP (least privilege) |
 | R3 | Migrations run with a separate account. That account is not used at run time | Twelve-Factor, Factor XII |
-| R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted. A transaction declares a tenant or a user, never both. | PostgreSQL connection pool behaviour |
+| R4 | The tenant is declared at the start of each transaction. A connection-level setting is not permitted. A transaction declares a tenant or a user, never both. A transaction declares one tenant only. | PostgreSQL connection pool behaviour |
 | R5 | If the tenant is not declared, a query returns no data | Nygard, Chapter 5 (Fail Fast) |
 | R6 | Tables without a tenant are on an explicit list. A test checks every table | Ford, Parsons, Kua, Chapter 2 |
 | R7 | There are only two database accounts: migration and application. Running code has no path that bypasses RLS | Golding, Chapter 9 |
 | R8 | A background handler gets the tenant from the message and declares it in the same way | Requirement 7 |
 | R9 | Each tenant table is tested with real PostgreSQL: read, update, insert for another tenant | Khorikov, Chapter 10 |
-| R10 | At startup the application checks its own account. If the account is a table owner or can bypass RLS, the application does not start | Nygard, Chapter 5 (Fail Fast) |
+| R10 | At startup the application checks its own account. If the account, or a role it is a member of, is a superuser, can bypass RLS or owns a table, the application does not start. The readiness check asks the same. | Nygard, Chapter 5 (Fail Fast). PostgreSQL documentation, Privileges |
 | R11 | The membership table has one more policy, `own_memberships`: `FOR SELECT` only, on `user_id` = the declared user (`app.user_id`, set in the transaction like the tenant). It serves `GET /v1/me/tenants`. Any policy other than `tenant_isolation` must be on an explicit list, and a test fails on any other | Postgres combines permissive policies with OR. A write policy would widen access |
-| R12 | The system admin sees tenant and member counts from ControlPlane's own summary data | Golding, Chapter 2 |
+| R12 | Deferred with the tenant list for the system admin (see Deferred): the system admin sees tenant and member counts from ControlPlane's own summary data | Golding, Chapter 2 |
 
 Work across tenants goes through the tenant list and declares each tenant in turn. RLS does not protect a cache or data that leaves the database. An EF Core query filter is not added as a second layer. RLS is the single source of truth.
 
@@ -234,35 +235,35 @@ Source: Golding, Chapter 2 (control plane). Khononov, Chapter 3 (when you are no
 
 ### Tenant onboarding process
 
-The process is a saga. Four steps run in order.
+The process is a saga. Three steps run in order.
 
-1. ControlPlane writes two rows in one transaction: the tenant ("provisioning") and the Owner invitation. Compensatable.
-2. The identity service is told "this email can sign up". The invitation link is created here. Compensatable.
-3. The tenant becomes "active". Pivot.
-4. Notifications sends the invitation email. Retried until it succeeds.
+1. ControlPlane writes the tenant ("provisioning"), the Owner invitation and the saga record in one transaction. The invitation code and its link are created here. Compensatable.
+2. The tenant becomes "active". Pivot.
+3. Notifications sends the invitation email. It is tried a limited number of times, with growing pauses.
+
+The Owner signs up with the identity provider like any other user. The onboarding creates nothing in the identity provider.
 
 Onboarding messages:
 
 | Message | Sent by | Handled by | Handler has a transaction |
 | --- | --- | --- | --- |
 | `StartTenantOnboarding` | `POST /v1/system/tenants` | ControlPlane, `StartTenantOnboardingHandler` (step 1, starts the saga) | Yes |
-| `RegisterOwnerWithIdentityProvider` | Step 1 | ControlPlane, `RegisterOwnerWithIdentityProviderHandler` (step 2, calls Clerk) | No |
-| `RegistrationTimedOut` | Step 1, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
-| `OwnerRegistered` | Step 2 | ControlPlane, `TenantOnboarding` saga | Yes |
-| `ActivateTenant` | Saga | ControlPlane, `ActivateTenantHandler` (step 3, pivot) | Yes |
-| `TenantActivated` | Step 3 | Audit, `RecordTenantCreatedHandler`; ControlPlane, `TenantOnboarding` saga | Yes, each its own |
-| `OwnerInvitationReady` | Step 3 | Notifications, `SendOwnerInvitationHandler` (step 4, calls the email service) | No |
+| `ActivateTenant` | Step 1 | ControlPlane, `ActivateTenantHandler` (step 2, pivot) | Yes |
+| `ActivationTimedOut` | Step 1, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
+| `TenantActivated` | Step 2 | Audit, `RecordTenantCreatedHandler` | Yes |
+| `TenantActivationCompleted` | Step 2 | ControlPlane, `TenantOnboarding` saga | Yes |
+| `OwnerInvitationReady` | Step 2 | Notifications, `SendOwnerInvitationHandler` (step 3, calls the email service) | No |
 | `InvitationEmailTimedOut` | Saga, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
-| `InvitationEmailSent` | Step 4 | ControlPlane, `TenantOnboarding` saga | Yes |
+| `InvitationEmailSent` | Step 3 | ControlPlane, `TenantOnboarding` saga | Yes |
 | `CancelTenant` | Saga | ControlPlane, `CancelTenantHandler` (compensation) | Yes |
 | `TenantCancelled` | `CancelTenantHandler` | ControlPlane, `TenantOnboarding` saga | Yes |
-| `RevokeOwnerRegistration` | Saga | ControlPlane, `RevokeOwnerRegistrationHandler` (compensation, calls Clerk) | No |
+| `CancellationTimedOut` | Saga, scheduled | ControlPlane, `TenantOnboarding` saga | Yes |
 | `CancelInvitation` | Saga | ControlPlane, `CancelInvitationHandler` (compensation) | Yes |
 | `RaiseOnboardingAlarm` | Saga | ControlPlane, `OnboardingAlarmHandler` | No |
 | `Fault<T>` of a step or a compensation | Wolverine, when the message goes to the dead letter queue | ControlPlane, `TenantOnboarding` saga | Yes |
 
-- If step 2 or step 3 fails, the tenant is cancelled. A reason code is stored on the tenant and logged. No endpoint shows it yet: the tenant list for the system admin is deferred.
-- If step 4 always fails, the tenant stays active and the process goes to the "needs attention" state. The invitation is cancelled.
+- If step 2 fails for good, the tenant is cancelled. A reason code is stored on the tenant and logged. No endpoint shows it yet: the tenant list for the system admin is deferred.
+- If step 3 fails for good, or a wait after step 1 times out, the process goes to "needs attention" and the invitation is cancelled. The alarm is raised once.
 - The invitation link travels to Notifications inside the message. See the deviations list.
 - The invitation link carries one invitation code: the tenant id and a secret, `<tenantId>.<secret>`. Only the hash of the secret is stored. Accepting declares the tenant from the code, then finds the invitation by the hash in that tenant. A wrong tenant, a wrong secret and a malformed code all answer 404. This is the only place where a request names its tenant outside the path. The secret gives the right, not the tenant id.
 - Accepting an invitation needs two things: the secret in the code, and a verified email address of the signed-in user that is the same as the invited address. The verified addresses come from the identity provider's server, not from the request.
@@ -299,7 +300,7 @@ Source: Twelve-Factor, Factor III. Nygard, Chapter 5 (Fail Fast).
 | Situation | Rule | Source |
 | --- | --- | --- |
 | An external service does not answer | Each external call has a time limit | Nygard, Chapter 5 (Timeouts) |
-| An external service is down for a long time | The gap between tries grows. When the limit is reached, the process goes to "needs attention" | Nygard, Chapter 5 |
+| An external service is down for a long time | The gap between tries grows. When the limit is reached, the step fails for good: the saga compensates, or goes to "needs attention" | Nygard, Chapter 5 |
 | The same request arrives twice | The tenant creation request carries an idempotency key. The second request does not create a new tenant | Hohpe and Woolf, Chapter 10 |
 | A pod is shutting down | The pod takes no new work and finishes the work it has | Twelve-Factor, Factor IX |
 | The health of a pod is not known | There are two check endpoints: "I am up" and "I can reach the database" | Industry practice |
@@ -310,14 +311,14 @@ Source: Twelve-Factor, Factor III. Nygard, Chapter 5 (Fail Fast).
 | Attack | Protection | OWASP |
 | --- | --- | --- |
 | Another tenant's id is put in the path | Membership check and RLS | API1 |
-| A forged or expired token | Signature, expiry and issuer are verified on each request | API2 |
+| A forged or expired token | Signature, expiry and issuer are verified on each request. Only a session token is accepted: a token without the session's id (`sid`), such as a JWT template's token, is refused | API2 |
 | Extra fields are added to a request | An endpoint reads only the defined fields | API3 |
-| Too many requests | A rate limit for each user. Lists are paged and the page size has a limit | API4 |
+| Too many requests | A rate limit for each user, kept in each pod. Accepting an invitation has a stricter limit of its own. Lists are paged and the page size has a limit | API4 |
 | A tenant user calls a system endpoint | The system door checks the staff list | API5 |
-| Internal structure is read from an error message | The error response has one shape and returns no internal detail | API8 |
+| Internal structure is read from an error message | The error response has one shape and returns no internal detail. A 401 does not say why the token failed | API8 |
 | A browser request from another site | Only permitted origins can call | API8 |
 
-All business endpoints start with `/v1`. The only exception is the two health endpoints: `/health/live` and `/health/ready`. These endpoints serve the infrastructure, need no identity and return only "healthy" or "unhealthy". No detail is given to the outside.
+All business endpoints start with `/v1`. The only exception is the two health endpoints: `/health/live` and `/health/ready`. These endpoints serve the infrastructure, need no identity and return only "healthy" or "unhealthy". No detail is given to the outside. The readiness endpoint is for the platform. It is not routed from outside.
 
 ## 9. Testing
 
@@ -361,7 +362,9 @@ These deviations were discussed openly and approved.
 | The test name pattern is `Operation_Scenario_ExpectedOutcome` | Khorikov, Chapter 3: a plain sentence | Common in .NET. `Operation` is the name of the work |
 | The `Api` and `Application` projects see Wolverine types | Khononov, Chapter 8 (Ports and Adapters): business logic does not see the infrastructure tool, a port is between them | The only reason for our own interface was "what if the tool changes". There is no concrete limitation. `Domain` and `Contracts` stay clean |
 | Handler, saga, message and DbContext types are public | Ousterhout, Chapter 5: a module hides its internal detail | Wolverine compiles handler code in a separate assembly. Project references and the architecture test protect the module boundary |
-| The invitation link goes to Notifications inside the message | OWASP, Forgot Password Cheat Sheet: a token is stored only as a hash | The link cannot be produced again later. Protection: the verified email of the person who accepts must be the same as the invited address, the link is single use and expires, an invitation whose message goes to the dead letter queue is cancelled. If a strict audit requires it, change to a signed token |
+| The invitation link goes to Notifications inside the message | OWASP, Forgot Password Cheat Sheet: a token is stored only as a hash | The link cannot be produced again later. The secret travels in ActivateTenant and OwnerInvitationReady and stays in the messaging tables until Wolverine removes handled messages. Protection: the verified email of the person who accepts must be the same as the invited address, the link is single use and expires, and an invitation whose email does not go out is cancelled. If a strict audit requires it, change to a signed token |
+| The rate limit is kept in each pod | OWASP API4: a limit for each user | A shared store (Redis or the database) is infrastructure the first template does not need. The real limit is the setting times the number of pods |
+| In Development, email without an email service is written to the log, link included | OWASP Logging Cheat Sheet: secrets are not logged | Local development and the smoke run need the link without an email account. Outside Development the application does not start without the email service |
 
 ## Deferred
 
@@ -377,7 +380,7 @@ These parts are not in the first template. Each one comes in when its written co
 | Slug in addresses | The frontend wants the tenant name in the address. The slug field is ready. The API path continues to use the id |
 | Read model | A report appears that needs a join across modules |
 | Pre-generated handler code | Startup time becomes a problem or the RuntimeCompilation package is not wanted in production. Try it first |
-| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. `ConnectionStrings:Messaging` is needed when `ConnectionStrings:Database` goes through a pooler in transaction mode (example: Neon's pooled endpoint), because Wolverine's message store holds session-level advisory locks; it then names a direct or session-mode connection. These go into the setup list, not into the architecture |
+| Provider setup notes | Example: on Neon the application account is created with SQL. In Clerk the second factor is enabled and the first system admin enrolls a device. `ConnectionStrings:Messaging` is needed when `ConnectionStrings:Database` goes through a pooler in transaction mode (example: Neon's pooled endpoint), because Wolverine's message store holds session-level advisory locks; it then names a direct or session-mode connection. In Clerk, sign-up is open and email verification at sign-up is required; the Owner signs up like any user. ControlPlane:InvitationEmailTimeout must be longer than the Notifications retry delays together. These go into the setup list, not into the architecture |
 | Features | Member invitation, custom roles, member removal, tenant suspension and deletion, support access, in-app notifications, a second system admin, the tenant list for the system admin |
 
 ## Open items

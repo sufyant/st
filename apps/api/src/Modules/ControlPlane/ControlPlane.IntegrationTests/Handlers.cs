@@ -11,8 +11,7 @@ using Wolverine.Persistence;
 
 namespace ControlPlane.IntegrationTests;
 
-// The module's handlers, called in their tenant with the services Wolverine would pass them. A handler that calls a system we do
-// not own runs without a transaction, as Wolverine runs it.
+// The module's handlers, called in their tenant with the services Wolverine would pass them.
 internal static class Handlers
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -27,7 +26,7 @@ internal static class Handlers
         string ownerEmail) =>
         InTenant.RunAsync(services, tenantId, async scope =>
         {
-            var (result, onboarding, register, timeout) = await StartTenantOnboardingHandler.HandleAsync(
+            var (result, onboarding, activate, timeout) = await StartTenantOnboardingHandler.HandleAsync(
                 new StartTenantOnboarding(adminId, "Acme Ltd", slug, ownerEmail, Guid.NewGuid().ToString()),
                 scope.GetRequiredService<ITenantCatalog>(),
                 scope.GetRequiredService<InvitationSettings>(),
@@ -39,23 +38,17 @@ internal static class Handlers
                 scope.GetRequiredService<CatalogDbContext>().Add(onboarding.Entity);
             }
 
-            return new StartedOnboarding(result, onboarding, register, timeout);
+            return new StartedOnboarding(result, onboarding, activate, timeout);
         });
 
-    public static async Task<OwnerRegistered> RegisterOwnerAsync(IServiceProvider services, RegisterOwnerWithIdentityProvider step)
-    {
-        await using var scope = services.CreateAsyncScope();
-        return await RegisterOwnerWithIdentityProviderHandler.HandleAsync(step, scope.ServiceProvider.GetRequiredService<IIdentityProvider>(), Cancellation);
-    }
-
-    public static Task<(TenantActivated? Activated, OwnerInvitationReady? Ready)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
+    public static Task<(TenantActivationCompleted? Completed, TenantActivated? Activated, OwnerInvitationReady? Ready)> ActivateAsync(IServiceProvider services, Guid tenantId, ActivateTenant step) =>
         InTenant.RunAsync(services, tenantId, scope => ActivateTenantHandler.HandleAsync(
             step,
             scope.GetRequiredService<ITenantCatalog>(),
             scope.GetRequiredService<TimeProvider>(),
             Cancellation));
 
-    public static Task<TenantCancelled> CancelTenantAsync(IServiceProvider services, Guid tenantId, CancelTenant step) =>
+    public static Task<TenantCancelled?> CancelTenantAsync(IServiceProvider services, Guid tenantId, CancelTenant step) =>
         InTenant.RunAsync(services, tenantId, scope => CancelTenantHandler.HandleAsync(
             step,
             scope.GetRequiredService<ITenantCatalog>(),
@@ -65,22 +58,15 @@ internal static class Handlers
     public static Task CancelInvitationAsync(IServiceProvider services, Guid tenantId, CancelInvitation step) =>
         InTenant.RunAsync(services, tenantId, scope => CancelInvitationHandler.HandleAsync(step, scope.GetRequiredService<ITenantCatalog>(), Cancellation));
 
-    public static async Task RevokeOwnerRegistrationAsync(IServiceProvider services, RevokeOwnerRegistration step)
-    {
-        await using var scope = services.CreateAsyncScope();
-        await RevokeOwnerRegistrationHandler.HandleAsync(step, scope.ServiceProvider.GetRequiredService<IIdentityProvider>(), Cancellation);
-    }
-
-    // A tenant onboarded up to its pivot, the way the saga drives it: started, its first owner registered with the identity
-    // provider, and activated. Returns what the invitation email is sent from.
+    // A tenant onboarded up to its pivot, the way the saga drives it: started and activated. Returns what the invitation email is
+    // sent from.
     public static async Task<(Guid TenantId, string Slug, OwnerInvitationReady Ready)> OnboardAsync(IServiceProvider services, string ownerEmail)
     {
         var admin = await Catalog.AddUserAsync(services);
         var tenantId = Guid.CreateVersion7();
         var slug = Unique.Slug();
         var started = await StartOnboardingAsync(services, tenantId, admin.ExternalId, slug, ownerEmail);
-        var registered = await RegisterOwnerAsync(services, started.Register.ShouldNotBeNull().Message);
-        var (_, ready) = await ActivateAsync(services, tenantId, new ActivateTenant(tenantId, registered.InvitationId, registered.Link));
+        var (_, _, ready) = await ActivateAsync(services, tenantId, started.Activate.ShouldNotBeNull().Message);
 
         return (tenantId, slug, ready.ShouldNotBeNull());
     }
@@ -113,6 +99,6 @@ internal static class Handlers
     public sealed record StartedOnboarding(
         Result<TenantDetails> Result,
         Insert<TenantOnboarding>? Onboarding,
-        DeliveryMessage<RegisterOwnerWithIdentityProvider>? Register,
-        RegistrationTimedOut? Timeout);
+        DeliveryMessage<ActivateTenant>? Activate,
+        ActivationTimedOut? Timeout);
 }
