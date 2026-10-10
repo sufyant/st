@@ -113,7 +113,6 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
         {
             admin.HasKey(a => a.UserId);
             admin.HasOne<User>().WithOne().HasForeignKey<SystemAdmin>(a => a.UserId);
-            admin.HasOne<User>().WithMany().HasForeignKey(a => a.GrantedBy).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -54,8 +54,8 @@ internal sealed class SystemAdminDirectory(
             person AS (
                 SELECT id FROM added
                 UNION ALL SELECT id FROM catalog.users WHERE external_id = {externalUserId})
-            INSERT INTO catalog.system_admins (user_id, granted_by, granted_at)
-            SELECT id, NULL, {now} FROM person
+            INSERT INTO catalog.system_admins (user_id, granted_at)
+            SELECT id, {now} FROM person
             WHERE NOT EXISTS (SELECT FROM catalog.system_admins)
             ON CONFLICT (user_id) DO NOTHING
             """,
