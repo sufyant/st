@@ -3,19 +3,25 @@ using Npgsql;
 namespace Api.Persistence;
 
 // R10: the application does not start as a role that row level security does not bind: a superuser, a role that bypasses it, or
-// the owner of a table, who can switch it off. Both of the application's connections are checked: the one requests use, and the
+// the owner of a table, who can switch it off. A member of such a role, directly or through other roles, has its rights or can
+// become it (PostgreSQL documentation, Privileges), so the role and every role it is a member of are checked. Both of the
+// application's connections are checked: the one requests use, and the
 // one Wolverine keeps its messages over, when it has one of its own. It runs before Wolverine starts. The migration step never starts
 // the host, so it runs as the owner without this check.
 internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHostedService
 {
+    // The connection's own role, and every role it is a member of.
     private const string RoleQuery =
         """
         SELECT
+            role.rolname,
+            role.rolname = current_user,
             role.rolsuper,
             role.rolbypassrls,
             EXISTS (SELECT FROM pg_class WHERE relowner = role.oid AND relkind IN ('r', 'p'))
         FROM pg_roles AS role
-        WHERE role.rolname = current_user
+        WHERE pg_has_role(current_user, role.oid, 'MEMBER')
+        ORDER BY role.rolname = current_user DESC, role.rolname
         """;
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -41,14 +47,19 @@ internal sealed class DatabaseAccountCheck(IConfiguration configuration) : IHost
     {
         await using var command = dataSource.CreateCommand(RoleQuery);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        await reader.ReadAsync(cancellationToken);
 
-        return
-        [
-            .. reader.GetBoolean(0) ? [$"the {connection} connection's role is a superuser"] : Array.Empty<string>(),
-            .. reader.GetBoolean(1) ? [$"the {connection} connection's role bypasses row level security"] : Array.Empty<string>(),
-            .. reader.GetBoolean(2) ? [$"the {connection} connection's role owns tables"] : Array.Empty<string>(),
-        ];
+        List<string> problems = [];
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var role = reader.GetBoolean(1) ? $"the {connection} connection's role" : $"the {connection} connection's role is a member of {reader.GetString(0)}, which";
+            problems.AddRange([
+                .. reader.GetBoolean(2) ? [$"{role} is a superuser"] : Array.Empty<string>(),
+                .. reader.GetBoolean(3) ? [$"{role} bypasses row level security"] : Array.Empty<string>(),
+                .. reader.GetBoolean(4) ? [$"{role} owns tables"] : Array.Empty<string>(),
+            ]);
+        }
+
+        return [.. problems];
     }
 
     private static async Task<string[]> ProblemsAsync(string key, string connectionString, CancellationToken cancellationToken)
