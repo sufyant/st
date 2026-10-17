@@ -158,6 +158,10 @@ public sealed class InviteMemberTests(Database database) : IAsyncLifetime
     [InlineData("""{ "email": "ada@example.com", "role": "Guest" }""")]
     [InlineData("""{ "email": "ada@example.com", "role": 7 }""")]
     [InlineData("""{ "email": "ada@example.com", "role": 0 }""")]
+    [InlineData("""{ "email": "ada@example.com", "role": "Owner, Admin" }""")]
+    [InlineData("""{ "email": "ada@example.com", "role": "Admin, Member" }""")]
+    [InlineData("""{ "email": "ada@example.com", "role": " Admin" }""")]
+    [InlineData("""{ "email": "ada@example.com", "role": "admin" }""")]
     public async Task InviteMember_WithoutAKnownRole_IsABadRequest(string body)
     {
         var tenant = await _catalog.AddTenantAsync();

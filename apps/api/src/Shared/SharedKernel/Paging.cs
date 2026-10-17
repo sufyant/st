@@ -1,7 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace SharedKernel;
 
@@ -146,23 +143,4 @@ public static class ListFilter
             ? value
             : Error.Validation(PagingErrorCodes.FilterInvalid, $"The filter {name} is one of: {string.Join(", ", ValuesOf<TValue>())}.");
     }
-}
-
-// The name of each member of an enum in JSON, as System.Text.Json writes it: the name the member declares, else its own name in camel
-// case. A sort field is so the name of its property in the response. The names are compared exactly.
-file static class JsonEnum<T>
-    where T : struct, Enum
-{
-    private static readonly (string Name, T Value)[] Members =
-    [
-        .. typeof(T).GetFields(BindingFlags.Public | BindingFlags.Static).Select(member => (
-            member.GetCustomAttribute<JsonStringEnumMemberNameAttribute>()?.Name ?? JsonNamingPolicy.CamelCase.ConvertName(member.Name),
-            (T)member.GetValue(null)!)),
-    ];
-
-    public static IReadOnlyList<string> Names { get; } = [.. Members.Select(member => member.Name)];
-
-    public static T First => Members[0].Value;
-
-    public static T? Find(string name) => Members.Where(member => member.Name == name).Select(member => (T?)member.Value).FirstOrDefault();
 }

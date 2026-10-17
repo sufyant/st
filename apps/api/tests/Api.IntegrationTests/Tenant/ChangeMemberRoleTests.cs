@@ -282,12 +282,16 @@ public sealed class ChangeMemberRoleTests(Database database) : IAsyncLifetime
         (await RoleOfAsync(tenant.Id, member)).ShouldBe("Member");
     }
 
-    // The role is required and is a name: a request without one, with an unknown one or with a number is refused, and never falls back
-    // to the enum's first value, Owner.
+    // The role is required and is its exact name: a request without one, with an unknown one, with a number, with a list of names, with
+    // spaces or in another case is refused, and never falls back to the enum's first value, Owner.
     [Theory]
     [InlineData("{}")]
     [InlineData("""{ "role": "Root" }""")]
     [InlineData("""{ "role": 0 }""")]
+    [InlineData("""{ "role": "Owner, Admin" }""")]
+    [InlineData("""{ "role": "Admin, Member" }""")]
+    [InlineData("""{ "role": " Admin" }""")]
+    [InlineData("""{ "role": "admin" }""")]
     public async Task ChangeMemberRole_WithoutAValidRole_IsABadRequestAndKeepsTheRole(string body)
     {
         var tenant = await _catalog.AddTenantAsync();

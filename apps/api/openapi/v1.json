@@ -3331,7 +3331,6 @@
           "tr",
           "ar"
         ],
-        "type": "string",
         "description": "A language the web speaks, by its BCP 47 language tag."
       },
       "ListPageOfInvitationResponse": {

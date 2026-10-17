@@ -469,7 +469,7 @@ export interface components {
         JsonElement: unknown;
         /**
          * @description A language the web speaks, by its BCP 47 language tag.
-         * @enum {string}
+         * @enum {unknown}
          */
         Language: "en" | "tr" | "ar";
         ListPageOfInvitationResponse: {
